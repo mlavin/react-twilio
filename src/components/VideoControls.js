@@ -12,7 +12,7 @@ let showBar = require('../images/showBar.png');
 class VideoControls extends Component {
     constructor(props) {
         super(props);
-        this.state = { localAudioMute: false, localCameraDisabled: false };
+        this.state = { localAudioMute: true, localCameraDisabled: true };
         this.videoControlStyle = {
             height: '50px', width: '100%',
             position: 'absolute', bottom: '0%'

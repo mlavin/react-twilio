@@ -31381,7 +31381,7 @@ var TwilioAudio = function (_Component) {
 
         _this.state = {};
         _this.alreadyAdded = [];
-        _this.mute = false;
+        _this.mute = true;
         return _this;
     }
 
@@ -31872,7 +31872,7 @@ var VideoControls = function (_Component) {
 
         var _this = _possibleConstructorReturn(this, (VideoControls.__proto__ || Object.getPrototypeOf(VideoControls)).call(this, props));
 
-        _this.state = { localAudioMute: false, localCameraDisabled: false };
+        _this.state = { localAudioMute: true, localCameraDisabled: true };
         _this.videoControlStyle = {
             height: '50px', width: '100%',
             position: 'absolute', bottom: '0%'
