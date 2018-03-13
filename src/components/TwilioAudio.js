@@ -9,7 +9,7 @@ class TwilioAudio extends Component {
 
         };
         this.alreadyAdded = [];
-        this.mute = false;
+        this.mute = true;
     }
 
     componentDidMount() {
