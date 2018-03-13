@@ -9,7 +9,7 @@ class TwilioVideo extends Component {
 
         };
         this.alreadyAdded = [];
-        this.cameraDisabled = false;
+        this.cameraDisabled = true;
     }
 
     componentWillMount() {
