@@ -51,7 +51,7 @@ class TwilioConnectionManager extends Component {
         //throw new Error();
         Video.createLocalTracks({
           audio: true,
-          video: true, // TODO: try with video: false
+          video: false, // TODO: try with video: false
         }).then((localTrack) => {
             this.localTrack = localTrack;
             Video
