@@ -31799,8 +31799,6 @@ var TwilioSecondaryParticipants = function (_Component) {
     }, {
         key: 'render',
         value: function render() {
-            var _newStyle;
-
             var _props2 = this.props,
                 participants = _props2.participants,
                 remote = _props2.remote,
@@ -31808,7 +31806,7 @@ var TwilioSecondaryParticipants = function (_Component) {
                 style = _props2.style,
                 hideClick = _props2.hideClick;
 
-            var newStyle = (_newStyle = { bottom: '0px', height: '20%', width: '100%', position: 'absolute' }, _defineProperty(_newStyle, 'bottom', '13%'), _defineProperty(_newStyle, 'display', 'none'), _newStyle);
+            var newStyle = _defineProperty({ bottom: '0px', height: '20%', width: '100%', position: 'absolute' }, 'bottom', '13%');
             return _react2.default.createElement(
                 'div',
                 { style: _extends({}, newStyle) },
@@ -31915,7 +31913,9 @@ var VideoControls = function (_Component) {
             var _state = this.state,
                 localAudioMute = _state.localAudioMute,
                 localCameraDisabled = _state.localCameraDisabled;
-            var disconnectCall = this.props.disconnectCall;
+            var _props = this.props,
+                disconnectCall = _props.disconnectCall,
+                showBarFunc = _props.showBar;
 
             var controlChildStyle = { margin: '13%', width: '30px', height: '30px' };
             var imageWrapperStryle = this.imageWrapperStryle;
@@ -31949,6 +31949,13 @@ var VideoControls = function (_Component) {
                     _react2.default.createElement('img', { style: controlChildStyle, onClick: function onClick() {
                             disconnectCall();
                         }, src: disconnect })
+                ),
+                _react2.default.createElement(
+                    'div',
+                    { style: imageWrapperStryle },
+                    _react2.default.createElement('img', { style: controlChildStyle, onClick: function onClick() {
+                            showBarFunc();
+                        }, src: showBar })
                 )
             );
         }

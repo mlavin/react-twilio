@@ -22,7 +22,7 @@ class TwilioSecondaryParticipants extends Component {
 
     render() {
         let { participants, remote, onVideoClick, style, hideClick } = this.props;
-        let newStyle = { bottom: '0px', height: '20%', width: '100%', position: 'absolute', bottom: '13%', display:'none' }
+        let newStyle = { bottom: '0px', height: '20%', width: '100%', position: 'absolute', bottom: '13%' }
         return (
             <div style={{ ...newStyle }}>
                 {

@@ -32,7 +32,7 @@ class VideoControls extends Component {
 
     render() {
         let { localAudioMute, localCameraDisabled } = this.state;
-        let { disconnectCall } = this.props;
+        let { disconnectCall, showBar: showBarFunc } = this.props;
         let controlChildStyle = { margin: '13%', width: '30px', height: '30px' }
         let { imageWrapperStryle } = this;
         return (
@@ -54,6 +54,12 @@ class VideoControls extends Component {
                         disconnectCall();
                     }} src={disconnect} />
                 </div>
+                <div style={imageWrapperStryle}>
+                    <img style={controlChildStyle} onClick={() => {
+                        showBarFunc();
+                    }} src={showBar} />
+                </div>
+
             </div>
         )
     }
