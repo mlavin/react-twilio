@@ -31567,7 +31567,7 @@ var TwilioConnectionManager = function (_Component) {
             //throw new Error();
             Video.createLocalTracks({
                 audio: true,
-                video: false // TODO: try with video: false
+                video: true // TODO: try with video: false
             }).then(function (localTrack) {
                 _this2.localTrack = localTrack;
                 Video.connect(token, { name: roomName, track: localTrack }).then(function (room) {
