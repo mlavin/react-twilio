@@ -9,7 +9,7 @@ class TwilioAudio extends Component {
 
         };
         this.alreadyAdded = [];
-        this.mute = true;
+        this.mute = props.mute;
     }
 
     componentDidMount() {
@@ -19,7 +19,7 @@ class TwilioAudio extends Component {
     componentWillReceiveProps(nextProps) {
         let { mute, tracks } = nextProps;
         if (mute != this.mute) {
-            this.toggleAudioTrack(tracks);
+            //this.toggleAudioTrack(tracks);
         }
     }
 

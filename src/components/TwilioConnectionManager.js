@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import TwilioRemoteAndLocalHolder from './TwilioRemoteAndLocalHolder';
 import propTypes from 'prop-types';
 const Video = require('twilio-video');
+const getUserMedia = require('@twilio/webrtc').getUserMedia;
 
 class TwilioConnectionManager extends Component {
     constructor(props) {
@@ -26,6 +27,13 @@ class TwilioConnectionManager extends Component {
     componentWillUnMount() {
         //dispose off Video Component
         this.disconnectCall();
+
+        getUserMedia({
+            audio: true,
+            video: true,
+        }).then(stream => {
+            stream.getTracks().forEach(track => track.stop());
+        });
     }
 
     componentWillReceiveProps(nextProps) {
@@ -41,7 +49,10 @@ class TwilioConnectionManager extends Component {
 
         this.token = token;
         //throw new Error();
-        Video.createLocalTracks().then((localTrack) => {
+        Video.createLocalTracks({
+          audio: true,
+          video: true, // TODO: try with video: false
+        }).then((localTrack) => {
             this.localTrack = localTrack;
             Video
                 .connect(token, { name: roomName, track: localTrack })

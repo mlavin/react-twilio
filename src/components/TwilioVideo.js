@@ -16,7 +16,8 @@ class TwilioVideo extends Component {
         let { tracks, remote } = this.props;
         if (!remote) {
             tracks.filter(track => !track.isAudio).forEach((track) => {
-                track.enable();
+                // track.enable() not a function
+                //track.enable();
             });
         }
     }
@@ -37,7 +38,7 @@ class TwilioVideo extends Component {
         let { tracks, remote } = this.props;
         if (!remote) {
             tracks.filter(track => !track.isAudio).forEach((track) => {
-                track.disable();
+                track.stop();
             });
         }
     }

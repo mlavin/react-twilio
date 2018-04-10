@@ -64,7 +64,7 @@ module.exports =
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 179);
+/******/ 	return __webpack_require__(__webpack_require__.s = 182);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -786,7 +786,7 @@ function isPrimitive(arg) {
 }
 exports.isPrimitive = isPrimitive;
 
-exports.isBuffer = __webpack_require__(338);
+exports.isBuffer = __webpack_require__(349);
 
 function objectToString(o) {
   return Object.prototype.toString.call(o);
@@ -830,7 +830,7 @@ exports.log = function() {
  *     prototype.
  * @param {function} superCtor Constructor function to inherit prototype from.
  */
-exports.inherits = __webpack_require__(337);
+exports.inherits = __webpack_require__(348);
 
 exports._extend = function(origin, add) {
   // Don't do anything if add isn't an object
@@ -1101,15 +1101,35 @@ function difference(list1, list2) {
 }
 
 /**
+ * Filter out the keys in an object with a given value.
+ * @param {object} object - Object to be filtered
+ * @param {*} [filterValue] - Value to be filtered out; If not specified, then
+ *   filters out all keys which have an explicit value of "undefined"
+ * @returns {object} - Filtered object
+ */
+function filterObject(object, filterValue) {
+  return Object.keys(object).reduce(function(filtered, key) {
+    if (object[key] !== filterValue) {
+      filtered[key] = object[key];
+    }
+    return filtered;
+  }, {});
+}
+
+/**
  * Map a list to an array of arrays, and return the flattened result.
  * @param {Array<*>|Set<*>|Map<*>} list
- * @param {function(*): Array<*>} mapFn
+ * @param {function(*): Array<*>} [mapFn]
  * @returns Array<*>
  */
 function flatMap(list, mapFn) {
   var listArray = list instanceof Map || list instanceof Set
     ? Array.from(list.values())
     : list;
+
+  mapFn = mapFn || function mapFn(item) {
+    return item;
+  };
 
   return listArray.reduce(function(flattened, item) {
     var mapped = mapFn(item);
@@ -1417,6 +1437,7 @@ exports.asLocalTrack = asLocalTrack;
 exports.asLocalTrackPublication = asLocalTrackPublication;
 exports.capitalize = capitalize;
 exports.difference = difference;
+exports.filterObject = filterObject;
 exports.flatMap = flatMap;
 exports.guessBrowser = guessBrowser;
 exports.makeClientSIPURI = makeClientSIPURI;
@@ -1549,8 +1570,8 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 
 var _prodInvariant = __webpack_require__(4);
 
-var DOMProperty = __webpack_require__(18);
-var ReactDOMComponentFlags = __webpack_require__(89);
+var DOMProperty = __webpack_require__(21);
+var ReactDOMComponentFlags = __webpack_require__(90);
 
 var invariant = __webpack_require__(2);
 
@@ -2177,7 +2198,7 @@ function isUndefined(arg) {
 
 
 
-var _prodInvariant = __webpack_require__(27);
+var _prodInvariant = __webpack_require__(28);
 
 var ReactCurrentOwner = __webpack_require__(15);
 
@@ -2607,7 +2628,7 @@ module.exports = emptyFunction;
 var debugTool = null;
 
 if (process.env.NODE_ENV !== 'production') {
-  var ReactDebugTool = __webpack_require__(228);
+  var ReactDebugTool = __webpack_require__(231);
   debugTool = ReactDebugTool;
 }
 
@@ -2632,10 +2653,10 @@ module.exports = { debugTool: debugTool };
 var _prodInvariant = __webpack_require__(4),
     _assign = __webpack_require__(6);
 
-var CallbackQueue = __webpack_require__(87);
-var PooledClass = __webpack_require__(23);
-var ReactFeatureFlags = __webpack_require__(92);
-var ReactReconciler = __webpack_require__(26);
+var CallbackQueue = __webpack_require__(88);
+var PooledClass = __webpack_require__(24);
+var ReactFeatureFlags = __webpack_require__(93);
+var ReactReconciler = __webpack_require__(27);
 var Transaction = __webpack_require__(40);
 
 var invariant = __webpack_require__(2);
@@ -2906,259 +2927,6 @@ module.exports = ReactCurrentOwner;
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-
-
-/**
- * Create a {@link Deferred}.
- * @returns {Deferred}
- */
-function defer() {
-  var deferred = {};
-  deferred.promise = new Promise(function(resolve, reject) {
-    deferred.resolve = resolve;
-    deferred.reject = reject;
-  });
-  return deferred;
-}
-
-/**
- * Copy a method from a `source` prototype onto a `wrapper` prototype. Invoking
- * the method on the `wrapper` prototype will invoke the corresponding method
- * on an instance accessed by `target`.
- * @param {object} source
- * @param {object} wrapper
- * @param {string} target
- * @param {string} methodName
- * @returns {undefined}
- */
-function delegateMethod(source, wrapper, target, methodName) {
-  if (methodName in wrapper) {
-    // Skip any methods already set.
-    return;
-  } else if (methodName.match(/^on[a-z]+$/)) {
-    // Skip EventHandlers (these are handled in the constructor).
-    return;
-  }
-
-  var type;
-  try {
-    type = typeof source[methodName];
-  } catch (error) {
-    // NOTE(mroberts): Attempting to check the type of non-function members
-    // on the prototype throws an error for some types.
-  }
-
-  if (type !== 'function') {
-    // Skip non-function members.
-    return;
-  }
-
-  /* eslint no-loop-func:0 */
-  wrapper[methodName] = function() {
-    return this[target][methodName].apply(this[target], arguments);
-  };
-}
-
-/**
- * Copy methods from a `source` prototype onto a `wrapper` prototype. Invoking
- * the methods on the `wrapper` prototype will invoke the corresponding method
- * on an instance accessed by `target`.
- * @param {object} source
- * @param {object} wrapper
- * @param {string} target
- * @returns {undefined}
- */
-function delegateMethods(source, wrapper, target) {
-  for (var methodName in source) {
-    delegateMethod(source, wrapper, target, methodName);
-  }
-}
-
-/**
- * Finds the items in list1 that are not in list2.
- * @param {Array<*>|Map<*>|Set<*>} list1
- * @param {Array<*>|Map<*>|Set<*>} list2
- * @returns {Set}
- */
-function difference(list1, list2) {
-  list1 = Array.isArray(list1) ? new Set(list1) : new Set(list1.values());
-  list2 = Array.isArray(list2) ? new Set(list2) : new Set(list2.values());
-
-  var difference = new Set();
-
-  list1.forEach(function(item) {
-    if (!list2.has(item)) {
-      difference.add(item);
-    }
-  });
-
-  return difference;
-}
-
-/**
- * Map a list to an array of arrays, and return the flattened result.
- * @param {Array<*>|Set<*>|Map<*>} list
- * @param {function(*): Array<*>} mapFn
- * @returns Array<*>
- */
-function flatMap(list, mapFn) {
-  var listArray = list instanceof Map || list instanceof Set
-    ? Array.from(list.values())
-    : list;
-
-  return listArray.reduce(function(flattened, item) {
-    var mapped = mapFn(item);
-    return flattened.concat(mapped);
-  }, []);
-}
-
-/**
- * Guess the browser.
- * @returns {?string} browser - "chrome", "firefox", "safari", or null
- */
-function guessBrowser() {
-  if (typeof webkitRTCPeerConnection !== 'undefined') {
-    return 'chrome';
-  } else if (typeof mozRTCPeerConnection !== 'undefined') {
-    return 'firefox';
-  } else if (typeof RTCPeerConnection !== 'undefined') {
-    if (typeof navigator !== 'undefined' && navigator.userAgent.match(/AppleWebKit\/(\d+)\./)) {
-      return 'safari';
-    }
-    // NOTE(mroberts): Could be Edge.
-  }
-  return null;
-}
-
-/**
- * Intercept an event that might otherwise be proxied on an EventTarget.
- * @param {EventTarget} target
- * @param {string} type
- * @returns {void}
- */
-function interceptEvent(target, type) {
-  var currentListener = null;
-  Object.defineProperty(target, 'on' + type, {
-    get: function() {
-      return currentListener;
-    },
-    set: function(newListener) {
-      if (currentListener) {
-        this.removeEventListener(type, currentListener);
-      }
-
-      if (typeof newListener === 'function') {
-        currentListener = newListener;
-        this.addEventListener(type, currentListener);
-      } else {
-        currentListener = null;
-      }
-    }
-  });
-}
-
-/**
- * This is a function for turning a Promise into the kind referenced in the
- * Legacy Interface Extensions section of the WebRTC spec.
- * @param {Promise<*>} promise
- * @param {function<*>} onSuccess
- * @param {function<Error>} onFailure
- * @returns {Promise<undefined>}
- */
-function legacyPromise(promise, onSuccess, onFailure) {
-  if (onSuccess) {
-    return promise.then(function(result) {
-      onSuccess(result);
-    }, function(error) {
-      onFailure(error);
-    });
-  }
-  return promise;
-}
-
-/**
- * Make a unique ID.
- * @return {string}
- */
-function makeUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0;
-    var v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-/**
- * For each property name on the `source` prototype, add getters and/or setters
- * to `wrapper` that proxy to `target`.
- * @param {object} source
- * @param {object} wrapper
- * @param {string} target
- * @returns {undefined}
- */
-function proxyProperties(source, wrapper, target) {
-  Object.getOwnPropertyNames(source).forEach(function(propertyName) {
-    proxyProperty(source, wrapper, target, propertyName);
-  });
-}
-
-/**
- * For the property name on the `source` prototype, add a getter and/or setter
- * to `wrapper` that proxies to `target`.
- * @param {object} source
- * @param {object} wrapper
- * @param {string} target
- * @param {string} propertyName
- * @returns {undefined}
- */
-function proxyProperty(source, wrapper, target, propertyName) {
-  if (propertyName in wrapper) {
-    // Skip any properties already set.
-    return;
-  } else if (propertyName.match(/^on[a-z]+$/)) {
-    Object.defineProperty(wrapper, propertyName, {
-      value: null,
-      writable: true
-    });
-
-    target.addEventListener(propertyName.slice(2), function() {
-      wrapper.dispatchEvent.apply(wrapper, arguments);
-    });
-
-    return;
-  }
-
-  Object.defineProperty(wrapper, propertyName, {
-    enumerable: true,
-    get: function() {
-      return target[propertyName];
-    }
-  });
-}
-
-/**
- * @typedef {object} Deferred
- * @property {Promise} promise
- * @property {function} reject
- * @property {function} resolve
- */
-
-exports.defer = defer;
-exports.delegateMethods = delegateMethods;
-exports.difference = difference;
-exports.flatMap = flatMap;
-exports.guessBrowser = guessBrowser;
-exports.interceptEvent = interceptEvent;
-exports.legacyPromise = legacyPromise;
-exports.makeUUID = makeUUID;
-exports.proxyProperties = proxyProperties;
-
-
-/***/ }),
-/* 17 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
 /* WEBPACK VAR INJECTION */(function(process) {/**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
@@ -3171,7 +2939,7 @@ exports.proxyProperties = proxyProperties;
 
 var _assign = __webpack_require__(6);
 
-var PooledClass = __webpack_require__(23);
+var PooledClass = __webpack_require__(24);
 
 var emptyFunction = __webpack_require__(12);
 var warning = __webpack_require__(3);
@@ -3430,220 +3198,7 @@ function getPooledWarningPropertyDefinition(propName, getVal) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 18 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- *
- */
-
-
-
-var _prodInvariant = __webpack_require__(4);
-
-var invariant = __webpack_require__(2);
-
-function checkMask(value, bitmask) {
-  return (value & bitmask) === bitmask;
-}
-
-var DOMPropertyInjection = {
-  /**
-   * Mapping from normalized, camelcased property names to a configuration that
-   * specifies how the associated DOM property should be accessed or rendered.
-   */
-  MUST_USE_PROPERTY: 0x1,
-  HAS_BOOLEAN_VALUE: 0x4,
-  HAS_NUMERIC_VALUE: 0x8,
-  HAS_POSITIVE_NUMERIC_VALUE: 0x10 | 0x8,
-  HAS_OVERLOADED_BOOLEAN_VALUE: 0x20,
-
-  /**
-   * Inject some specialized knowledge about the DOM. This takes a config object
-   * with the following properties:
-   *
-   * isCustomAttribute: function that given an attribute name will return true
-   * if it can be inserted into the DOM verbatim. Useful for data-* or aria-*
-   * attributes where it's impossible to enumerate all of the possible
-   * attribute names,
-   *
-   * Properties: object mapping DOM property name to one of the
-   * DOMPropertyInjection constants or null. If your attribute isn't in here,
-   * it won't get written to the DOM.
-   *
-   * DOMAttributeNames: object mapping React attribute name to the DOM
-   * attribute name. Attribute names not specified use the **lowercase**
-   * normalized name.
-   *
-   * DOMAttributeNamespaces: object mapping React attribute name to the DOM
-   * attribute namespace URL. (Attribute names not specified use no namespace.)
-   *
-   * DOMPropertyNames: similar to DOMAttributeNames but for DOM properties.
-   * Property names not specified use the normalized name.
-   *
-   * DOMMutationMethods: Properties that require special mutation methods. If
-   * `value` is undefined, the mutation method should unset the property.
-   *
-   * @param {object} domPropertyConfig the config as described above.
-   */
-  injectDOMPropertyConfig: function (domPropertyConfig) {
-    var Injection = DOMPropertyInjection;
-    var Properties = domPropertyConfig.Properties || {};
-    var DOMAttributeNamespaces = domPropertyConfig.DOMAttributeNamespaces || {};
-    var DOMAttributeNames = domPropertyConfig.DOMAttributeNames || {};
-    var DOMPropertyNames = domPropertyConfig.DOMPropertyNames || {};
-    var DOMMutationMethods = domPropertyConfig.DOMMutationMethods || {};
-
-    if (domPropertyConfig.isCustomAttribute) {
-      DOMProperty._isCustomAttributeFunctions.push(domPropertyConfig.isCustomAttribute);
-    }
-
-    for (var propName in Properties) {
-      !!DOMProperty.properties.hasOwnProperty(propName) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'injectDOMPropertyConfig(...): You\'re trying to inject DOM property \'%s\' which has already been injected. You may be accidentally injecting the same DOM property config twice, or you may be injecting two configs that have conflicting property names.', propName) : _prodInvariant('48', propName) : void 0;
-
-      var lowerCased = propName.toLowerCase();
-      var propConfig = Properties[propName];
-
-      var propertyInfo = {
-        attributeName: lowerCased,
-        attributeNamespace: null,
-        propertyName: propName,
-        mutationMethod: null,
-
-        mustUseProperty: checkMask(propConfig, Injection.MUST_USE_PROPERTY),
-        hasBooleanValue: checkMask(propConfig, Injection.HAS_BOOLEAN_VALUE),
-        hasNumericValue: checkMask(propConfig, Injection.HAS_NUMERIC_VALUE),
-        hasPositiveNumericValue: checkMask(propConfig, Injection.HAS_POSITIVE_NUMERIC_VALUE),
-        hasOverloadedBooleanValue: checkMask(propConfig, Injection.HAS_OVERLOADED_BOOLEAN_VALUE)
-      };
-      !(propertyInfo.hasBooleanValue + propertyInfo.hasNumericValue + propertyInfo.hasOverloadedBooleanValue <= 1) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'DOMProperty: Value can be one of boolean, overloaded boolean, or numeric value, but not a combination: %s', propName) : _prodInvariant('50', propName) : void 0;
-
-      if (process.env.NODE_ENV !== 'production') {
-        DOMProperty.getPossibleStandardName[lowerCased] = propName;
-      }
-
-      if (DOMAttributeNames.hasOwnProperty(propName)) {
-        var attributeName = DOMAttributeNames[propName];
-        propertyInfo.attributeName = attributeName;
-        if (process.env.NODE_ENV !== 'production') {
-          DOMProperty.getPossibleStandardName[attributeName] = propName;
-        }
-      }
-
-      if (DOMAttributeNamespaces.hasOwnProperty(propName)) {
-        propertyInfo.attributeNamespace = DOMAttributeNamespaces[propName];
-      }
-
-      if (DOMPropertyNames.hasOwnProperty(propName)) {
-        propertyInfo.propertyName = DOMPropertyNames[propName];
-      }
-
-      if (DOMMutationMethods.hasOwnProperty(propName)) {
-        propertyInfo.mutationMethod = DOMMutationMethods[propName];
-      }
-
-      DOMProperty.properties[propName] = propertyInfo;
-    }
-  }
-};
-
-/* eslint-disable max-len */
-var ATTRIBUTE_NAME_START_CHAR = ':A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD';
-/* eslint-enable max-len */
-
-/**
- * DOMProperty exports lookup objects that can be used like functions:
- *
- *   > DOMProperty.isValid['id']
- *   true
- *   > DOMProperty.isValid['foobar']
- *   undefined
- *
- * Although this may be confusing, it performs better in general.
- *
- * @see http://jsperf.com/key-exists
- * @see http://jsperf.com/key-missing
- */
-var DOMProperty = {
-  ID_ATTRIBUTE_NAME: 'data-reactid',
-  ROOT_ATTRIBUTE_NAME: 'data-reactroot',
-
-  ATTRIBUTE_NAME_START_CHAR: ATTRIBUTE_NAME_START_CHAR,
-  ATTRIBUTE_NAME_CHAR: ATTRIBUTE_NAME_START_CHAR + '\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040',
-
-  /**
-   * Map from property "standard name" to an object with info about how to set
-   * the property in the DOM. Each object contains:
-   *
-   * attributeName:
-   *   Used when rendering markup or with `*Attribute()`.
-   * attributeNamespace
-   * propertyName:
-   *   Used on DOM node instances. (This includes properties that mutate due to
-   *   external factors.)
-   * mutationMethod:
-   *   If non-null, used instead of the property or `setAttribute()` after
-   *   initial render.
-   * mustUseProperty:
-   *   Whether the property must be accessed and mutated as an object property.
-   * hasBooleanValue:
-   *   Whether the property should be removed when set to a falsey value.
-   * hasNumericValue:
-   *   Whether the property must be numeric or parse as a numeric and should be
-   *   removed when set to a falsey value.
-   * hasPositiveNumericValue:
-   *   Whether the property must be positive numeric or parse as a positive
-   *   numeric and should be removed when set to a falsey value.
-   * hasOverloadedBooleanValue:
-   *   Whether the property can be used as a flag as well as with a value.
-   *   Removed when strictly equal to false; present without a value when
-   *   strictly equal to true; present with a value otherwise.
-   */
-  properties: {},
-
-  /**
-   * Mapping from lowercase property names to the properly cased version, used
-   * to warn in the case of missing properties. Available only in __DEV__.
-   *
-   * autofocus is predefined, because adding it to the property whitelist
-   * causes unintended side effects.
-   *
-   * @type {Object}
-   */
-  getPossibleStandardName: process.env.NODE_ENV !== 'production' ? { autofocus: 'autoFocus' } : null,
-
-  /**
-   * All of the isCustomAttribute() functions that have been injected.
-   */
-  _isCustomAttributeFunctions: [],
-
-  /**
-   * Checks whether a property name is a custom attribute.
-   * @method
-   */
-  isCustomAttribute: function (attributeName) {
-    for (var i = 0; i < DOMProperty._isCustomAttributeFunctions.length; i++) {
-      var isCustomAttributeFn = DOMProperty._isCustomAttributeFunctions[i];
-      if (isCustomAttributeFn(attributeName)) {
-        return true;
-      }
-    }
-    return false;
-  },
-
-  injection: DOMPropertyInjection
-};
-
-module.exports = DOMProperty;
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
-
-/***/ }),
-/* 19 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3898,7 +3453,7 @@ module.exports = Log;
 
 
 /***/ }),
-/* 20 */
+/* 18 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3908,7 +3463,7 @@ module.exports = Log;
 
 
 var inherits = __webpack_require__(1).inherits;
-var TwilioError = __webpack_require__(329);
+var TwilioError = __webpack_require__(339);
 var TwilioErrorByCode = {};
 
 /**
@@ -4691,13 +4246,7 @@ Object.defineProperty(TwilioErrorByCode, 53501, { value: ConfigurationAcquireTur
 
 
 /***/ }),
-/* 21 */
-/***/ (function(module, exports) {
-
-module.exports = require("react");
-
-/***/ }),
-/* 22 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4708,35 +4257,35 @@ var WebRTC = {};
 Object.defineProperties(WebRTC, {
   getStats: {
     enumerable: true,
-    value: __webpack_require__(166)
+    value: __webpack_require__(170)
   },
   getUserMedia: {
     enumerable: true,
-    value: __webpack_require__(167)
+    value: __webpack_require__(171)
   },
   MediaStream: {
     enumerable: true,
-    value: __webpack_require__(76)
+    value: __webpack_require__(77)
   },
   MediaStreamTrack: {
     enumerable: true,
-    value: __webpack_require__(168)
+    value: __webpack_require__(172)
   },
   RTCIceCandidate: {
     enumerable: true,
-    value: __webpack_require__(169)
+    value: __webpack_require__(173)
   },
   RTCPeerConnection: {
     enumerable: true,
-    value: __webpack_require__(172)
+    value: __webpack_require__(176)
   },
   RTCSessionDescription: {
     enumerable: true,
-    value: __webpack_require__(174)
+    value: __webpack_require__(178)
   },
   version: {
     enumerable: true,
-    value: __webpack_require__(176).version
+    value: __webpack_require__(179).version
   }
 });
 
@@ -4744,7 +4293,763 @@ module.exports = WebRTC;
 
 
 /***/ }),
+/* 20 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Create a {@link Deferred}.
+ * @returns {Deferred}
+ */
+function defer() {
+  var deferred = {};
+  deferred.promise = new Promise(function(resolve, reject) {
+    deferred.resolve = resolve;
+    deferred.reject = reject;
+  });
+  return deferred;
+}
+
+/**
+ * Copy a method from a `source` prototype onto a `wrapper` prototype. Invoking
+ * the method on the `wrapper` prototype will invoke the corresponding method
+ * on an instance accessed by `target`.
+ * @param {object} source
+ * @param {object} wrapper
+ * @param {string} target
+ * @param {string} methodName
+ * @returns {undefined}
+ */
+function delegateMethod(source, wrapper, target, methodName) {
+  if (methodName in wrapper) {
+    // Skip any methods already set.
+    return;
+  } else if (methodName.match(/^on[a-z]+$/)) {
+    // Skip EventHandlers (these are handled in the constructor).
+    return;
+  }
+
+  var type;
+  try {
+    type = typeof source[methodName];
+  } catch (error) {
+    // NOTE(mroberts): Attempting to check the type of non-function members
+    // on the prototype throws an error for some types.
+  }
+
+  if (type !== 'function') {
+    // Skip non-function members.
+    return;
+  }
+
+  /* eslint no-loop-func:0 */
+  wrapper[methodName] = function() {
+    return this[target][methodName].apply(this[target], arguments);
+  };
+}
+
+/**
+ * Copy methods from a `source` prototype onto a `wrapper` prototype. Invoking
+ * the methods on the `wrapper` prototype will invoke the corresponding method
+ * on an instance accessed by `target`.
+ * @param {object} source
+ * @param {object} wrapper
+ * @param {string} target
+ * @returns {undefined}
+ */
+function delegateMethods(source, wrapper, target) {
+  for (var methodName in source) {
+    delegateMethod(source, wrapper, target, methodName);
+  }
+}
+
+/**
+ * Finds the items in list1 that are not in list2.
+ * @param {Array<*>|Map<*>|Set<*>} list1
+ * @param {Array<*>|Map<*>|Set<*>} list2
+ * @returns {Set}
+ */
+function difference(list1, list2) {
+  list1 = Array.isArray(list1) ? new Set(list1) : new Set(list1.values());
+  list2 = Array.isArray(list2) ? new Set(list2) : new Set(list2.values());
+
+  var difference = new Set();
+
+  list1.forEach(function(item) {
+    if (!list2.has(item)) {
+      difference.add(item);
+    }
+  });
+
+  return difference;
+}
+
+/**
+ * Map a list to an array of arrays, and return the flattened result.
+ * @param {Array<*>|Set<*>|Map<*>} list
+ * @param {function(*): Array<*>} mapFn
+ * @returns Array<*>
+ */
+function flatMap(list, mapFn) {
+  var listArray = list instanceof Map || list instanceof Set
+    ? Array.from(list.values())
+    : list;
+
+  return listArray.reduce(function(flattened, item) {
+    var mapped = mapFn(item);
+    return flattened.concat(mapped);
+  }, []);
+}
+
+/**
+ * Guess the browser.
+ * @returns {?string} browser - "chrome", "firefox", "safari", or null
+ */
+function guessBrowser() {
+  if (typeof webkitRTCPeerConnection !== 'undefined') {
+    return 'chrome';
+  } else if (typeof mozRTCPeerConnection !== 'undefined') {
+    return 'firefox';
+  } else if (typeof RTCPeerConnection !== 'undefined') {
+    if (typeof navigator !== 'undefined' && navigator.userAgent.match(/AppleWebKit\/(\d+)\./)) {
+      return 'safari';
+    }
+    // NOTE(mroberts): Could be Edge.
+  }
+  return null;
+}
+
+/**
+ * Intercept an event that might otherwise be proxied on an EventTarget.
+ * @param {EventTarget} target
+ * @param {string} type
+ * @returns {void}
+ */
+function interceptEvent(target, type) {
+  var currentListener = null;
+  Object.defineProperty(target, 'on' + type, {
+    get: function() {
+      return currentListener;
+    },
+    set: function(newListener) {
+      if (currentListener) {
+        this.removeEventListener(type, currentListener);
+      }
+
+      if (typeof newListener === 'function') {
+        currentListener = newListener;
+        this.addEventListener(type, currentListener);
+      } else {
+        currentListener = null;
+      }
+    }
+  });
+}
+
+/**
+ * This is a function for turning a Promise into the kind referenced in the
+ * Legacy Interface Extensions section of the WebRTC spec.
+ * @param {Promise<*>} promise
+ * @param {function<*>} onSuccess
+ * @param {function<Error>} onFailure
+ * @returns {Promise<undefined>}
+ */
+function legacyPromise(promise, onSuccess, onFailure) {
+  if (onSuccess) {
+    return promise.then(function(result) {
+      onSuccess(result);
+    }, function(error) {
+      onFailure(error);
+    });
+  }
+  return promise;
+}
+
+/**
+ * Make a unique ID.
+ * @return {string}
+ */
+function makeUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0;
+    var v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * For each property name on the `source` prototype, add getters and/or setters
+ * to `wrapper` that proxy to `target`.
+ * @param {object} source
+ * @param {object} wrapper
+ * @param {string} target
+ * @returns {undefined}
+ */
+function proxyProperties(source, wrapper, target) {
+  Object.getOwnPropertyNames(source).forEach(function(propertyName) {
+    proxyProperty(source, wrapper, target, propertyName);
+  });
+}
+
+/**
+ * For the property name on the `source` prototype, add a getter and/or setter
+ * to `wrapper` that proxies to `target`.
+ * @param {object} source
+ * @param {object} wrapper
+ * @param {string} target
+ * @param {string} propertyName
+ * @returns {undefined}
+ */
+function proxyProperty(source, wrapper, target, propertyName) {
+  if (propertyName in wrapper) {
+    // Skip any properties already set.
+    return;
+  } else if (propertyName.match(/^on[a-z]+$/)) {
+    Object.defineProperty(wrapper, propertyName, {
+      value: null,
+      writable: true
+    });
+
+    target.addEventListener(propertyName.slice(2), function() {
+      wrapper.dispatchEvent.apply(wrapper, arguments);
+    });
+
+    return;
+  }
+
+  Object.defineProperty(wrapper, propertyName, {
+    enumerable: true,
+    get: function() {
+      return target[propertyName];
+    }
+  });
+}
+
+/**
+ * @typedef {object} Deferred
+ * @property {Promise} promise
+ * @property {function} reject
+ * @property {function} resolve
+ */
+
+exports.defer = defer;
+exports.delegateMethods = delegateMethods;
+exports.difference = difference;
+exports.flatMap = flatMap;
+exports.guessBrowser = guessBrowser;
+exports.interceptEvent = interceptEvent;
+exports.legacyPromise = legacyPromise;
+exports.makeUUID = makeUUID;
+exports.proxyProperties = proxyProperties;
+
+
+/***/ }),
+/* 21 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+
+
+var _prodInvariant = __webpack_require__(4);
+
+var invariant = __webpack_require__(2);
+
+function checkMask(value, bitmask) {
+  return (value & bitmask) === bitmask;
+}
+
+var DOMPropertyInjection = {
+  /**
+   * Mapping from normalized, camelcased property names to a configuration that
+   * specifies how the associated DOM property should be accessed or rendered.
+   */
+  MUST_USE_PROPERTY: 0x1,
+  HAS_BOOLEAN_VALUE: 0x4,
+  HAS_NUMERIC_VALUE: 0x8,
+  HAS_POSITIVE_NUMERIC_VALUE: 0x10 | 0x8,
+  HAS_OVERLOADED_BOOLEAN_VALUE: 0x20,
+
+  /**
+   * Inject some specialized knowledge about the DOM. This takes a config object
+   * with the following properties:
+   *
+   * isCustomAttribute: function that given an attribute name will return true
+   * if it can be inserted into the DOM verbatim. Useful for data-* or aria-*
+   * attributes where it's impossible to enumerate all of the possible
+   * attribute names,
+   *
+   * Properties: object mapping DOM property name to one of the
+   * DOMPropertyInjection constants or null. If your attribute isn't in here,
+   * it won't get written to the DOM.
+   *
+   * DOMAttributeNames: object mapping React attribute name to the DOM
+   * attribute name. Attribute names not specified use the **lowercase**
+   * normalized name.
+   *
+   * DOMAttributeNamespaces: object mapping React attribute name to the DOM
+   * attribute namespace URL. (Attribute names not specified use no namespace.)
+   *
+   * DOMPropertyNames: similar to DOMAttributeNames but for DOM properties.
+   * Property names not specified use the normalized name.
+   *
+   * DOMMutationMethods: Properties that require special mutation methods. If
+   * `value` is undefined, the mutation method should unset the property.
+   *
+   * @param {object} domPropertyConfig the config as described above.
+   */
+  injectDOMPropertyConfig: function (domPropertyConfig) {
+    var Injection = DOMPropertyInjection;
+    var Properties = domPropertyConfig.Properties || {};
+    var DOMAttributeNamespaces = domPropertyConfig.DOMAttributeNamespaces || {};
+    var DOMAttributeNames = domPropertyConfig.DOMAttributeNames || {};
+    var DOMPropertyNames = domPropertyConfig.DOMPropertyNames || {};
+    var DOMMutationMethods = domPropertyConfig.DOMMutationMethods || {};
+
+    if (domPropertyConfig.isCustomAttribute) {
+      DOMProperty._isCustomAttributeFunctions.push(domPropertyConfig.isCustomAttribute);
+    }
+
+    for (var propName in Properties) {
+      !!DOMProperty.properties.hasOwnProperty(propName) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'injectDOMPropertyConfig(...): You\'re trying to inject DOM property \'%s\' which has already been injected. You may be accidentally injecting the same DOM property config twice, or you may be injecting two configs that have conflicting property names.', propName) : _prodInvariant('48', propName) : void 0;
+
+      var lowerCased = propName.toLowerCase();
+      var propConfig = Properties[propName];
+
+      var propertyInfo = {
+        attributeName: lowerCased,
+        attributeNamespace: null,
+        propertyName: propName,
+        mutationMethod: null,
+
+        mustUseProperty: checkMask(propConfig, Injection.MUST_USE_PROPERTY),
+        hasBooleanValue: checkMask(propConfig, Injection.HAS_BOOLEAN_VALUE),
+        hasNumericValue: checkMask(propConfig, Injection.HAS_NUMERIC_VALUE),
+        hasPositiveNumericValue: checkMask(propConfig, Injection.HAS_POSITIVE_NUMERIC_VALUE),
+        hasOverloadedBooleanValue: checkMask(propConfig, Injection.HAS_OVERLOADED_BOOLEAN_VALUE)
+      };
+      !(propertyInfo.hasBooleanValue + propertyInfo.hasNumericValue + propertyInfo.hasOverloadedBooleanValue <= 1) ? process.env.NODE_ENV !== 'production' ? invariant(false, 'DOMProperty: Value can be one of boolean, overloaded boolean, or numeric value, but not a combination: %s', propName) : _prodInvariant('50', propName) : void 0;
+
+      if (process.env.NODE_ENV !== 'production') {
+        DOMProperty.getPossibleStandardName[lowerCased] = propName;
+      }
+
+      if (DOMAttributeNames.hasOwnProperty(propName)) {
+        var attributeName = DOMAttributeNames[propName];
+        propertyInfo.attributeName = attributeName;
+        if (process.env.NODE_ENV !== 'production') {
+          DOMProperty.getPossibleStandardName[attributeName] = propName;
+        }
+      }
+
+      if (DOMAttributeNamespaces.hasOwnProperty(propName)) {
+        propertyInfo.attributeNamespace = DOMAttributeNamespaces[propName];
+      }
+
+      if (DOMPropertyNames.hasOwnProperty(propName)) {
+        propertyInfo.propertyName = DOMPropertyNames[propName];
+      }
+
+      if (DOMMutationMethods.hasOwnProperty(propName)) {
+        propertyInfo.mutationMethod = DOMMutationMethods[propName];
+      }
+
+      DOMProperty.properties[propName] = propertyInfo;
+    }
+  }
+};
+
+/* eslint-disable max-len */
+var ATTRIBUTE_NAME_START_CHAR = ':A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD';
+/* eslint-enable max-len */
+
+/**
+ * DOMProperty exports lookup objects that can be used like functions:
+ *
+ *   > DOMProperty.isValid['id']
+ *   true
+ *   > DOMProperty.isValid['foobar']
+ *   undefined
+ *
+ * Although this may be confusing, it performs better in general.
+ *
+ * @see http://jsperf.com/key-exists
+ * @see http://jsperf.com/key-missing
+ */
+var DOMProperty = {
+  ID_ATTRIBUTE_NAME: 'data-reactid',
+  ROOT_ATTRIBUTE_NAME: 'data-reactroot',
+
+  ATTRIBUTE_NAME_START_CHAR: ATTRIBUTE_NAME_START_CHAR,
+  ATTRIBUTE_NAME_CHAR: ATTRIBUTE_NAME_START_CHAR + '\\-.0-9\\u00B7\\u0300-\\u036F\\u203F-\\u2040',
+
+  /**
+   * Map from property "standard name" to an object with info about how to set
+   * the property in the DOM. Each object contains:
+   *
+   * attributeName:
+   *   Used when rendering markup or with `*Attribute()`.
+   * attributeNamespace
+   * propertyName:
+   *   Used on DOM node instances. (This includes properties that mutate due to
+   *   external factors.)
+   * mutationMethod:
+   *   If non-null, used instead of the property or `setAttribute()` after
+   *   initial render.
+   * mustUseProperty:
+   *   Whether the property must be accessed and mutated as an object property.
+   * hasBooleanValue:
+   *   Whether the property should be removed when set to a falsey value.
+   * hasNumericValue:
+   *   Whether the property must be numeric or parse as a numeric and should be
+   *   removed when set to a falsey value.
+   * hasPositiveNumericValue:
+   *   Whether the property must be positive numeric or parse as a positive
+   *   numeric and should be removed when set to a falsey value.
+   * hasOverloadedBooleanValue:
+   *   Whether the property can be used as a flag as well as with a value.
+   *   Removed when strictly equal to false; present without a value when
+   *   strictly equal to true; present with a value otherwise.
+   */
+  properties: {},
+
+  /**
+   * Mapping from lowercase property names to the properly cased version, used
+   * to warn in the case of missing properties. Available only in __DEV__.
+   *
+   * autofocus is predefined, because adding it to the property whitelist
+   * causes unintended side effects.
+   *
+   * @type {Object}
+   */
+  getPossibleStandardName: process.env.NODE_ENV !== 'production' ? { autofocus: 'autoFocus' } : null,
+
+  /**
+   * All of the isCustomAttribute() functions that have been injected.
+   */
+  _isCustomAttributeFunctions: [],
+
+  /**
+   * Checks whether a property name is a custom attribute.
+   * @method
+   */
+  isCustomAttribute: function (attributeName) {
+    for (var i = 0; i < DOMProperty._isCustomAttributeFunctions.length; i++) {
+      var isCustomAttributeFn = DOMProperty._isCustomAttributeFunctions[i];
+      if (isCustomAttributeFn(attributeName)) {
+        return true;
+      }
+    }
+    return false;
+  },
+
+  injection: DOMPropertyInjection
+};
+
+module.exports = DOMProperty;
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
+
+/***/ }),
+/* 22 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var difference = __webpack_require__(5).difference;
+var flatMap = __webpack_require__(5).flatMap;
+var setSimulcastInMediaSection = __webpack_require__(333);
+
+var ptToFixedBitrateAudioCodecName = {
+  0: 'PCMU',
+  8: 'PCMA'
+};
+
+/**
+ * A payload type
+ * @typedef {number} PT
+ */
+
+/**
+ * An {@link AudioCodec} or {@link VideoCodec}
+ * @typedef {AudioCodec|VideoCodec} Codec
+ */
+
+// NOTE(mmalavalli): This value is derived from the IETF spec
+// for JSEP, and it is used to convert a 'b=TIAS' value in bps
+// to a 'b=AS' value in kbps.
+// Spec: https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-21#section-5.9
+var RTCP_BITRATE = 16000;
+
+/**
+ * Construct a b= line string for the given max bitrate in bps. If the modifier
+ * is 'AS', then the max bitrate will be converted to kbps using the formula
+ * specified in the IETF spec for JSEP mentioned above.
+ * @param {string} modifier - 'AS' | 'TIAS'
+ * @param {?number} maxBitrate - Max outgoing bitrate (bps)
+ * @returns {?string} - If "maxBitrate" is null, then returns null;
+ *   otherwise return the constructed b= line string
+ */
+function createBLine(modifier, maxBitrate) {
+  if (!maxBitrate) {
+    return null;
+  }
+  return '\r\nb=' + modifier + ':' + (modifier === 'AS'
+    ? Math.round((maxBitrate + RTCP_BITRATE) / 950)
+    : maxBitrate);
+}
+
+/**
+ * Create a Codec Map for the given m= section.
+ * @param {string} section - The given m= section
+ * @returns {Map<Codec, Array<PT>>}
+ */
+function createCodecMapForMediaSection(section) {
+  return Array.from(createPtToCodecName(section)).reduce(function(codecMap, pair) {
+    var pt = pair[0];
+    var codecName = pair[1];
+    var pts = codecMap.get(codecName) || [];
+    return codecMap.set(codecName, pts.concat(pt));
+  }, new Map());
+}
+
+/**
+ * Create a Map from PTs to codec names for the given m= section.
+ * @param {string} mediaSection - The given m= section.
+ * @returns {Map<PT, Codec>} ptToCodecName
+ */
+function createPtToCodecName(mediaSection) {
+  return getPayloadTypesInMediaSection(mediaSection).reduce(function(ptToCodecName, pt) {
+    var rtpmapPattern = new RegExp('a=rtpmap:' + pt + ' ([^/]+)');
+    var matches = mediaSection.match(rtpmapPattern);
+    var codecName = matches
+      ? matches[1].toLowerCase()
+      : ptToFixedBitrateAudioCodecName[pt]
+        ? ptToFixedBitrateAudioCodecName[pt].toLowerCase()
+        : '';
+    return ptToCodecName.set(pt, codecName);
+  }, new Map());
+}
+
+/**
+ * Get the m= sections of a particular kind and direction from an sdp.
+ * @param {string} sdp - SDP string
+ * @param {string} [kind] - Pattern for matching kind
+ * @param {string} [direction] - Pattern for matching direction
+ * @returns {Array<string>} mediaSections
+ */
+function getMediaSections(sdp, kind, direction) {
+  return sdp.replace(/\r\n\r\n$/, '\r\n').split('\r\nm=').slice(1).map(function(mediaSection) {
+    return 'm=' + mediaSection;
+  }).filter(function(mediaSection) {
+    var kindPattern = new RegExp('m=' + (kind || '.*'), 'gm');
+    var directionPattern = new RegExp('a=' + (direction || '.*'), 'gm');
+    return kindPattern.test(mediaSection) && directionPattern.test(mediaSection);
+  });
+}
+
+/**
+ * Get the Codec Payload Types present in the first line of the given m= section
+ * @param {string} section - The m= section
+ * @returns {Array<PT>} Payload Types
+ */
+function getPayloadTypesInMediaSection(section) {
+  var mLine = section.split('\r\n')[0];
+
+  // In "m=<kind> <port> <proto> <payload_type_1> <payload_type_2> ... <payload_type_n>",
+  // the regex matches <port> and the PayloadTypes.
+  var matches = mLine.match(/([0-9]+)/g);
+
+  // This should not happen, but in case there are no PayloadTypes in
+  // the m= line, return an empty array.
+  if (!matches) {
+    return [];
+  }
+
+  // Since only the PayloadTypes are needed, we discard the <port>.
+  return matches.slice(1).map(function(match) {
+    return parseInt(match, 10);
+  });
+}
+
+/**
+ * Create the reordered Codec Payload Types based on the preferred Codec Names.
+ * @param {Map<Codec, Array<PT>>} codecMap - Codec Map
+ * @param {Array<Codec>} preferredCodecs - Preferred Codec Names
+ * @returns {Array<PT>} Reordered Payload Types
+ */
+function getReorderedPayloadTypes(codecMap, preferredCodecs) {
+  preferredCodecs = preferredCodecs.map(function(codecName) {
+    return codecName.toLowerCase();
+  });
+
+  var preferredPayloadTypes = flatMap(preferredCodecs, function(codecName) {
+    return codecMap.get(codecName) || [];
+  });
+
+  var remainingCodecs = difference(Array.from(codecMap.keys()), preferredCodecs);
+  var remainingPayloadTypes = flatMap(remainingCodecs, function(codecName) {
+    return codecMap.get(codecName);
+  });
+
+  return preferredPayloadTypes.concat(remainingPayloadTypes);
+}
+
+/**
+ * Set the specified max bitrate in the given m= section.
+ * @param {string} modifier - 'AS' | 'TIAS'
+ * @param {?number} maxBitrate - Max outgoing bitrate (bps)
+ * @param {string} section - m= section string
+ * @returns {string} The updated m= section
+ */
+function setBitrateInMediaSection(modifier, maxBitrate, section) {
+  var bLine = createBLine(modifier, maxBitrate) || '';
+  var bLinePattern = /\r\nb=(AS|TIAS):([0-9]+)/;
+  var bLineMatched = section.match(bLinePattern);
+
+  if (!bLineMatched) {
+    return section.replace(/(\r\n)?$/, bLine + '$1');
+  }
+
+  var maxBitrateMatched = parseInt(bLineMatched[2], 10);
+  maxBitrate = maxBitrate || Infinity;
+  bLine = createBLine(modifier, Math.min(maxBitrateMatched, maxBitrate));
+  return section.replace(bLinePattern, bLine);
+}
+
+/**
+ * Set maximum bitrates to the media sections in a given sdp.
+ * @param {string} sdp - sdp string
+ * @param {string} modifier - 'AS' | 'TIAS"
+ * @param {?number} maxAudioBitrate - Max outgoing audio bitrate (bps), null
+ *   if no limit is to be applied
+ * @param {?number} maxVideoBitrate - Max outgoing video bitrate (bps), null
+ *   if no limit is to be applied
+ * @returns {string} - The updated sdp string
+ */
+function setBitrateParameters(sdp, modifier, maxAudioBitrate, maxVideoBitrate) {
+  var mediaSections = getMediaSections(sdp);
+  var session = sdp.split('\r\nm=')[0];
+  return [session].concat(mediaSections.map(function(section) {
+    // Bitrate parameters should not be applied to m=application sections
+    // or to m=(audio|video) sections that do not receive media.
+    if (!/^m=(audio|video)/.test(section) || !/a=(recvonly|sendrecv)/.test(section)) {
+      return section;
+    }
+    var kind = section.match(/^m=(audio|video)/)[1];
+    var maxBitrate = kind === 'audio' ? maxAudioBitrate : maxVideoBitrate;
+    return setBitrateInMediaSection(modifier, maxBitrate, section);
+  })).join('\r\n');
+}
+
+/**
+ * Set the given Codec Payload Types in the first line of the given m= section.
+ * @param {Array<PT>} payloadTypes - Payload Types
+ * @param {string} section - Given m= section
+ * @returns {string} - Updated m= section
+ */
+function setPayloadTypesInMediaSection(payloadTypes, section) {
+  var lines = section.split('\r\n');
+  var mLine = lines[0];
+  var otherLines = lines.slice(1);
+  mLine = mLine.replace(/([0-9]+\s?)+$/, payloadTypes.join(' '));
+  return [mLine].concat(otherLines).join('\r\n');
+}
+
+/**
+ * Return a new SDP string with the re-ordered codec preferences.
+ * @param {string} sdp
+ * @param {Array<AudioCodec>} preferredAudioCodecs - If empty, the existing order
+ *   of audio codecs is preserved
+ * @param {Array<VideoCodecSettings>} preferredVideoCodecs - If empty, the
+ *   existing order of video codecs is preserved
+ * @returns {string} Updated SDP string
+ */
+function setCodecPreferences(sdp, preferredAudioCodecs, preferredVideoCodecs) {
+  var mediaSections = getMediaSections(sdp);
+  var session = sdp.split('\r\nm=')[0];
+  return [session].concat(mediaSections.map(function(section) {
+    // Codec preferences should not be applied to m=application sections.
+    if (!/^m=(audio|video)/.test(section)) {
+      return section;
+    }
+    var kind = section.match(/^m=(audio|video)/)[1];
+    var codecMap = createCodecMapForMediaSection(section);
+    var preferredCodecs = kind === 'audio' ? preferredAudioCodecs : preferredVideoCodecs.map(function(codec) {
+      return codec.codec;
+    });
+    var payloadTypes = getReorderedPayloadTypes(codecMap, preferredCodecs);
+    var newSection = setPayloadTypesInMediaSection(payloadTypes, section);
+
+    var pcmaPayloadTypes = codecMap.get('pcma') || [];
+    var pcmuPayloadTypes = codecMap.get('pcmu') || [];
+    var fixedBitratePayloadTypes = kind === 'audio'
+      ? new Set(pcmaPayloadTypes.concat(pcmuPayloadTypes))
+      : new Set();
+
+    return fixedBitratePayloadTypes.has(payloadTypes[0])
+      ? newSection.replace(/\r\nb=(AS|TIAS):([0-9]+)/g, '')
+      : newSection;
+  })).join('\r\n');
+}
+
+/**
+ * Return a new SDP string with simulcast settings.
+ * @param {string} sdp
+ * @param {Map<Track.ID, TrackAttributes>} trackIdsToAttributes
+ * @returns {string} Updated SDP string
+ */
+function setSimulcast(sdp, trackIdsToAttributes) {
+  var mediaSections = getMediaSections(sdp);
+  var session = sdp.split('\r\nm=')[0];
+  return [session].concat(mediaSections.map(function(section) {
+    section = section.replace(/\r\n$/, '');
+    if (!/^m=video/.test(section)) {
+      return section;
+    }
+    var codecMap = createCodecMapForMediaSection(section);
+    var payloadTypes = getPayloadTypesInMediaSection(section);
+    var vp8PayloadTypes = new Set(codecMap.get('vp8') || []);
+
+    var hasVP8PayloadType = payloadTypes.some(function(payloadType) {
+      return vp8PayloadTypes.has(payloadType);
+    });
+    return hasVP8PayloadType
+      ? setSimulcastInMediaSection(section, trackIdsToAttributes)
+      : section;
+  })).concat('').join('\r\n');
+}
+
+/**
+ * Codec Payload Type.
+ * @typedef {number} PayloadType
+ */
+
+exports.createCodecMapForMediaSection = createCodecMapForMediaSection;
+exports.createPtToCodecName = createPtToCodecName;
+exports.getMediaSections = getMediaSections;
+exports.setBitrateParameters = setBitrateParameters;
+exports.setCodecPreferences = setCodecPreferences;
+exports.setSimulcast = setSimulcast;
+
+
+/***/ }),
 /* 23 */
+/***/ (function(module, exports) {
+
+module.exports = require("react");
+
+/***/ }),
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4860,7 +5165,7 @@ module.exports = PooledClass;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 24 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4882,7 +5187,7 @@ var warning = __webpack_require__(3);
 var canDefineProperty = __webpack_require__(43);
 var hasOwnProperty = Object.prototype.hasOwnProperty;
 
-var REACT_ELEMENT_TYPE = __webpack_require__(109);
+var REACT_ELEMENT_TYPE = __webpack_require__(110);
 
 var RESERVED_PROPS = {
   key: true,
@@ -5205,7 +5510,7 @@ module.exports = ReactElement;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 25 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5219,11 +5524,11 @@ module.exports = ReactElement;
 
 
 
-var DOMNamespaces = __webpack_require__(52);
+var DOMNamespaces = __webpack_require__(54);
 var setInnerHTML = __webpack_require__(42);
 
-var createMicrosoftUnsafeLocalFunction = __webpack_require__(59);
-var setTextContent = __webpack_require__(106);
+var createMicrosoftUnsafeLocalFunction = __webpack_require__(61);
+var setTextContent = __webpack_require__(107);
 
 var ELEMENT_NODE_TYPE = 1;
 var DOCUMENT_FRAGMENT_NODE_TYPE = 11;
@@ -5326,7 +5631,7 @@ DOMLazyTree.queueText = queueText;
 module.exports = DOMLazyTree;
 
 /***/ }),
-/* 26 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5340,7 +5645,7 @@ module.exports = DOMLazyTree;
 
 
 
-var ReactRef = __webpack_require__(242);
+var ReactRef = __webpack_require__(245);
 var ReactInstrumentation = __webpack_require__(13);
 
 var warning = __webpack_require__(3);
@@ -5496,7 +5801,7 @@ module.exports = ReactReconciler;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 27 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5538,7 +5843,7 @@ function reactProdInvariant(code) {
 module.exports = reactProdInvariant;
 
 /***/ }),
-/* 28 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5555,11 +5860,11 @@ module.exports = reactProdInvariant;
 var _prodInvariant = __webpack_require__(4);
 
 var EventPluginRegistry = __webpack_require__(37);
-var EventPluginUtils = __webpack_require__(53);
-var ReactErrorUtils = __webpack_require__(57);
+var EventPluginUtils = __webpack_require__(55);
+var ReactErrorUtils = __webpack_require__(59);
 
-var accumulateInto = __webpack_require__(99);
-var forEachAccumulated = __webpack_require__(100);
+var accumulateInto = __webpack_require__(100);
+var forEachAccumulated = __webpack_require__(101);
 var invariant = __webpack_require__(2);
 
 /**
@@ -5816,7 +6121,7 @@ module.exports = EventPluginHub;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 29 */
+/* 30 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5830,11 +6135,11 @@ module.exports = EventPluginHub;
 
 
 
-var EventPluginHub = __webpack_require__(28);
-var EventPluginUtils = __webpack_require__(53);
+var EventPluginHub = __webpack_require__(29);
+var EventPluginUtils = __webpack_require__(55);
 
-var accumulateInto = __webpack_require__(99);
-var forEachAccumulated = __webpack_require__(100);
+var accumulateInto = __webpack_require__(100);
+var forEachAccumulated = __webpack_require__(101);
 var warning = __webpack_require__(3);
 
 var getListener = EventPluginHub.getListener;
@@ -5954,7 +6259,7 @@ module.exports = EventPropagators;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 30 */
+/* 31 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6003,7 +6308,7 @@ var ReactInstanceMap = {
 module.exports = ReactInstanceMap;
 
 /***/ }),
-/* 31 */
+/* 32 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6017,9 +6322,9 @@ module.exports = ReactInstanceMap;
 
 
 
-var SyntheticEvent = __webpack_require__(17);
+var SyntheticEvent = __webpack_require__(16);
 
-var getEventTarget = __webpack_require__(62);
+var getEventTarget = __webpack_require__(64);
 
 /**
  * @interface UIEvent
@@ -6065,7 +6370,7 @@ SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 module.exports = SyntheticUIEvent;
 
 /***/ }),
-/* 32 */
+/* 33 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6081,24 +6386,24 @@ module.exports = SyntheticUIEvent;
 
 var _assign = __webpack_require__(6);
 
-var ReactBaseClasses = __webpack_require__(108);
-var ReactChildren = __webpack_require__(273);
-var ReactDOMFactories = __webpack_require__(274);
-var ReactElement = __webpack_require__(24);
-var ReactPropTypes = __webpack_require__(276);
-var ReactVersion = __webpack_require__(278);
+var ReactBaseClasses = __webpack_require__(109);
+var ReactChildren = __webpack_require__(276);
+var ReactDOMFactories = __webpack_require__(277);
+var ReactElement = __webpack_require__(25);
+var ReactPropTypes = __webpack_require__(279);
+var ReactVersion = __webpack_require__(281);
 
-var createReactClass = __webpack_require__(280);
-var onlyChild = __webpack_require__(282);
+var createReactClass = __webpack_require__(283);
+var onlyChild = __webpack_require__(285);
 
 var createElement = ReactElement.createElement;
 var createFactory = ReactElement.createFactory;
 var cloneElement = ReactElement.cloneElement;
 
 if (process.env.NODE_ENV !== 'production') {
-  var lowPriorityWarning = __webpack_require__(66);
+  var lowPriorityWarning = __webpack_require__(68);
   var canDefineProperty = __webpack_require__(43);
-  var ReactElementValidator = __webpack_require__(110);
+  var ReactElementValidator = __webpack_require__(111);
   var didWarnPropTypesDeprecated = false;
   createElement = ReactElementValidator.createElement;
   createFactory = ReactElementValidator.createFactory;
@@ -6201,7 +6506,7 @@ module.exports = React;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 33 */
+/* 34 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6661,7 +6966,7 @@ module.exports = StateMachine;
 
 
 /***/ }),
-/* 34 */
+/* 35 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(process) {/**
@@ -6686,236 +6991,14 @@ if (process.env.NODE_ENV !== 'production') {
   // By explicitly using `prop-types` you are opting into new development behavior.
   // http://fb.me/prop-types-in-prod
   var throwOnDirectAccess = true;
-  module.exports = __webpack_require__(85)(isValidElement, throwOnDirectAccess);
+  module.exports = __webpack_require__(86)(isValidElement, throwOnDirectAccess);
 } else {
   // By explicitly using `prop-types` you are opting into new production behavior.
   // http://fb.me/prop-types-in-prod
-  module.exports = __webpack_require__(198)();
+  module.exports = __webpack_require__(201)();
 }
 
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
-
-/***/ }),
-/* 35 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-var flatMap = __webpack_require__(16).flatMap;
-
-/**
- * Match a pattern across lines, returning the first capture group for any
- * matches.
- * @param {string} pattern
- * @param {string} lines
- * @returns {Set<string>} matches
- */
-function getMatches(pattern, lines) {
-  var matches = lines.match(new RegExp(pattern, 'gm')) || [];
-  return matches.reduce(function(results, line) {
-    var match = line.match(new RegExp(pattern));
-    return match ? results.add(match[1]) : results;
-  }, new Set());
-}
-
-/**
- * Get a Set of MediaStreamTrack IDs from an SDP.
- * @param {string} pattern
- * @param {string} sdp
- * @returns {Set<string>}
- */
-function getTrackIds(pattern, sdp) {
-  return getMatches(pattern, sdp);
-}
-
-/**
- * Get a Set of MediaStreamTrack IDs from a Plan B SDP.
- * @param {string} sdp - Plan B SDP
- * @returns {Set<string>} trackIds
- */
-function getPlanBTrackIds(sdp) {
-  return getTrackIds('^a=ssrc:[0-9]+ +msid:.+ +(.+) *$', sdp);
-}
-
-/**
- * Get a Set of MediaStreamTrack IDs from a Unified Plan SDP.
- * @param {string} sdp - Unified Plan SDP
- * @returns {Set<string>} trackIds
- */
-function getUnifiedPlanTrackIds(sdp) {
-  return getTrackIds('^a=msid:.+ +(.+) *$', sdp);
-}
-
-/**
- * Get a Set of SSRCs for a MediaStreamTrack from a Plan B SDP.
- * @param {string} sdp - Plan B SDP
- * @param {string} trackId - MediaStreamTrack ID
- * @returns {Set<string>}
- */
-function getPlanBSSRCs(sdp, trackId) {
-  var pattern = '^a=ssrc:([0-9]+) +msid:[^ ]+ +' + trackId + ' *$';
-  return getMatches(pattern, sdp);
-}
-
-/**
- * Get the m= sections of a particular kind and direction from an sdp.
- * @param {string} sdp -  sdp string
- * @param {string} [kind] - Pattern for matching kind
- * @param {string} [direction] - Pattern for matching direction
- * @returns {Array<string>} mediaSections
- */
-function getMediaSections(sdp, kind, direction) {
-  kind = kind || '.*';
-  direction = direction || '.*';
-  return sdp.split('\r\nm=').slice(1).map(function(mediaSection) {
-    return 'm=' + mediaSection;
-  }).filter(function(mediaSection) {
-    var kindPattern = new RegExp('m=' + kind, 'gm');
-    var directionPattern = new RegExp('a=' + direction, 'gm');
-    return kindPattern.test(mediaSection) && directionPattern.test(mediaSection);
-  });
-}
-
-/**
- * Get the Set of SSRCs announced in a MediaSection.
- * @param {string} mediaSection
- * @returns {Array<string>} ssrcs
- */
-function getMediaSectionSSRCs(mediaSection) {
-  return Array.from(getMatches('^a=ssrc:([0-9]+) +.*$', mediaSection));
-}
-
-/**
- * Get a Set of SSRCs for a MediaStreamTrack from a Unified Plan SDP.
- * @param {string} sdp - Unified Plan SDP
- * @param {string} trackId - MediaStreamTrack ID
- * @returns {Set<string>}
- */
-function getUnifiedPlanSSRCs(sdp, trackId) {
-  var mediaSections = getMediaSections(sdp);
-
-  var msidAttrRegExp = new RegExp('^a=msid:[^ ]+ +' + trackId + ' *$', 'gm');
-  var matchingMediaSections = mediaSections.filter(function(mediaSection) {
-    return mediaSection.match(msidAttrRegExp);
-  });
-
-  return new Set(flatMap(matchingMediaSections, getMediaSectionSSRCs));
-}
-
-/**
- * Get a Map from MediaStreamTrack IDs to SSRCs from an SDP.
- * @param {function(string): Set<string>} getTrackIds
- * @param {function(string, string): Set<string>} getSSRCs
- * @param {string} sdp - SDP
- * @returns {Map<string, Set<string>>} trackIdsToSSRCs
- */
-function getTrackIdsToSSRCs(getTrackIds, getSSRCs, sdp) {
-  return new Map(Array.from(getTrackIds(sdp)).map(function(trackId) {
-    return [trackId, getSSRCs(sdp, trackId)];
-  }));
-}
-
-/**
- * Get a Map from MediaStreamTrack IDs to SSRCs from a Plan B SDP.
- * @param {string} sdp - Plan B SDP
- * @returns {Map<string, Set<string>>} trackIdsToSSRCs
- */
-function getPlanBTrackIdsToSSRCs(sdp) {
-  return getTrackIdsToSSRCs(getPlanBTrackIds, getPlanBSSRCs, sdp);
-}
-
-/**
- * Get a Map from MediaStreamTrack IDs to SSRCs from a Plan B SDP.
- * @param {string} sdp - Plan B SDP
- * @returns {Map<string, Set<string>>} trackIdsToSSRCs
- */
-function getUnifiedPlanTrackIdsToSSRCs(sdp) {
-  return getTrackIdsToSSRCs(getUnifiedPlanTrackIds, getUnifiedPlanSSRCs, sdp);
-}
-
-/**
- * Update the mappings from MediaStreamTrack IDs to SSRCs as indicated by both
- * the Map from MediaStreamTrack IDs to SSRCs and the SDP itself. This method
- * ensures that SSRCs never change once announced.
- * @param {function(string): Map<string, Set<string>>} getTrackIdsToSSRCs
- * @param {Map<string, Set<string>>} trackIdsToSSRCs
- * @param {string} sdp - SDP
- * @returns {strinng} updatedSdp - updated SDP
- */
-function updateTrackIdsToSSRCs(getTrackIdsToSSRCs, trackIdsToSSRCs, sdp) {
-  var newTrackIdsToSSRCs = getTrackIdsToSSRCs(sdp);
-  var newSSRCsToOldSSRCs = new Map();
-
-  // NOTE(mroberts): First, update a=ssrc attributes.
-  newTrackIdsToSSRCs.forEach(function(ssrcs, trackId) {
-    if (!trackIdsToSSRCs.has(trackId)) {
-      trackIdsToSSRCs.set(trackId, ssrcs);
-      return;
-    }
-    var oldSSRCs = Array.from(trackIdsToSSRCs.get(trackId));
-    var newSSRCs = Array.from(ssrcs);
-    oldSSRCs.forEach(function(oldSSRC, i) {
-      var newSSRC = newSSRCs[i];
-      newSSRCsToOldSSRCs.set(newSSRC, oldSSRC);
-      var pattern = '^a=ssrc:' + newSSRC + ' (.*)$';
-      var replacement = 'a=ssrc:' + oldSSRC + ' $1';
-      sdp = sdp.replace(new RegExp(pattern, 'gm'), replacement);
-    });
-  });
-
-  // NOTE(mroberts): Then, update a=ssrc-group attributes.
-  var pattern = '^(a=ssrc-group:[^ ]+ +)(.*)$';
-  var matches = sdp.match(new RegExp(pattern, 'gm')) || [];
-  matches.forEach(function(line) {
-    var match = line.match(new RegExp(pattern));
-    if (!match) {
-      return;
-    }
-    var prefix = match[1];
-    var newSSRCs = match[2];
-    var oldSSRCs = newSSRCs.split(' ').map(function(newSSRC) {
-      var oldSSRC = newSSRCsToOldSSRCs.get(newSSRC);
-      return oldSSRC ? oldSSRC : newSSRC;
-    }).join(' ');
-    sdp = sdp.replace(match[0], prefix + oldSSRCs);
-  });
-
-  return sdp;
-}
-
-/**
- * Update the mappings from MediaStreamTrack IDs to SSRCs as indicated by both
- * the Map from MediaStreamTrack IDs to SSRCs and the Plan B SDP itself. This
- * method ensures that SSRCs never change once announced.
- * @param {Map<string, Set<string>>} trackIdsToSSRCs
- * @param {string} sdp - Plan B SDP
- * @returns {string} updatedSdp - updated Plan B SDP
- */
-function updatePlanBTrackIdsToSSRCs(trackIdsToSSRCs, sdp) {
-  return updateTrackIdsToSSRCs(getPlanBTrackIdsToSSRCs, trackIdsToSSRCs, sdp);
-}
-
-/**
- * Update the mappings from MediaStreamTrack IDs to SSRCs as indicated by both
- * the Map from MediaStreamTrack IDs to SSRCs and the Plan B SDP itself. This
- * method ensures that SSRCs never change once announced.
- * @param {Map<string, Set<string>>} trackIdsToSSRCs
- * @param {string} sdp - Plan B SDP
- * @returns {string} updatedSdp - updated Plan B SDP
- */
-function updateUnifiedPlanTrackIdsToSSRCs(trackIdsToSSRCs, sdp) {
-  return updateTrackIdsToSSRCs(getUnifiedPlanTrackIdsToSSRCs, trackIdsToSSRCs, sdp);
-}
-
-exports.getMediaSections = getMediaSections;
-exports.getPlanBTrackIds = getPlanBTrackIds;
-exports.getUnifiedPlanTrackIds = getUnifiedPlanTrackIds;
-exports.getPlanBSSRCs = getPlanBSSRCs;
-exports.getUnifiedPlanSSRCs = getUnifiedPlanSSRCs;
-exports.updatePlanBTrackIdsToSSRCs = updatePlanBTrackIdsToSSRCs;
-exports.updateUnifiedPlanTrackIdsToSSRCs = updateUnifiedPlanTrackIdsToSSRCs;
-
 
 /***/ }),
 /* 36 */
@@ -7216,11 +7299,11 @@ module.exports = EventPluginRegistry;
 var _assign = __webpack_require__(6);
 
 var EventPluginRegistry = __webpack_require__(37);
-var ReactEventEmitterMixin = __webpack_require__(232);
-var ViewportMetrics = __webpack_require__(98);
+var ReactEventEmitterMixin = __webpack_require__(235);
+var ViewportMetrics = __webpack_require__(99);
 
-var getVendorPrefixedEventName = __webpack_require__(267);
-var isEventSupported = __webpack_require__(63);
+var getVendorPrefixedEventName = __webpack_require__(270);
+var isEventSupported = __webpack_require__(65);
 
 /**
  * Summary of `ReactBrowserEventEmitter` event handling:
@@ -7540,10 +7623,10 @@ module.exports = ReactBrowserEventEmitter;
 
 
 
-var SyntheticUIEvent = __webpack_require__(31);
-var ViewportMetrics = __webpack_require__(98);
+var SyntheticUIEvent = __webpack_require__(32);
+var ViewportMetrics = __webpack_require__(99);
 
-var getEventModifierState = __webpack_require__(61);
+var getEventModifierState = __webpack_require__(63);
 
 /**
  * @interface MouseEvent
@@ -7973,12 +8056,12 @@ module.exports = escapeTextContentForBrowser;
 
 
 var ExecutionEnvironment = __webpack_require__(8);
-var DOMNamespaces = __webpack_require__(52);
+var DOMNamespaces = __webpack_require__(54);
 
 var WHITESPACE_TEST = /^[ \r\n\t\f]/;
 var NONVISIBLE_TEST = /<(!--|link|noscript|meta|script|style)[ \r\n\t\f\/>]/;
 
-var createMicrosoftUnsafeLocalFunction = __webpack_require__(59);
+var createMicrosoftUnsafeLocalFunction = __webpack_require__(61);
 
 // SVG temp container for IE lacking innerHTML
 var reusableSVGContainer;
@@ -8095,9 +8178,9 @@ module.exports = canDefineProperty;
 "use strict";
 
 
-var AudioTrack = __webpack_require__(115);
+var AudioTrack = __webpack_require__(116);
 var inherits = __webpack_require__(1).inherits;
-var LocalMediaTrack = __webpack_require__(116);
+var LocalMediaTrack = __webpack_require__(117);
 
 /**
  * Construct a {@link LocalAudioTrack} from a MediaStreamTrack.
@@ -8210,11 +8293,11 @@ module.exports = LocalAudioTrack;
 
 
 var inherits = __webpack_require__(1).inherits;
-var Track = __webpack_require__(68);
-var DefaultDataTrackSender = __webpack_require__(287);
+var Track = __webpack_require__(70);
+var DefaultDataTrackSender = __webpack_require__(290);
 var buildLogLevels = __webpack_require__(5).buildLogLevels;
 var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
-var Log = __webpack_require__(19);
+var Log = __webpack_require__(17);
 
 /**
  * Construct a {@link LocalDataTrack}.
@@ -8291,7 +8374,7 @@ function LocalDataTrack(options) {
   Track.call(this, dataTrackSender.id, 'data', options);
 
   Object.defineProperties(this, {
-    _dataTrackSender: {
+    _trackSender: {
       value: dataTrackSender
     },
     maxPacketLifeTime: {
@@ -8322,7 +8405,7 @@ inherits(LocalDataTrack, Track);
  * @returns {void}
  */
 LocalDataTrack.prototype.send = function send(data) {
-  this._dataTrackSender.send(data);
+  this._trackSender.send(data);
 };
 
 /**
@@ -8351,8 +8434,8 @@ module.exports = LocalDataTrack;
 
 
 var inherits = __webpack_require__(1).inherits;
-var LocalMediaTrack = __webpack_require__(116);
-var VideoTrack = __webpack_require__(118);
+var LocalMediaTrack = __webpack_require__(117);
+var VideoTrack = __webpack_require__(121);
 
 /**
  * Construct a {@link LocalVideoTrack} from a MediaStreamTrack.
@@ -8482,6 +8565,52 @@ module.exports = g;
 "use strict";
 
 
+/**
+ * RTCRtpSender shim.
+ * @param {MediaStreamTrack} track
+ * @property {MediaStreamTrack} track
+ */
+function RTCRtpSenderShim(track) {
+  Object.defineProperties(this, {
+    track: {
+      enumerable: true,
+      value: track,
+      writable: true
+    }
+  });
+}
+
+// NOTE(mmalavalli): Because of the way we will be using this shim, there
+// are a couple of use cases that will not be covered:
+//
+// /* Case 1 */
+// const sender = pc.addTrack(track);
+// assert.equal(sender.track, track);
+// pc.removeTrack(sender);
+// assert.equal(sender.track, null); /* Error */
+//
+// /* Case 2 */
+// const sender = pc.addTrack(track);
+// const senders1 = new Set(pc.getSenders());
+// assert(senders1.has(sender));
+// pc.removeTrack(track);
+// const senders2 = new Set(pc.getSenders());
+// assert(senders2.has(sender)); /* Error */
+//
+// For now, since we only use senders for passing them to RTCPeerConnection#removeTrack(),
+// we will omit handling these use cases for now, and revisit them when we start
+// using the RTCRtpSender APIs.
+
+module.exports = RTCRtpSenderShim;
+
+
+/***/ }),
+/* 49 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
 var EventEmitter = __webpack_require__(10).EventEmitter;
 
 /**
@@ -8522,7 +8651,229 @@ module.exports = EventTarget;
 
 
 /***/ }),
-/* 49 */
+/* 50 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var flatMap = __webpack_require__(20).flatMap;
+
+/**
+ * Match a pattern across lines, returning the first capture group for any
+ * matches.
+ * @param {string} pattern
+ * @param {string} lines
+ * @returns {Set<string>} matches
+ */
+function getMatches(pattern, lines) {
+  var matches = lines.match(new RegExp(pattern, 'gm')) || [];
+  return matches.reduce(function(results, line) {
+    var match = line.match(new RegExp(pattern));
+    return match ? results.add(match[1]) : results;
+  }, new Set());
+}
+
+/**
+ * Get a Set of MediaStreamTrack IDs from an SDP.
+ * @param {string} pattern
+ * @param {string} sdp
+ * @returns {Set<string>}
+ */
+function getTrackIds(pattern, sdp) {
+  return getMatches(pattern, sdp);
+}
+
+/**
+ * Get a Set of MediaStreamTrack IDs from a Plan B SDP.
+ * @param {string} sdp - Plan B SDP
+ * @returns {Set<string>} trackIds
+ */
+function getPlanBTrackIds(sdp) {
+  return getTrackIds('^a=ssrc:[0-9]+ +msid:.+ +(.+) *$', sdp);
+}
+
+/**
+ * Get a Set of MediaStreamTrack IDs from a Unified Plan SDP.
+ * @param {string} sdp - Unified Plan SDP
+ * @returns {Set<string>} trackIds
+ */
+function getUnifiedPlanTrackIds(sdp) {
+  return getTrackIds('^a=msid:.+ +(.+) *$', sdp);
+}
+
+/**
+ * Get a Set of SSRCs for a MediaStreamTrack from a Plan B SDP.
+ * @param {string} sdp - Plan B SDP
+ * @param {string} trackId - MediaStreamTrack ID
+ * @returns {Set<string>}
+ */
+function getPlanBSSRCs(sdp, trackId) {
+  var pattern = '^a=ssrc:([0-9]+) +msid:[^ ]+ +' + trackId + ' *$';
+  return getMatches(pattern, sdp);
+}
+
+/**
+ * Get the m= sections of a particular kind and direction from an sdp.
+ * @param {string} sdp -  sdp string
+ * @param {string} [kind] - Pattern for matching kind
+ * @param {string} [direction] - Pattern for matching direction
+ * @returns {Array<string>} mediaSections
+ */
+function getMediaSections(sdp, kind, direction) {
+  kind = kind || '.*';
+  direction = direction || '.*';
+  return sdp.split('\r\nm=').slice(1).map(function(mediaSection) {
+    return 'm=' + mediaSection;
+  }).filter(function(mediaSection) {
+    var kindPattern = new RegExp('m=' + kind, 'gm');
+    var directionPattern = new RegExp('a=' + direction, 'gm');
+    return kindPattern.test(mediaSection) && directionPattern.test(mediaSection);
+  });
+}
+
+/**
+ * Get the Set of SSRCs announced in a MediaSection.
+ * @param {string} mediaSection
+ * @returns {Array<string>} ssrcs
+ */
+function getMediaSectionSSRCs(mediaSection) {
+  return Array.from(getMatches('^a=ssrc:([0-9]+) +.*$', mediaSection));
+}
+
+/**
+ * Get a Set of SSRCs for a MediaStreamTrack from a Unified Plan SDP.
+ * @param {string} sdp - Unified Plan SDP
+ * @param {string} trackId - MediaStreamTrack ID
+ * @returns {Set<string>}
+ */
+function getUnifiedPlanSSRCs(sdp, trackId) {
+  var mediaSections = getMediaSections(sdp);
+
+  var msidAttrRegExp = new RegExp('^a=msid:[^ ]+ +' + trackId + ' *$', 'gm');
+  var matchingMediaSections = mediaSections.filter(function(mediaSection) {
+    return mediaSection.match(msidAttrRegExp);
+  });
+
+  return new Set(flatMap(matchingMediaSections, getMediaSectionSSRCs));
+}
+
+/**
+ * Get a Map from MediaStreamTrack IDs to SSRCs from an SDP.
+ * @param {function(string): Set<string>} getTrackIds
+ * @param {function(string, string): Set<string>} getSSRCs
+ * @param {string} sdp - SDP
+ * @returns {Map<string, Set<string>>} trackIdsToSSRCs
+ */
+function getTrackIdsToSSRCs(getTrackIds, getSSRCs, sdp) {
+  return new Map(Array.from(getTrackIds(sdp)).map(function(trackId) {
+    return [trackId, getSSRCs(sdp, trackId)];
+  }));
+}
+
+/**
+ * Get a Map from MediaStreamTrack IDs to SSRCs from a Plan B SDP.
+ * @param {string} sdp - Plan B SDP
+ * @returns {Map<string, Set<string>>} trackIdsToSSRCs
+ */
+function getPlanBTrackIdsToSSRCs(sdp) {
+  return getTrackIdsToSSRCs(getPlanBTrackIds, getPlanBSSRCs, sdp);
+}
+
+/**
+ * Get a Map from MediaStreamTrack IDs to SSRCs from a Plan B SDP.
+ * @param {string} sdp - Plan B SDP
+ * @returns {Map<string, Set<string>>} trackIdsToSSRCs
+ */
+function getUnifiedPlanTrackIdsToSSRCs(sdp) {
+  return getTrackIdsToSSRCs(getUnifiedPlanTrackIds, getUnifiedPlanSSRCs, sdp);
+}
+
+/**
+ * Update the mappings from MediaStreamTrack IDs to SSRCs as indicated by both
+ * the Map from MediaStreamTrack IDs to SSRCs and the SDP itself. This method
+ * ensures that SSRCs never change once announced.
+ * @param {function(string): Map<string, Set<string>>} getTrackIdsToSSRCs
+ * @param {Map<string, Set<string>>} trackIdsToSSRCs
+ * @param {string} sdp - SDP
+ * @returns {strinng} updatedSdp - updated SDP
+ */
+function updateTrackIdsToSSRCs(getTrackIdsToSSRCs, trackIdsToSSRCs, sdp) {
+  var newTrackIdsToSSRCs = getTrackIdsToSSRCs(sdp);
+  var newSSRCsToOldSSRCs = new Map();
+
+  // NOTE(mroberts): First, update a=ssrc attributes.
+  newTrackIdsToSSRCs.forEach(function(ssrcs, trackId) {
+    if (!trackIdsToSSRCs.has(trackId)) {
+      trackIdsToSSRCs.set(trackId, ssrcs);
+      return;
+    }
+    var oldSSRCs = Array.from(trackIdsToSSRCs.get(trackId));
+    var newSSRCs = Array.from(ssrcs);
+    oldSSRCs.forEach(function(oldSSRC, i) {
+      var newSSRC = newSSRCs[i];
+      newSSRCsToOldSSRCs.set(newSSRC, oldSSRC);
+      var pattern = '^a=ssrc:' + newSSRC + ' (.*)$';
+      var replacement = 'a=ssrc:' + oldSSRC + ' $1';
+      sdp = sdp.replace(new RegExp(pattern, 'gm'), replacement);
+    });
+  });
+
+  // NOTE(mroberts): Then, update a=ssrc-group attributes.
+  var pattern = '^(a=ssrc-group:[^ ]+ +)(.*)$';
+  var matches = sdp.match(new RegExp(pattern, 'gm')) || [];
+  matches.forEach(function(line) {
+    var match = line.match(new RegExp(pattern));
+    if (!match) {
+      return;
+    }
+    var prefix = match[1];
+    var newSSRCs = match[2];
+    var oldSSRCs = newSSRCs.split(' ').map(function(newSSRC) {
+      var oldSSRC = newSSRCsToOldSSRCs.get(newSSRC);
+      return oldSSRC ? oldSSRC : newSSRC;
+    }).join(' ');
+    sdp = sdp.replace(match[0], prefix + oldSSRCs);
+  });
+
+  return sdp;
+}
+
+/**
+ * Update the mappings from MediaStreamTrack IDs to SSRCs as indicated by both
+ * the Map from MediaStreamTrack IDs to SSRCs and the Plan B SDP itself. This
+ * method ensures that SSRCs never change once announced.
+ * @param {Map<string, Set<string>>} trackIdsToSSRCs
+ * @param {string} sdp - Plan B SDP
+ * @returns {string} updatedSdp - updated Plan B SDP
+ */
+function updatePlanBTrackIdsToSSRCs(trackIdsToSSRCs, sdp) {
+  return updateTrackIdsToSSRCs(getPlanBTrackIdsToSSRCs, trackIdsToSSRCs, sdp);
+}
+
+/**
+ * Update the mappings from MediaStreamTrack IDs to SSRCs as indicated by both
+ * the Map from MediaStreamTrack IDs to SSRCs and the Plan B SDP itself. This
+ * method ensures that SSRCs never change once announced.
+ * @param {Map<string, Set<string>>} trackIdsToSSRCs
+ * @param {string} sdp - Plan B SDP
+ * @returns {string} updatedSdp - updated Plan B SDP
+ */
+function updateUnifiedPlanTrackIdsToSSRCs(trackIdsToSSRCs, sdp) {
+  return updateTrackIdsToSSRCs(getUnifiedPlanTrackIdsToSSRCs, trackIdsToSSRCs, sdp);
+}
+
+exports.getMediaSections = getMediaSections;
+exports.getPlanBTrackIds = getPlanBTrackIds;
+exports.getUnifiedPlanTrackIds = getUnifiedPlanTrackIds;
+exports.getPlanBSSRCs = getPlanBSSRCs;
+exports.getUnifiedPlanSSRCs = getUnifiedPlanSSRCs;
+exports.updatePlanBTrackIdsToSSRCs = updatePlanBTrackIdsToSSRCs;
+exports.updateUnifiedPlanTrackIdsToSSRCs = updateUnifiedPlanTrackIdsToSSRCs;
+
+
+/***/ }),
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8593,7 +8944,7 @@ function shallowEqual(objA, objB) {
 module.exports = shallowEqual;
 
 /***/ }),
-/* 50 */
+/* 52 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8612,7 +8963,7 @@ module.exports = ReactPropTypesSecret;
 
 
 /***/ }),
-/* 51 */
+/* 53 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8626,14 +8977,14 @@ module.exports = ReactPropTypesSecret;
 
 
 
-var DOMLazyTree = __webpack_require__(25);
-var Danger = __webpack_require__(205);
+var DOMLazyTree = __webpack_require__(26);
+var Danger = __webpack_require__(208);
 var ReactDOMComponentTree = __webpack_require__(7);
 var ReactInstrumentation = __webpack_require__(13);
 
-var createMicrosoftUnsafeLocalFunction = __webpack_require__(59);
+var createMicrosoftUnsafeLocalFunction = __webpack_require__(61);
 var setInnerHTML = __webpack_require__(42);
-var setTextContent = __webpack_require__(106);
+var setTextContent = __webpack_require__(107);
 
 function getNodeAfter(parentNode, node) {
   // Special case for text components, which return [open, close] comments
@@ -8842,7 +9193,7 @@ module.exports = DOMChildrenOperations;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 52 */
+/* 54 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8865,7 +9216,7 @@ var DOMNamespaces = {
 module.exports = DOMNamespaces;
 
 /***/ }),
-/* 53 */
+/* 55 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8881,7 +9232,7 @@ module.exports = DOMNamespaces;
 
 var _prodInvariant = __webpack_require__(4);
 
-var ReactErrorUtils = __webpack_require__(57);
+var ReactErrorUtils = __webpack_require__(59);
 
 var invariant = __webpack_require__(2);
 var warning = __webpack_require__(3);
@@ -9095,7 +9446,7 @@ module.exports = EventPluginUtils;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 54 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9157,7 +9508,7 @@ var KeyEscapeUtils = {
 module.exports = KeyEscapeUtils;
 
 /***/ }),
-/* 55 */
+/* 57 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9173,10 +9524,10 @@ module.exports = KeyEscapeUtils;
 
 var _prodInvariant = __webpack_require__(4);
 
-var ReactPropTypesSecret = __webpack_require__(97);
-var propTypesFactory = __webpack_require__(84);
+var ReactPropTypesSecret = __webpack_require__(98);
+var propTypesFactory = __webpack_require__(85);
 
-var React = __webpack_require__(32);
+var React = __webpack_require__(33);
 var PropTypes = propTypesFactory(React.isValidElement);
 
 var invariant = __webpack_require__(2);
@@ -9299,7 +9650,7 @@ module.exports = LinkedValueUtils;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 56 */
+/* 58 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9347,7 +9698,7 @@ module.exports = ReactComponentEnvironment;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 57 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9429,7 +9780,7 @@ module.exports = ReactErrorUtils;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 58 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9446,7 +9797,7 @@ module.exports = ReactErrorUtils;
 var _prodInvariant = __webpack_require__(4);
 
 var ReactCurrentOwner = __webpack_require__(15);
-var ReactInstanceMap = __webpack_require__(30);
+var ReactInstanceMap = __webpack_require__(31);
 var ReactInstrumentation = __webpack_require__(13);
 var ReactUpdates = __webpack_require__(14);
 
@@ -9667,7 +10018,7 @@ module.exports = ReactUpdateQueue;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 59 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9702,7 +10053,7 @@ var createMicrosoftUnsafeLocalFunction = function (func) {
 module.exports = createMicrosoftUnsafeLocalFunction;
 
 /***/ }),
-/* 60 */
+/* 62 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9755,7 +10106,7 @@ function getEventCharCode(nativeEvent) {
 module.exports = getEventCharCode;
 
 /***/ }),
-/* 61 */
+/* 63 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9801,7 +10152,7 @@ function getEventModifierState(nativeEvent) {
 module.exports = getEventModifierState;
 
 /***/ }),
-/* 62 */
+/* 64 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9839,7 +10190,7 @@ function getEventTarget(nativeEvent) {
 module.exports = getEventTarget;
 
 /***/ }),
-/* 63 */
+/* 65 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9902,7 +10253,7 @@ function isEventSupported(eventNameSuffix, capture) {
 module.exports = isEventSupported;
 
 /***/ }),
-/* 64 */
+/* 66 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -9947,7 +10298,7 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 module.exports = shouldUpdateReactComponent;
 
 /***/ }),
-/* 65 */
+/* 67 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -10322,7 +10673,7 @@ module.exports = validateDOMNesting;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 66 */
+/* 68 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -10391,7 +10742,7 @@ module.exports = lowPriorityWarning;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 67 */
+/* 69 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -10399,12 +10750,12 @@ module.exports = lowPriorityWarning;
 
 var asLocalTrack = __webpack_require__(5).asLocalTrack;
 var buildLogLevels = __webpack_require__(5).buildLogLevels;
-var getUserMedia = __webpack_require__(22).getUserMedia;
+var getUserMedia = __webpack_require__(19).getUserMedia;
 var LocalAudioTrack = __webpack_require__(44);
 var LocalDataTrack = __webpack_require__(45);
 var LocalVideoTrack = __webpack_require__(46);
-var MediaStreamTrack = __webpack_require__(22).MediaStreamTrack;
-var Log = __webpack_require__(19);
+var MediaStreamTrack = __webpack_require__(19).MediaStreamTrack;
+var Log = __webpack_require__(17);
 var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
 
 // This is used to make out which createLocalTracks() call a particular Log
@@ -10538,7 +10889,7 @@ module.exports = createLocalTracks;
 
 
 /***/ }),
-/* 68 */
+/* 70 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -10565,6 +10916,9 @@ function Track(id, kind, options) {
   }, options);
 
   EventEmitter.call(this);
+
+  var name = String(options.name);
+
   Object.defineProperties(this, {
     _instanceId: {
       value: ++nInstances
@@ -10582,7 +10936,7 @@ function Track(id, kind, options) {
     },
     name: {
       enumerable: true,
-      value: options.name
+      value: name
     }
   });
 }
@@ -10640,14 +10994,14 @@ module.exports = Track;
 
 
 /***/ }),
-/* 69 */
+/* 71 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var buildLogLevels = __webpack_require__(5).buildLogLevels;
-var Log = __webpack_require__(19);
+var Log = __webpack_require__(17);
 var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
 var nInstances = 0;
 
@@ -10729,22 +11083,22 @@ module.exports = LocalTrackPublication;
 
 
 /***/ }),
-/* 70 */
+/* 72 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var MediaStream = __webpack_require__(22).MediaStream;
+var MediaStream = __webpack_require__(19).MediaStream;
 var inherits = __webpack_require__(1).inherits;
-var Track = __webpack_require__(68);
+var Track = __webpack_require__(70);
 
 /**
- * Construct a {@link MediaTrack} from a MediaStreamTrack.
+ * Construct a {@link MediaTrack}.
  * @class
  * @classdesc A {@link MediaTrack} represents audio or video that can be sent to
  *   or received from a {@link Room}.
- * @param {MediaStreamTrack} mediaStreamTrack
+ * @param {MediaTrackTransceiver} mediaTrackTransceiver
  * @param {{log: Log}} options
  * @property {Track.ID} id - This {@link Track}'s ID
  * @property {boolean} isStarted - Whether or not the {@link MediaTrack} has
@@ -10759,8 +11113,8 @@ var Track = __webpack_require__(68);
  * @fires MediaTrack#enabled
  * @fires MediaTrack#started
  */
-function MediaTrack(mediaStreamTrack, options) {
-  Track.call(this, mediaStreamTrack.id, mediaStreamTrack.kind, options);
+function MediaTrack(mediaTrackTransceiver, options) {
+  Track.call(this, mediaTrackTransceiver.id, mediaTrackTransceiver.kind, options);
   var isStarted = false;
 
   options = Object.assign({
@@ -10790,7 +11144,7 @@ function MediaTrack(mediaStreamTrack, options) {
     },
     mediaStreamTrack: {
       enumerable: true,
-      value: mediaStreamTrack
+      value: mediaTrackTransceiver.track
     }
   });
 
@@ -10806,8 +11160,10 @@ inherits(MediaTrack, Track);
 MediaTrack.prototype._start = function _start() {
   this._log.debug('Started');
   this._isStarted = true;
-  this._detachElement(this._dummyEl);
-  this._dummyEl.oncanplay = null;
+  if (this._dummyEl) {
+    this._detachElement(this._dummyEl);
+    this._dummyEl.oncanplay = null;
+  }
   this.emit(STARTED, this);
 };
 
@@ -10822,16 +11178,20 @@ MediaTrack.prototype._initialize = function _initialize() {
     self.mediaStreamTrack.removeEventListener('ended', onended);
   });
 
-  this._dummyEl.muted = true;
-  this._dummyEl.oncanplay = this._start.bind(this, this._dummyEl);
-  this._attach(this._dummyEl);
-  this._attachments.delete(this._dummyEl);
+  if (this._dummyEl) {
+    this._dummyEl.muted = true;
+    this._dummyEl.oncanplay = this._start.bind(this, this._dummyEl);
+    this._attach(this._dummyEl);
+    this._attachments.delete(this._dummyEl);
+  }
 };
 
 MediaTrack.prototype._end = function _end() {
   this._log.debug('Ended');
-  this._detachElement(this._dummyEl);
-  this._dummyEl.oncanplay = null;
+  if (this._dummyEl) {
+    this._detachElement(this._dummyEl);
+    this._dummyEl.oncanplay = null;
+  }
 };
 
 MediaTrack.prototype.attach = function attach(el) {
@@ -10889,7 +11249,9 @@ MediaTrack.prototype._selectElement = function _selectElement(selector) {
 };
 
 MediaTrack.prototype._createElement = function _createElement() {
-  return document.createElement(this.kind);
+  return typeof document !== 'undefined'
+    ? document.createElement(this.kind)
+    : null;
 };
 
 MediaTrack.prototype.detach = function _detach(el) {
@@ -10948,14 +11310,14 @@ module.exports = MediaTrack;
 
 
 /***/ }),
-/* 71 */
+/* 73 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var StateMachine = __webpack_require__(33);
+var StateMachine = __webpack_require__(34);
 
 /*
 ParticipantSignaling States
@@ -11027,7 +11389,7 @@ inherits(ParticipantSignaling, StateMachine);
 /**
  * Add the {@link TrackSignaling}, MediaStreamTrack, or
  * {@link DataTrackSender} to the {@link ParticipantSignaling}.
- * @param {TrackSignaling|MediaStreamTrack|DataTrackSender} track
+ * @param {TrackSignaling|DataTrackSender|MediaTrackSender} track
  * @returns {this}
  * @fires ParticipantSignaling#trackAdded
  */
@@ -11052,7 +11414,7 @@ ParticipantSignaling.prototype.disconnect = function disconnect() {
 /**
  * Remove the {@link TrackSignaling}, MediaStreamTrack, or
  * {@link DataTrackSender} from the {@link ParticipantSignaling}.
- * @param {TrackSignaling|MediaStreamTrack|DataTrackSender} track
+ * @param {TrackSignaling|DataTrackSender|MediaTrackSender} track
  * @returns {boolean}
  * @fires ParticipantSignaling#trackRemoved
  */
@@ -11096,18 +11458,18 @@ module.exports = ParticipantSignaling;
 
 
 /***/ }),
-/* 72 */
+/* 74 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 /* WEBPACK VAR INJECTION */(function(global) {
 
 var toplevel = global.window || global;
-var Transport = __webpack_require__(159);
-var WebSocket = toplevel.WebSocket ? toplevel.WebSocket : __webpack_require__(127);
+var Transport = __webpack_require__(163);
+var WebSocket = toplevel.WebSocket ? toplevel.WebSocket : __webpack_require__(131);
 var addEventListener = toplevel.addEventListener ? toplevel.addEventListener.bind(toplevel) : null;
 
-module.exports = __webpack_require__(150)({
+module.exports = __webpack_require__(154)({
   addEventListener: addEventListener,
   console: toplevel.console,
   Promise: toplevel.Promise,
@@ -11119,7 +11481,7 @@ module.exports = __webpack_require__(150)({
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(47)))
 
 /***/ }),
-/* 73 */
+/* 75 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11242,240 +11604,13 @@ module.exports = CancelablePromise;
 
 
 /***/ }),
-/* 74 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-var difference = __webpack_require__(5).difference;
-var flatMap = __webpack_require__(5).flatMap;
-
-// NOTE(mmalavalli): This value is derived from the IETF spec
-// for JSEP, and it is used to convert a 'b=TIAS' value in bps
-// to a 'b=AS' value in kbps.
-// Spec: https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-21#section-5.9
-var RTCP_BITRATE = 16000;
-
-/**
- * Construct a b= line string for the given max bitrate in bps. If the modifier
- * is 'AS', then the max bitrate will be converted to kbps using the formula
- * specified in the IETF spec for JSEP mentioned above.
- * @param {string} modifier - 'AS' | 'TIAS'
- * @param {?number} maxBitrate - Max outgoing bitrate (bps)
- * @returns {?string} - If "maxBitrate" is null, then returns null;
- *   otherwise return the constructed b= line string
- */
-function createBLine(modifier, maxBitrate) {
-  if (!maxBitrate) {
-    return null;
-  }
-  return '\r\nb=' + modifier + ':' + (modifier === 'AS'
-    ? Math.round((maxBitrate + RTCP_BITRATE) / 950)
-    : maxBitrate);
-}
-
-/**
- * Create a Codec Map for the given m= section.
- * @param {string} section - The given m= section
- * @returns {Map<AudioCodec|VideoCodec, Array<PayloadType>>}
- */
-function createCodecMapForMediaSection(section) {
-  var payloadTypes = getPayloadTypesInMediaSection(section);
-  return payloadTypes.reduce(function(codecMap, payloadType) {
-    var rtpmapPattern = new RegExp('a=rtpmap:' + payloadType + ' ([^/]+)');
-    var matches = section.match(rtpmapPattern);
-
-    // This should not happen, but in case there is no rtpmap entry
-    // for a given Codec Name, then return the existing Codec Map.
-    if (!matches) {
-      return codecMap;
-    }
-
-    var codecName = matches[1].toLowerCase();
-    var types = codecMap.get(codecName) || [];
-    return codecMap.set(codecName, types.concat(payloadType));
-  }, new Map());
-}
-
-/**
- * Get the m= sections of a particular kind and direction from an sdp.
- * @param {string} sdp - SDP string
- * @param {string} [kind] - Pattern for matching kind
- * @param {string} [direction] - Pattern for matching direction
- * @returns {Array<string>} mediaSections
- */
-function getMediaSections(sdp, kind, direction) {
-  return sdp.split('\r\nm=').slice(1).map(function(mediaSection) {
-    return 'm=' + mediaSection;
-  }).filter(function(mediaSection) {
-    var kindPattern = new RegExp('m=' + (kind || '.*'), 'gm');
-    var directionPattern = new RegExp('a=' + (direction || '.*'), 'gm');
-    return kindPattern.test(mediaSection) && directionPattern.test(mediaSection);
-  });
-}
-
-/**
- * Get the Codec Payload Types present in the first line of the given m= section
- * @param {string} section - The m= section
- * @returns {Array<PayloadType>} Payload Types
- */
-function getPayloadTypesInMediaSection(section) {
-  var mLine = section.split('\r\n')[0];
-
-  // In "m=<kind> <port> <proto> <payload_type_1> <payload_type_2> ... <payload_type_n>",
-  // the regex matches <port> and the PayloadTypes.
-  var matches = mLine.match(/([0-9]+)/g);
-
-  // This should not happen, but in case there are no PayloadTypes in
-  // the m= line, return an empty array.
-  if (!matches) {
-    return [];
-  }
-
-  // Since only the PayloadTypes are needed, we discard the <port>.
-  return matches.slice(1).map(function(match) {
-    return parseInt(match, 10);
-  });
-}
-
-/**
- * Create the reordered Codec Payload Types based on the preferred Codec Names.
- * @param {Map<AudioCodec|VideoCodec, Array<PayloadType>>} codecMap - Codec Map
- * @param {Array<AudioCodec|VideoCodec>} preferredCodecs - Preferred Codec Names
- * @returns {Array<PayloadType>} Reordered Payload Types
- */
-function getReorderedPayloadTypes(codecMap, preferredCodecs) {
-  preferredCodecs = preferredCodecs.map(function(codecName) {
-    return codecName.toLowerCase();
-  });
-
-  var preferredPayloadTypes = flatMap(preferredCodecs, function(codecName) {
-    return codecMap.get(codecName) || [];
-  });
-
-  var remainingCodecs = difference(Array.from(codecMap.keys()), preferredCodecs);
-  var remainingPayloadTypes = flatMap(remainingCodecs, function(codecName) {
-    return codecMap.get(codecName);
-  });
-
-  return preferredPayloadTypes.concat(remainingPayloadTypes);
-}
-
-/**
- * Set the specified max bitrate in the given m= section.
- * @param {string} modifier - 'AS' | 'TIAS'
- * @param {?number} maxBitrate - Max outgoing bitrate (bps)
- * @param {string} section - m= section string
- * @returns {string} The updated m= section
- */
-function setBitrateInMediaSection(modifier, maxBitrate, section) {
-  var bLine = createBLine(modifier, maxBitrate) || '';
-  var bLinePattern = /\r\nb=(AS|TIAS):([0-9]+)/;
-  var bLineMatched = section.match(bLinePattern);
-
-  if (!bLineMatched) {
-    return section.replace(/(\r\n)?$/, bLine + '$1');
-  }
-
-  var maxBitrateMatched = parseInt(bLineMatched[2], 10);
-  maxBitrate = maxBitrate || Infinity;
-  bLine = createBLine(modifier, Math.min(maxBitrateMatched, maxBitrate));
-  return section.replace(bLinePattern, bLine);
-}
-
-/**
- * Set maximum bitrates to the media sections in a given sdp.
- * @param {string} sdp - sdp string
- * @param {string} modifier - 'AS' | 'TIAS"
- * @param {?number} maxAudioBitrate - Max outgoing audio bitrate (bps), null
- *   if no limit is to be applied
- * @param {?number} maxVideoBitrate - Max outgoing video bitrate (bps), null
- *   if no limit is to be applied
- * @returns {string} - The updated sdp string
- */
-function setBitrateParameters(sdp, modifier, maxAudioBitrate, maxVideoBitrate) {
-  var mediaSections = getMediaSections(sdp);
-  var session = sdp.split('\r\nm=')[0];
-  return [session].concat(mediaSections.map(function(section) {
-    // Bitrate parameters should not be applied to m=application sections
-    // or to m=(audio|video) sections that do not receive media.
-    if (!/^m=(audio|video)/.test(section) || !/a=(recvonly|sendrecv)/.test(section)) {
-      return section;
-    }
-    var kind = section.match(/^m=(audio|video)/)[1];
-    var maxBitrate = kind === 'audio' ? maxAudioBitrate : maxVideoBitrate;
-    return setBitrateInMediaSection(modifier, maxBitrate, section);
-  })).join('\r\n');
-}
-
-/**
- * Set the given Codec Payload Types in the first line of the given m= section.
- * @param {Array<PayloadType>} payloadTypes - Payload Types
- * @param {string} section - Given m= section
- * @returns {string} - Updated m= section
- */
-function setPayloadTypesInMediaSection(payloadTypes, section) {
-  var lines = section.split('\r\n');
-  var mLine = lines[0];
-  var otherLines = lines.slice(1);
-  mLine = mLine.replace(/([0-9]+\s?)+$/, payloadTypes.join(' '));
-  return [mLine].concat(otherLines).join('\r\n');
-}
-
-/**
- * Return a new SDP string with the re-ordered codec preferences.
- * @param {string} sdp
- * @param {Array<AudioCodec>} preferredAudioCodecs - If empty, the existing order
- *   of audio codecs is preserved
- * @param {Array<VideoCodec>} preferredVideoCodecs - If empty, the existing order
- *   of video codecs is preserved
- * @returns {string} Updated SDP string
- */
-function setCodecPreferences(sdp, preferredAudioCodecs, preferredVideoCodecs) {
-  var mediaSections = getMediaSections(sdp);
-  var session = sdp.split('\r\nm=')[0];
-  return [session].concat(mediaSections.map(function(section) {
-    // Codec preferences should not be applied to m=application sections.
-    if (!/^m=(audio|video)/.test(section)) {
-      return section;
-    }
-    var kind = section.match(/^m=(audio|video)/)[1];
-    var codecMap = createCodecMapForMediaSection(section);
-    var preferredCodecs = kind === 'audio' ? preferredAudioCodecs : preferredVideoCodecs;
-    var payloadTypes = getReorderedPayloadTypes(codecMap, preferredCodecs);
-    var newSection = setPayloadTypesInMediaSection(payloadTypes, section);
-
-    var pcmaPayloadTypes = codecMap.get('pcma') || [];
-    var pcmuPayloadTypes = codecMap.get('pcmu') || [];
-    var fixedBitratePayloadTypes = kind === 'audio'
-      ? new Set(pcmaPayloadTypes.concat(pcmuPayloadTypes))
-      : new Set();
-
-    return fixedBitratePayloadTypes.has(payloadTypes[0])
-      ? newSection.replace(/\r\nb=(AS|TIAS):([0-9]+)/g, '')
-      : newSection;
-  })).join('\r\n');
-}
-
-/**
- * Codec Payload Type.
- * @typedef {number} PayloadType
- */
-
-exports.getMediaSections = getMediaSections;
-exports.setBitrateParameters = setBitrateParameters;
-exports.setCodecPreferences = setCodecPreferences;
-
-
-/***/ }),
-/* 75 */
+/* 76 */
 /***/ (function(module, exports) {
 
-module.exports = {"_args":[["twilio-video@1.6.0","/Users/melonarg/Sites/devdesktop/react-twilio"]],"_from":"twilio-video@1.6.0","_id":"twilio-video@1.6.0","_inBundle":false,"_integrity":"sha1-Ehuylhi9FxRSc/8/D8K7DCerg/8=","_location":"/twilio-video","_phantomChildren":{},"_requested":{"type":"version","registry":true,"raw":"twilio-video@1.6.0","name":"twilio-video","escapedName":"twilio-video","rawSpec":"1.6.0","saveSpec":null,"fetchSpec":"1.6.0"},"_requiredBy":["/"],"_resolved":"https://registry.npmjs.org/twilio-video/-/twilio-video-1.6.0.tgz","_spec":"1.6.0","_where":"/Users/melonarg/Sites/devdesktop/react-twilio","author":{"name":"Mark Andrus Roberts","email":"mroberts@twilio.com"},"browser":{"ws":"./src/ws.js","xmlhttprequest":"./src/xmlhttprequest.js"},"bugs":{"url":"https://github.com/twilio/twilio-video.js/issues"},"contributors":[{"name":"Ryan Rowland","email":"rrowland@twilio.com"},{"name":"Manjesh Malavalli","email":"mmalavalli@twilio.com"}],"dependencies":{"@twilio/sip.js":"^0.7.6","@twilio/webrtc":"^1.1.0","ws":"^2.3.1","xmlhttprequest":"^1.8.0"},"description":"Twilio Video JavaScript library","devDependencies":{"browserify":"^14.3.0","cheerio":"^0.22.0","chromedriver":"2.28.0","envify":"^4.0.0","eslint":"^3.19.0","geckodriver":"1.4.0","ink-docstrap":"^1.3.0","istanbul":"^0.4.5","jsdoc":"^3.4.3","karma":"^1.6.0","karma-browserify":"^5.1.1","karma-chrome-launcher":"^2.0.0","karma-firefox-launcher":"^1.0.1","karma-mocha":"^1.3.0","karma-safaritechpreview-launcher":"0.0.6","karma-spec-reporter":"^0.0.31","mocha":"^3.2.0","mock-browser":"^0.92.14","npm-run-all":"^4.0.2","phantom":"^4.0.2","release-tool":"^0.2.2","requirejs":"^2.3.3","rimraf":"^2.6.1","selenium-webdriver":"3.3.0","sinon":"^4.0.1","travis-multirunner":"^4.0.0","twilio":"^2.11.1","uglify-js":"^2.8.22","vinyl-fs":"^2.4.4","vinyl-source-stream":"^1.1.0","webrtc-adapter":"^4.1.1"},"engines":{"node":">=0.12"},"homepage":"https://twilio.com","keywords":["twilio","webrtc","library","javascript","video","rooms"],"license":"BSD-3-Clause","main":"./lib/index.js","name":"twilio-video","repository":{"type":"git","url":"git+https://github.com/twilio/twilio-video.js.git"},"scripts":{"build":"npm-run-all clean lint docs cover test:integration build:js build:min.js test:umd","build:js":"node ./scripts/build.js ./src/twilio-video.js ./LICENSE.md ./dist/twilio-video.js","build:min.js":"uglifyjs ./dist/twilio-video.js -o ./dist/twilio-video.min.js --comments \"/^! twilio-video.js/\" -b beautify=false,ascii_only=true","build:quick":"npm-run-all clean lint docs build:js build:min.js","build:travis":"npm-run-all clean lint docs cover test:integration:travis build:js build:min.js test:umd test:framework","clean":"rimraf ./coverage ./dist","cover":"istanbul cover node_modules/mocha/bin/_mocha -- ./test/unit/index.js","docs":"node ./scripts/docs.js ./dist/docs","lint":"eslint ./lib","test":"npm-run-all test:unit test:integration","test:framework":"npm-run-all test:framework:angular test:framework:meteor test:framework:no-framework test:framework:react","test:framework:angular":"npm-run-all test:framework:angular:*","test:framework:angular:install":"cd ./test/framework/twilio-video-angular && rimraf ./node_modules && npm install","test:framework:angular:run":"mocha ./test/framework/twilio-video-angular.js","test:framework:angular:test":"node ./scripts/framework.js twilio-video-angular","test:framework:meteor":"npm-run-all test:framework:meteor:*","test:framework:meteor:install":"cd ./test/framework/twilio-video-meteor && rimraf ./node_modules && npm install","test:framework:meteor:run":"mocha ./test/framework/twilio-video-meteor.js","test:framework:meteor:test":"node ./scripts/framework.js twilio-video-meteor","test:framework:no-framework":"npm-run-all test:framework:no-framework:*","test:framework:no-framework:run":"mocha ./test/framework/twilio-video-no-framework.js","test:framework:react":"npm-run-all test:framework:react:*","test:framework:react:build":"cd ./test/framework/twilio-video-react && npm run build","test:framework:react:install":"cd ./test/framework/twilio-video-react && rimraf ./node_modules && npm install","test:framework:react:run":"mocha ./test/framework/twilio-video-react.js","test:framework:react:test":"node ./scripts/framework.js twilio-video-react","test:integration":"node ./scripts/karma.js karma/integration.conf.js","test:integration:adapter":"node ./scripts/karma.js karma/integration.adapter.conf.js","test:integration:travis":"node ./scripts/integration.js","test:umd":"mocha ./test/umd/index.js","test:unit":"mocha ./test/unit/index.js"},"title":"Twilio Video","version":"1.6.0"}
+module.exports = {"name":"twilio-video","title":"Twilio Video","description":"Twilio Video JavaScript library","version":"1.8.0","homepage":"https://twilio.com","author":"Mark Andrus Roberts <mroberts@twilio.com>","contributors":["Ryan Rowland <rrowland@twilio.com>","Manjesh Malavalli <mmalavalli@twilio.com>"],"keywords":["twilio","webrtc","library","javascript","video","rooms"],"repository":{"type":"git","url":"https://github.com/twilio/twilio-video.js.git"},"devDependencies":{"@types/express":"^4.11.0","@types/node":"^8.5.1","@types/selenium-webdriver":"^3.0.8","@types/ws":"^3.2.1","browserify":"^14.3.0","cheerio":"^0.22.0","chromedriver":"2.28.0","envify":"^4.0.0","eslint":"^4.9.0","express":"^4.16.2","geckodriver":"1.4.0","ink-docstrap":"^1.3.0","istanbul":"^0.4.5","jsdoc":"^3.4.3","karma":"^1.6.0","karma-browserify":"^5.1.1","karma-chrome-launcher":"^2.0.0","karma-firefox-launcher":"^1.0.1","karma-mocha":"^1.3.0","karma-safaritechpreview-launcher":"0.0.6","karma-spec-reporter":"^0.0.31","mocha":"^3.2.0","npm-run-all":"^4.0.2","phantom":"^4.0.2","release-tool":"^0.2.2","requirejs":"^2.3.3","rimraf":"^2.6.1","selenium-webdriver":"3.3.0","sinon":"^4.0.1","travis-multirunner":"^4.0.0","ts-node":"4.0.1","tslint":"5.8.0","twilio":"^2.11.1","typescript":"2.6.2","uglify-js":"^2.8.22","vinyl-fs":"^2.4.4","vinyl-source-stream":"^1.1.0","webrtc-adapter":"^4.1.1"},"engines":{"node":">=0.12"},"license":"BSD-3-Clause","main":"./lib/index.js","scripts":{"lint":"eslint ./lib ./test/*.js ./test/framework/*.js ./test/lib/*.js ./test/integration/** ./test/unit/**","test:unit":"mocha ./test/unit/index.js","test:integration:adapter":"node ./scripts/karma.js karma/integration.adapter.conf.js","test:integration:travis":"node ./scripts/integration.js","test:integration":"node ./scripts/karma.js karma/integration.conf.js","test:umd":"mocha ./test/umd/index.js","test:crossbrowser:build:clean":"rimraf ./test/crossbrowser/lib ./test/crossbrowser/src/browser/index.js","test:crossbrowser:build:lint":"cd ./test/crossbrowser && tslint --project tsconfig.json","test:crossbrowser:build:tsc":"cd ./test/crossbrowser && tsc","test:crossbrowser:build:browser":"cd ./test/crossbrowser && browserify lib/crossbrowser/src/browser/index.js > src/browser/index.js","test:crossbrowser:build":"npm-run-all test:crossbrowser:build:*","test:crossbrowser:test":"cd ./test/crossbrowser && mocha --compilers ts:ts-node/register test/integration/spec/**/*.ts","test:crossbrowser":"npm-run-all test:crossbrowser:*","test:sdkdriver:build:clean":"rimraf ./test/lib/sdkdriver/lib ./test/lib/sdkdriver/test/integration/browser/index.js","test:sdkdriver:build:lint":"cd ./test/lib/sdkdriver && tslint --project tsconfig.json","test:sdkdriver:build:tsc":"cd ./test/lib/sdkdriver && tsc --rootDir src","test:sdkdriver:build":"npm-run-all test:sdkdriver:build:*","test:sdkdriver:test:unit":"cd ./test/lib/sdkdriver && mocha --compilers ts:ts-node/register test/unit/spec/**/*.ts","test:sdkdriver:test:integration:browser":"cd ./test/lib/sdkdriver/test/integration && browserify browser/browser.js > browser/index.js","test:sdkdriver:test:integration:run":"cd ./test/lib/sdkdriver && mocha --compilers ts:ts-node/register test/integration/spec/**/*.ts","test:sdkdriver:test:integration":"npm-run-all test:sdkdriver:test:integration:*","test:sdkdriver:test":"npm-run-all test:sdkdriver:test:*","test:sdkdriver":"npm-run-all test:sdkdriver:*","test:framework:angular:install":"cd ./test/framework/twilio-video-angular && rimraf ./node_modules && npm install","test:framework:angular:test":"node ./scripts/framework.js twilio-video-angular","test:framework:angular:run":"mocha ./test/framework/twilio-video-angular.js","test:framework:angular":"npm-run-all test:framework:angular:*","test:framework:meteor:install":"cd ./test/framework/twilio-video-meteor && rimraf ./node_modules && npm install","test:framework:meteor:test":"node ./scripts/framework.js twilio-video-meteor","test:framework:meteor:run":"mocha ./test/framework/twilio-video-meteor.js","test:framework:meteor":"npm-run-all test:framework:meteor:*","test:framework:no-framework:run":"mocha ./test/framework/twilio-video-no-framework.js","test:framework:no-framework":"npm-run-all test:framework:no-framework:*","test:framework:react:install":"cd ./test/framework/twilio-video-react && rimraf ./node_modules && npm install","test:framework:react:test":"node ./scripts/framework.js twilio-video-react","test:framework:react:build":"cd ./test/framework/twilio-video-react && npm run build","test:framework:react:run":"mocha ./test/framework/twilio-video-react.js","test:framework:react":"npm-run-all test:framework:react:*","test:framework":"npm-run-all test:framework:meteor test:framework:no-framework test:framework:react","test":"npm-run-all test:unit test:integration","build:js":"node ./scripts/build.js ./src/twilio-video.js ./LICENSE.md ./dist/twilio-video.js","build:min.js":"uglifyjs ./dist/twilio-video.js -o ./dist/twilio-video.min.js --comments \"/^! twilio-video.js/\" -b beautify=false,ascii_only=true","build":"npm-run-all clean lint docs cover test:integration build:js build:min.js test:umd","build:travis":"npm-run-all clean lint docs cover test:integration:travis build:js build:min.js test:umd test:framework","build:quick":"npm-run-all clean lint docs build:js build:min.js","docs":"node ./scripts/docs.js ./dist/docs","clean":"rimraf ./coverage ./dist","cover":"istanbul cover node_modules/mocha/bin/_mocha -- ./test/unit/index.js"},"dependencies":{"@twilio/sip.js":"^0.7.7","@twilio/webrtc":"^2.0.0","ws":"^3.3.1","xmlhttprequest":"^1.8.0"},"browser":{"ws":"./src/ws.js","xmlhttprequest":"./src/xmlhttprequest.js"}}
 
 /***/ }),
-/* 76 */
+/* 77 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11494,7 +11629,7 @@ if (typeof webkitMediaStream !== 'undefined') {
 
 
 /***/ }),
-/* 77 */
+/* 78 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11540,7 +11675,7 @@ module.exports = ChromeRTCSessionDescription;
 
 
 /***/ }),
-/* 78 */
+/* 79 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11553,13 +11688,13 @@ module.exports = typeof RTCSessionDescription !== 'undefined'
 
 
 /***/ }),
-/* 79 */
+/* 80 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var defer = __webpack_require__(16).defer;
+var defer = __webpack_require__(20).defer;
 
 var states = {
   high: new Set(['low']),
@@ -11673,7 +11808,7 @@ module.exports = Latch;
 
 
 /***/ }),
-/* 80 */
+/* 81 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11685,11 +11820,11 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(21);
+var _react = __webpack_require__(23);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _propTypes = __webpack_require__(34);
+var _propTypes = __webpack_require__(35);
 
 var _propTypes2 = _interopRequireDefault(_propTypes);
 
@@ -11727,7 +11862,8 @@ var TwilioVideo = function (_Component) {
                 tracks.filter(function (track) {
                     return !track.isAudio;
                 }).forEach(function (track) {
-                    track.enable();
+                    // track.enable() not a function
+                    //track.enable();
                 });
             }
         }
@@ -11755,7 +11891,7 @@ var TwilioVideo = function (_Component) {
                 tracks.filter(function (track) {
                     return !track.isAudio;
                 }).forEach(function (track) {
-                    track.disable();
+                    track.stop();
                 });
             }
         }
@@ -11847,7 +11983,7 @@ TwilioVideo.propTypes = {
 exports.default = TwilioVideo;
 
 /***/ }),
-/* 81 */
+/* 82 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11928,7 +12064,7 @@ module.exports = EventListener;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 82 */
+/* 83 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -11958,7 +12094,7 @@ function focusNode(node) {
 module.exports = focusNode;
 
 /***/ }),
-/* 83 */
+/* 84 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -12000,7 +12136,7 @@ function getActiveElement(doc) /*?DOMElement*/{
 module.exports = getActiveElement;
 
 /***/ }),
-/* 84 */
+/* 85 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -12017,7 +12153,7 @@ module.exports = getActiveElement;
 // Therefore we re-export development-only version with all the PropTypes checks here.
 // However if one is migrating to the `prop-types` npm library, they will go through the
 // `index.js` entry point, and it will branch depending on the environment.
-var factory = __webpack_require__(85);
+var factory = __webpack_require__(86);
 module.exports = function(isValidElement) {
   // It is still allowed in 15.5.
   var throwOnDirectAccess = false;
@@ -12026,7 +12162,7 @@ module.exports = function(isValidElement) {
 
 
 /***/ }),
-/* 85 */
+/* 86 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -12044,8 +12180,8 @@ var invariant = __webpack_require__(2);
 var warning = __webpack_require__(3);
 var assign = __webpack_require__(6);
 
-var ReactPropTypesSecret = __webpack_require__(50);
-var checkPropTypes = __webpack_require__(197);
+var ReactPropTypesSecret = __webpack_require__(52);
+var checkPropTypes = __webpack_require__(200);
 
 module.exports = function(isValidElement, throwOnDirectAccess) {
   /* global Symbol */
@@ -12576,7 +12712,7 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 86 */
+/* 87 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -12734,7 +12870,7 @@ var CSSProperty = {
 module.exports = CSSProperty;
 
 /***/ }),
-/* 87 */
+/* 88 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -12753,7 +12889,7 @@ var _prodInvariant = __webpack_require__(4);
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var PooledClass = __webpack_require__(23);
+var PooledClass = __webpack_require__(24);
 
 var invariant = __webpack_require__(2);
 
@@ -12857,7 +12993,7 @@ module.exports = PooledClass.addPoolingTo(CallbackQueue);
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 88 */
+/* 89 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -12871,11 +13007,11 @@ module.exports = PooledClass.addPoolingTo(CallbackQueue);
 
 
 
-var DOMProperty = __webpack_require__(18);
+var DOMProperty = __webpack_require__(21);
 var ReactDOMComponentTree = __webpack_require__(7);
 var ReactInstrumentation = __webpack_require__(13);
 
-var quoteAttributeValueForBrowser = __webpack_require__(268);
+var quoteAttributeValueForBrowser = __webpack_require__(271);
 var warning = __webpack_require__(3);
 
 var VALID_ATTRIBUTE_NAME_REGEX = new RegExp('^[' + DOMProperty.ATTRIBUTE_NAME_START_CHAR + '][' + DOMProperty.ATTRIBUTE_NAME_CHAR + ']*$');
@@ -13096,7 +13232,7 @@ module.exports = DOMPropertyOperations;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 89 */
+/* 90 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -13117,7 +13253,7 @@ var ReactDOMComponentFlags = {
 module.exports = ReactDOMComponentFlags;
 
 /***/ }),
-/* 90 */
+/* 91 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -13133,7 +13269,7 @@ module.exports = ReactDOMComponentFlags;
 
 var _assign = __webpack_require__(6);
 
-var LinkedValueUtils = __webpack_require__(55);
+var LinkedValueUtils = __webpack_require__(57);
 var ReactDOMComponentTree = __webpack_require__(7);
 var ReactUpdates = __webpack_require__(14);
 
@@ -13321,7 +13457,7 @@ module.exports = ReactDOMSelect;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 91 */
+/* 92 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -13354,7 +13490,7 @@ ReactEmptyComponent.injection = ReactEmptyComponentInjection;
 module.exports = ReactEmptyComponent;
 
 /***/ }),
-/* 92 */
+/* 93 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -13379,7 +13515,7 @@ var ReactFeatureFlags = {
 module.exports = ReactFeatureFlags;
 
 /***/ }),
-/* 93 */
+/* 94 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -13451,7 +13587,7 @@ module.exports = ReactHostComponent;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 94 */
+/* 95 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -13465,11 +13601,11 @@ module.exports = ReactHostComponent;
 
 
 
-var ReactDOMSelection = __webpack_require__(223);
+var ReactDOMSelection = __webpack_require__(226);
 
-var containsNode = __webpack_require__(185);
-var focusNode = __webpack_require__(82);
-var getActiveElement = __webpack_require__(83);
+var containsNode = __webpack_require__(188);
+var focusNode = __webpack_require__(83);
+var getActiveElement = __webpack_require__(84);
 
 function isInDocument(node) {
   return containsNode(document.documentElement, node);
@@ -13577,7 +13713,7 @@ var ReactInputSelection = {
 module.exports = ReactInputSelection;
 
 /***/ }),
-/* 95 */
+/* 96 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -13593,27 +13729,27 @@ module.exports = ReactInputSelection;
 
 var _prodInvariant = __webpack_require__(4);
 
-var DOMLazyTree = __webpack_require__(25);
-var DOMProperty = __webpack_require__(18);
-var React = __webpack_require__(32);
+var DOMLazyTree = __webpack_require__(26);
+var DOMProperty = __webpack_require__(21);
+var React = __webpack_require__(33);
 var ReactBrowserEventEmitter = __webpack_require__(38);
 var ReactCurrentOwner = __webpack_require__(15);
 var ReactDOMComponentTree = __webpack_require__(7);
-var ReactDOMContainerInfo = __webpack_require__(215);
-var ReactDOMFeatureFlags = __webpack_require__(217);
-var ReactFeatureFlags = __webpack_require__(92);
-var ReactInstanceMap = __webpack_require__(30);
+var ReactDOMContainerInfo = __webpack_require__(218);
+var ReactDOMFeatureFlags = __webpack_require__(220);
+var ReactFeatureFlags = __webpack_require__(93);
+var ReactInstanceMap = __webpack_require__(31);
 var ReactInstrumentation = __webpack_require__(13);
-var ReactMarkupChecksum = __webpack_require__(237);
-var ReactReconciler = __webpack_require__(26);
-var ReactUpdateQueue = __webpack_require__(58);
+var ReactMarkupChecksum = __webpack_require__(240);
+var ReactReconciler = __webpack_require__(27);
+var ReactUpdateQueue = __webpack_require__(60);
 var ReactUpdates = __webpack_require__(14);
 
 var emptyObject = __webpack_require__(36);
-var instantiateReactComponent = __webpack_require__(104);
+var instantiateReactComponent = __webpack_require__(105);
 var invariant = __webpack_require__(2);
 var setInnerHTML = __webpack_require__(42);
-var shouldUpdateReactComponent = __webpack_require__(64);
+var shouldUpdateReactComponent = __webpack_require__(66);
 var warning = __webpack_require__(3);
 
 var ATTR_NAME = DOMProperty.ID_ATTRIBUTE_NAME;
@@ -14119,7 +14255,7 @@ module.exports = ReactMount;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 96 */
+/* 97 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14136,7 +14272,7 @@ module.exports = ReactMount;
 
 var _prodInvariant = __webpack_require__(4);
 
-var React = __webpack_require__(32);
+var React = __webpack_require__(33);
 
 var invariant = __webpack_require__(2);
 
@@ -14163,7 +14299,7 @@ module.exports = ReactNodeTypes;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 97 */
+/* 98 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14183,7 +14319,7 @@ var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
 module.exports = ReactPropTypesSecret;
 
 /***/ }),
-/* 98 */
+/* 99 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14211,7 +14347,7 @@ var ViewportMetrics = {
 module.exports = ViewportMetrics;
 
 /***/ }),
-/* 99 */
+/* 100 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14273,7 +14409,7 @@ module.exports = accumulateInto;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 100 */
+/* 101 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14307,7 +14443,7 @@ function forEachAccumulated(arr, cb, scope) {
 module.exports = forEachAccumulated;
 
 /***/ }),
-/* 101 */
+/* 102 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14321,7 +14457,7 @@ module.exports = forEachAccumulated;
 
 
 
-var ReactNodeTypes = __webpack_require__(96);
+var ReactNodeTypes = __webpack_require__(97);
 
 function getHostComponentFromComposite(inst) {
   var type;
@@ -14340,7 +14476,7 @@ function getHostComponentFromComposite(inst) {
 module.exports = getHostComponentFromComposite;
 
 /***/ }),
-/* 102 */
+/* 103 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14376,7 +14512,7 @@ function getTextContentAccessor() {
 module.exports = getTextContentAccessor;
 
 /***/ }),
-/* 103 */
+/* 104 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14502,7 +14638,7 @@ var inputValueTracking = {
 module.exports = inputValueTracking;
 
 /***/ }),
-/* 104 */
+/* 105 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14519,11 +14655,11 @@ module.exports = inputValueTracking;
 var _prodInvariant = __webpack_require__(4),
     _assign = __webpack_require__(6);
 
-var ReactCompositeComponent = __webpack_require__(212);
-var ReactEmptyComponent = __webpack_require__(91);
-var ReactHostComponent = __webpack_require__(93);
+var ReactCompositeComponent = __webpack_require__(215);
+var ReactEmptyComponent = __webpack_require__(92);
+var ReactHostComponent = __webpack_require__(94);
 
-var getNextDebugID = __webpack_require__(281);
+var getNextDebugID = __webpack_require__(284);
 var invariant = __webpack_require__(2);
 var warning = __webpack_require__(3);
 
@@ -14635,7 +14771,7 @@ module.exports = instantiateReactComponent;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 105 */
+/* 106 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14689,7 +14825,7 @@ function isTextInputElement(elem) {
 module.exports = isTextInputElement;
 
 /***/ }),
-/* 106 */
+/* 107 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14744,7 +14880,7 @@ if (ExecutionEnvironment.canUseDOM) {
 module.exports = setTextContent;
 
 /***/ }),
-/* 107 */
+/* 108 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14761,11 +14897,11 @@ module.exports = setTextContent;
 var _prodInvariant = __webpack_require__(4);
 
 var ReactCurrentOwner = __webpack_require__(15);
-var REACT_ELEMENT_TYPE = __webpack_require__(231);
+var REACT_ELEMENT_TYPE = __webpack_require__(234);
 
-var getIteratorFn = __webpack_require__(265);
+var getIteratorFn = __webpack_require__(268);
 var invariant = __webpack_require__(2);
-var KeyEscapeUtils = __webpack_require__(54);
+var KeyEscapeUtils = __webpack_require__(56);
 var warning = __webpack_require__(3);
 
 var SEPARATOR = '.';
@@ -14924,7 +15060,7 @@ module.exports = traverseAllChildren;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 108 */
+/* 109 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -14938,15 +15074,15 @@ module.exports = traverseAllChildren;
 
 
 
-var _prodInvariant = __webpack_require__(27),
+var _prodInvariant = __webpack_require__(28),
     _assign = __webpack_require__(6);
 
-var ReactNoopUpdateQueue = __webpack_require__(111);
+var ReactNoopUpdateQueue = __webpack_require__(112);
 
 var canDefineProperty = __webpack_require__(43);
 var emptyObject = __webpack_require__(36);
 var invariant = __webpack_require__(2);
-var lowPriorityWarning = __webpack_require__(66);
+var lowPriorityWarning = __webpack_require__(68);
 
 /**
  * Base class helpers for the updating state of a component.
@@ -15071,7 +15207,7 @@ module.exports = {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 109 */
+/* 110 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -15094,7 +15230,7 @@ var REACT_ELEMENT_TYPE = typeof Symbol === 'function' && Symbol['for'] && Symbol
 module.exports = REACT_ELEMENT_TYPE;
 
 /***/ }),
-/* 110 */
+/* 111 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -15117,14 +15253,14 @@ module.exports = REACT_ELEMENT_TYPE;
 
 var ReactCurrentOwner = __webpack_require__(15);
 var ReactComponentTreeHook = __webpack_require__(11);
-var ReactElement = __webpack_require__(24);
+var ReactElement = __webpack_require__(25);
 
-var checkReactTypeSpec = __webpack_require__(279);
+var checkReactTypeSpec = __webpack_require__(282);
 
 var canDefineProperty = __webpack_require__(43);
-var getIteratorFn = __webpack_require__(112);
+var getIteratorFn = __webpack_require__(113);
 var warning = __webpack_require__(3);
-var lowPriorityWarning = __webpack_require__(66);
+var lowPriorityWarning = __webpack_require__(68);
 
 function getDeclarationErrorAddendum() {
   if (ReactCurrentOwner.current) {
@@ -15353,7 +15489,7 @@ module.exports = ReactElementValidator;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 111 */
+/* 112 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -15452,7 +15588,7 @@ module.exports = ReactNoopUpdateQueue;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 112 */
+/* 113 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -15496,13 +15632,13 @@ function getIteratorFn(maybeIterable) {
 module.exports = getIteratorFn;
 
 /***/ }),
-/* 113 */
+/* 114 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var defaultCreateLocalTracks = __webpack_require__(67);
+var defaultCreateLocalTracks = __webpack_require__(69);
 var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
 
 /**
@@ -15604,14 +15740,15 @@ module.exports = {
 
 
 /***/ }),
-/* 114 */
+/* 115 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var EventEmitter = __webpack_require__(10).EventEmitter;
 var inherits = __webpack_require__(1).inherits;
+var EventEmitter = __webpack_require__(10).EventEmitter;
+var TrackTransceiver = __webpack_require__(130);
 
 /**
  * Construct a {@link DataTrackTransceiver}.
@@ -15628,18 +15765,12 @@ var inherits = __webpack_require__(1).inherits;
  * @property {?number} maxPacketLifeTime
  * @property {?number} maxRetransmits
  * @property {boolean} ordered
+ * @implements TrackTransceiver
  */
 function DataTrackTransceiver(id, maxPacketLifeTime, maxRetransmits, ordered) {
   EventEmitter.call(this);
+  TrackTransceiver.call(this, id, 'data');
   Object.defineProperties(this, {
-    id: {
-      enumerable: true,
-      value: id
-    },
-    kind: {
-      enumerable: true,
-      value: 'data'
-    },
     maxPacketLifeTime: {
       enumerable: true,
       value: maxPacketLifeTime
@@ -15661,21 +15792,21 @@ module.exports = DataTrackTransceiver;
 
 
 /***/ }),
-/* 115 */
+/* 116 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var MediaTrack = __webpack_require__(70);
+var MediaTrack = __webpack_require__(72);
 
 /**
- * Construct an {@link AudioTrack} from a MediaStreamTrack.
+ * Construct an {@link AudioTrack}.
  * @class
  * @classdesc An {@link AudioTrack} is a {@link Track} representing audio.
  * @extends Track
- * @param {MediaStreamTrack} mediaStreamTrack
+ * @param {MediaTrackTransceiver} mediaTrackTransceiver
  * @param {{log: Log}} options
  * @property {boolean} isStarted - Whether or not the {@link AudioTrack} has
  *   started; if the {@link AudioTrack} started, there is enough audio data to
@@ -15688,8 +15819,8 @@ var MediaTrack = __webpack_require__(70);
  * @fires AudioTrack#enabled
  * @fires AudioTrack#started
  */
-function AudioTrack(mediaStreamTrack, options) {
-  MediaTrack.call(this, mediaStreamTrack, options);
+function AudioTrack(mediaTrackTransceiver, options) {
+  MediaTrack.call(this, mediaTrackTransceiver, options);
 }
 
 inherits(AudioTrack, MediaTrack);
@@ -15812,16 +15943,17 @@ module.exports = AudioTrack;
 
 
 /***/ }),
-/* 116 */
+/* 117 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var buildLogLevels = __webpack_require__(5).buildLogLevels;
-var Log = __webpack_require__(19);
+var Log = __webpack_require__(17);
 var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
-var MediaTrack = __webpack_require__(70);
+var MediaTrack = __webpack_require__(72);
+var MediaTrackSender = __webpack_require__(119);
 
 /**
  * Construct a {@link LocalMediaTrack} from a MediaStreamTrack.
@@ -15832,7 +15964,7 @@ var MediaTrack = __webpack_require__(70);
  * {@link LocalMediaTrack#disable} or stopped completely with
  * {@link LocalMediaTrack#stop}.
  * @extends MediaTrack
- * @param {function(MediaStreamTrack, TrackSignaling): MediaTrack} - Track
+ * @param {function(MediaTrackTransceiver, TrackSignaling): MediaTrack} - MediaTrack
  * @param {MediaStream} mediaStreamTrack - The underlying MediaStreamTrack
  * @param {LocalTrackOptions} [options] - {@link LocalTrack} options
  * @property {boolean} isStopped - Whether or not the {@link LocalMediaTrack} is stopped
@@ -15845,12 +15977,17 @@ function LocalMediaTrack(MediaTrack, mediaStreamTrack, options) {
 
   var logLevels = buildLogLevels(options.logLevel);
   options.log = options.log || new Log('default', this, logLevels);
-  MediaTrack.call(this, mediaStreamTrack, options);
+
+  var mediaTrackSender = new MediaTrackSender(mediaStreamTrack);
+  MediaTrack.call(this, mediaTrackSender, options);
 
   Object.defineProperties(this, {
     _didCallEnd: {
       value: false,
       writable: true
+    },
+    _trackSender: {
+      value: mediaTrackSender
     },
     isEnabled: {
       enumerable: true,
@@ -15900,7 +16037,7 @@ module.exports = LocalMediaTrack;
 
 
 /***/ }),
-/* 117 */
+/* 118 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -15908,16 +16045,16 @@ module.exports = LocalMediaTrack;
 
 var buildLogLevels = __webpack_require__(5).buildLogLevels;
 var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
-var Log = __webpack_require__(19);
+var Log = __webpack_require__(17);
 
 /**
- * Construct a {@link RemoteMediaTrack} from a MediaStreamTrack.
+ * Construct a {@link RemoteMediaTrack}.
  * @class
  * @classdesc A {@link RemoteMediaTrack} represents a {@link MediaTrack}
  *   published to a {@link Room} by a {@link RemoteParticipant}.
  * @extends {MediaTrack}
- * @param {function(MediaStreamTrack, TrackSignaling): MediaTrack} MediaTrack
- * @param {MediaStreamTrack} mediaStreamTrack
+ * @param {function(MediaTrackTransceiver, TrackSignaling): MediaTrack} MediaTrack
+ * @param {MediaTrackReceiver} mediaTrackReceiver
  * @param {RemoteTrackSignaling} signaling
  * @param {{log: Log}} options
  * @property {boolean} isSubscribed - Whether the {@link RemoteMediaTrack} is
@@ -15925,7 +16062,7 @@ var Log = __webpack_require__(19);
  * @property {Track.SID} sid - The SID assigned to the {@link RemoteMediaTrack}
  * @fires RemoteTrack#unsubscribed
  */
-function RemoteMediaTrack(MediaTrack, mediaStreamTrack, signaling, options) {
+function RemoteMediaTrack(MediaTrack, mediaTrackReceiver, signaling, options) {
   options = Object.assign({
     logLevel: DEFAULT_LOG_LEVEL,
     name: signaling.name
@@ -15933,7 +16070,7 @@ function RemoteMediaTrack(MediaTrack, mediaStreamTrack, signaling, options) {
 
   var logLevels = buildLogLevels(options.logLevel);
   options.log = options.log || new Log('default', this, logLevels);
-  MediaTrack.call(this, mediaStreamTrack, options);
+  MediaTrack.call(this, mediaTrackReceiver, options);
 
   var isSubscribed = signaling.isSubscribed;
   Object.defineProperties(this, {
@@ -15944,6 +16081,9 @@ function RemoteMediaTrack(MediaTrack, mediaStreamTrack, signaling, options) {
       get: function() {
         return isSubscribed;
       }
+    },
+    _mediaTrackReceiver: {
+      value: mediaTrackReceiver
     },
     _signaling: {
       value: signaling
@@ -15984,21 +16124,118 @@ module.exports = RemoteMediaTrack;
 
 
 /***/ }),
-/* 118 */
+/* 119 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var MediaTrack = __webpack_require__(70);
+var MediaTrackTransceiver = __webpack_require__(120);
 
 /**
- * Construct a {@link VideoTrack} from a MediaStreamTrack.
+ * Construct a {@link MediaTrackSender}.
+ * @class
+ * @classdesc A {@link MediaTrackSender} represents one or more
+ *   local RTCRtpSenders.
+ * @param {MediaStreamTrack} mediaStreamTrack
+ * @extends MediaTrackTransceiver
+ */
+function MediaTrackSender(mediaStreamTrack) {
+  if (!(this instanceof MediaTrackSender)) {
+    return new MediaTrackSender(mediaStreamTrack);
+  }
+  MediaTrackTransceiver.call(this, mediaStreamTrack.id, mediaStreamTrack);
+  Object.defineProperties(this, {
+    _senders: {
+      value: new Set()
+    }
+  });
+}
+
+inherits(MediaTrackSender, MediaTrackTransceiver);
+
+/**
+ * Add an RTCRtpSender.
+ * @param {RTCRtpSender} sender
+ * @returns {this}
+ */
+MediaTrackSender.prototype.addSender = function addSender(sender) {
+  this._senders.add(sender);
+  return this;
+};
+
+/**
+ * Remove an RTCRtpSender.
+ * @param {RTCRtpSender} sender
+ * @returns {this}
+ */
+MediaTrackSender.prototype.removeSender = function removeSender(sender) {
+  this._senders.delete(sender);
+  return this;
+};
+
+module.exports = MediaTrackSender;
+
+
+/***/ }),
+/* 120 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var inherits = __webpack_require__(1).inherits;
+var TrackTransceiver = __webpack_require__(130);
+
+/**
+ * Construct a {@link MediaTrackTransceiver}.
+ * @class
+ * @classdesc A {@link MediaTrackTransceiver} represents either one or more
+ *   local RTCRtpSenders, or a single RTCRtpReceiver.
+ * @param {Track.ID} id - The MediaStreamTrack ID signaled through RSP/SDP
+ * @param {MediaStreamTrack} mediaStreamTrack
+ * @property {MediaStreamTrack} track
+ * @extends TrackTransceiver
+ */
+function MediaTrackTransceiver(id, mediaStreamTrack) {
+  TrackTransceiver.call(this, id, mediaStreamTrack.kind);
+  Object.defineProperties(this, {
+    readyState: {
+      enumerable: true,
+      get: function() {
+        return mediaStreamTrack.readyState;
+      }
+    },
+    track: {
+      enumerable: true,
+      value: mediaStreamTrack
+    }
+  });
+}
+
+
+inherits(MediaTrackTransceiver, TrackTransceiver);
+
+module.exports = MediaTrackTransceiver;
+
+
+/***/ }),
+/* 121 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var inherits = __webpack_require__(1).inherits;
+var MediaTrack = __webpack_require__(72);
+
+/**
+ * Construct a {@link VideoTrack}.
  * @class
  * @classdesc A {@link VideoTrack} is a {@link Track} representing video.
  * @extends Track
- * @param {MediaStreamTrack} mediaStreamTrack
+ * @param {MediaTrackTransceiver} mediaTrackTransceiver
  * @param {{log: Log}} options
  * @property {boolean} isStarted - Whether or not the {@link VideoTrack} has
  *   started; if the {@link VideoTrack} started, there is enough video data to
@@ -16014,8 +16251,8 @@ var MediaTrack = __webpack_require__(70);
  * @fires VideoTrack#enabled
  * @fires VideoTrack#started
  */
-function VideoTrack(mediaStreamTrack, options) {
-  MediaTrack.call(this, mediaStreamTrack, options);
+function VideoTrack(mediaTrackTransceiver, options) {
+  MediaTrack.call(this, mediaTrackTransceiver, options);
   Object.defineProperties(this, {
     dimensions: {
       enumerable: true,
@@ -16035,7 +16272,7 @@ var DIMENSIONS_CHANGED = VideoTrack.DIMENSIONS_CHANGED = 'dimensionsChanged';
 
 function emitDimensionsChangedEvents(track) {
   if (typeof document === 'undefined') {
-    throw new Error('document is undefined');
+    return null;
   }
   var elem = document.createElement(track.kind);
   elem.muted = true;
@@ -16208,15 +16445,16 @@ module.exports = VideoTrack;
 
 
 /***/ }),
-/* 119 */
+/* 122 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var RemoteAudioTrack = __webpack_require__(296);
-var RemoteDataTrack = __webpack_require__(297);
-var RemoteVideoTrack = __webpack_require__(298);
+var RemoteAudioTrack = __webpack_require__(300);
+var RemoteDataTrack = __webpack_require__(301);
+var RemoteTrackPublication = __webpack_require__(302);
+var RemoteVideoTrack = __webpack_require__(303);
 var EventEmitter = __webpack_require__(10).EventEmitter;
 var inherits = __webpack_require__(1).inherits;
 var util = __webpack_require__(5);
@@ -16384,7 +16622,27 @@ Participant.prototype._handleTrackSignalingEvents = function _handleTrackSignali
   var signaling = this._signaling;
 
   function trackSignalingAdded(signaling) {
-    signaling.getMediaStreamTrackOrDataTrackTransceiver().then(function(mediaStreamTrackOrDataTrackReceiver) {
+    function handleTrackSubscriptionFailed() {
+      if (!signaling.error) {
+        return;
+      }
+      signaling.removeListener('updated', handleTrackSubscriptionFailed);
+      var remoteTrackPublication = new RemoteTrackPublication(
+        signaling.kind,
+        signaling.sid,
+        signaling.name,
+        { log: log });
+      self._log.warn('Failed to subscribe to Remote' +
+        util.capitalize(signaling.kind) + 'Track ' + signaling.sid + ' with ' +
+        'name "' + signaling.name + '": ' + signaling.error.message);
+      self.emit('trackSubscriptionFailed', signaling.error, remoteTrackPublication);
+    }
+
+    signaling.on('updated', handleTrackSubscriptionFailed);
+
+    signaling.getTrackTransceiver().then(function(trackReceiver) {
+      signaling.removeListener('updated', handleTrackSubscriptionFailed);
+
       var RemoteTrack = {
         audio: RemoteAudioTrack,
         video: RemoteVideoTrack,
@@ -16394,17 +16652,17 @@ Participant.prototype._handleTrackSignalingEvents = function _handleTrackSignali
       // NOTE(mroberts): It should never be the case that the TrackSignaling and
       // MediaStreamTrack or DataTrackReceiver kinds disagree; however, just in
       // case, we handle it here.
-      if (!RemoteTrack || signaling.kind !== mediaStreamTrackOrDataTrackReceiver.kind) {
+      if (!RemoteTrack || signaling.kind !== trackReceiver.kind) {
         return;
       }
 
-      var track = new RemoteTrack(mediaStreamTrackOrDataTrackReceiver, signaling, { log: log });
+      var track = new RemoteTrack(trackReceiver, signaling, { log: log });
       self._addTrack(track);
     });
   }
 
   function trackSignalingRemoved(signaling) {
-    signaling.getMediaStreamTrackOrDataTrackTransceiver().then(function() {
+    signaling.getTrackTransceiver().then(function() {
       var track = self.tracks.get(signaling.id);
       if (track) {
         self._removeTrack(track);
@@ -16618,7 +16876,7 @@ module.exports = Participant;
 
 
 /***/ }),
-/* 120 */
+/* 123 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -16683,15 +16941,15 @@ module.exports = RecordingSignaling;
 
 
 /***/ }),
-/* 121 */
+/* 124 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var DefaultRecordingSignaling = __webpack_require__(120);
-var StateMachine = __webpack_require__(33);
+var DefaultRecordingSignaling = __webpack_require__(123);
+var StateMachine = __webpack_require__(34);
 
 /*
 RoomSignaling States
@@ -16833,7 +17091,7 @@ module.exports = RoomSignaling;
 
 
 /***/ }),
-/* 122 */
+/* 125 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -16854,28 +17112,30 @@ var util = __webpack_require__(5);
  * @property {Track.ID} id
  * @property {boolean} isEnabled
  * @property {Track.Kind} kind
- * @property {?MediaStreamTrack|DataTrackTransceiver} mediaStreamTrackOrDataTrackTransceiver
+ * @property {?TrackTransceiver} trackTransceiver
  * @property {?Track.SID} sid
  */
 function TrackSignaling(name, id, kind, isEnabled) {
   EventEmitter.call(this);
-  var mediaStreamTrackOrDataTrackTransceiver;
   var sid = null;
+  var trackTransceiver = null;
   Object.defineProperties(this, {
     _isEnabled: {
       value: isEnabled,
       writable: true
     },
-    _mediaStreamTrackOrDataTrackTransceiver: {
+    _trackTransceiver: {
       get: function() {
-        return mediaStreamTrackOrDataTrackTransceiver;
+        return trackTransceiver;
       },
-      set: function(_mediaStreamTrackOrDataTrackTransceiver) {
-        mediaStreamTrackOrDataTrackTransceiver = _mediaStreamTrackOrDataTrackTransceiver;
-        this._mediaStreamTrackOrDataTrackTransceiverDeferred.resolve(mediaStreamTrackOrDataTrackTransceiver);
+      set: function(_trackTransceiver) {
+        if (trackTransceiver === null) {
+          trackTransceiver = _trackTransceiver;
+          this._trackTransceiverDeferred.resolve(trackTransceiver);
+        }
       }
     },
-    _mediaStreamTrackOrDataTrackTransceiverDeferred: {
+    _trackTransceiverDeferred: {
       value: util.defer()
     },
     _sid: {
@@ -16885,12 +17145,8 @@ function TrackSignaling(name, id, kind, isEnabled) {
       set: function(_sid) {
         if (sid === null) {
           sid = _sid;
-          this._sidDeferred.resolve(sid);
         }
       }
-    },
-    _sidDeferred: {
-      value: util.defer()
     },
     id: {
       enumerable: true,
@@ -16906,10 +17162,10 @@ function TrackSignaling(name, id, kind, isEnabled) {
       enumerable: true,
       value: kind
     },
-    mediaStreamTrackOrDataTrackTransceiver: {
+    trackTransceiver: {
       enumerable: true,
       get: function() {
-        return mediaStreamTrackOrDataTrackTransceiver;
+        return trackTransceiver;
       }
     },
     name: {
@@ -16951,29 +17207,20 @@ TrackSignaling.prototype.enable = function enable(enabled) {
 };
 
 /**
- * Get the MediaStreamTrack or {@link DataTrackTransceiver} on the
- * {@link TrackSignaling}.
- * @returns {Promise<MediaStreamTrack|DataTrackTransceiver>}
+ * Get the {@link TrackTransceiver} on the @link TrackSignaling}.
+ * @returns {Promise<TrackTransceiver>}
  */
-TrackSignaling.prototype.getMediaStreamTrackOrDataTrackTransceiver = function getMediaStreamTrackOrDataTrackTransceiver() {
-  return this._mediaStreamTrackOrDataTrackTransceiverDeferred.promise;
+TrackSignaling.prototype.getTrackTransceiver = function getTrackTransceiver() {
+  return this._trackTransceiverDeferred.promise;
 };
 
 /**
- * Get the SID on the {@link TrackSignaling}.
- * @returns {Promise<Track.SID>}
- */
-TrackSignaling.prototype.getSid = function getSid() {
-  return this._sidDeferred.promise;
-};
-
-/**
- * Set the MediaStreamTrack or {@link DataTrackTransceiver} on the {@link TrackSignaling}.
- * @param {MediaStreamTrack|DataTrackTransceiver} mediaStreamTrackOrDataTrackTransceiver
+ * Set the {@link TrackTransceiver} on the {@link TrackSignaling}.
+ * @param {TrackTransceiver} trackTransceiver
  * @returns {this}
  */
-TrackSignaling.prototype.setMediaStreamTrackOrDataTrackTransceiver = function setMediaStreamTrackOrDataTrackTransceiver(mediaStreamTrackOrDataTrackTransceiver) {
-  this._mediaStreamTrackOrDataTrackTransceiver = mediaStreamTrackOrDataTrackTransceiver;
+TrackSignaling.prototype.setTrackTransceiver = function setTrackTransceiver(trackTransceiver) {
+  this._trackTransceiver = trackTransceiver;
   return this;
 };
 
@@ -16999,13 +17246,13 @@ module.exports = TrackSignaling;
 
 
 /***/ }),
-/* 123 */
+/* 126 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var SIP = __webpack_require__(72);
+var SIP = __webpack_require__(74);
 
 function SIPJSMediaHandler(peerConnectionManager, createMessage) {
   if (!(this instanceof SIPJSMediaHandler)) {
@@ -17110,14 +17357,14 @@ module.exports = SIPJSMediaHandler;
 
 
 /***/ }),
-/* 124 */
+/* 127 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var TrackStats = __webpack_require__(126);
+var TrackStats = __webpack_require__(129);
 
 /**
  * Statistics for a {@link LocalTrack}.
@@ -17160,14 +17407,14 @@ module.exports = LocalTrackStats;
 
 
 /***/ }),
-/* 125 */
+/* 128 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var TrackStats = __webpack_require__(126);
+var TrackStats = __webpack_require__(129);
 
 /**
  * Statistics for a remote {@link Track}.
@@ -17203,7 +17450,7 @@ module.exports = RemoteTrackStats;
 
 
 /***/ }),
-/* 126 */
+/* 129 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17257,26 +17504,60 @@ module.exports = TrackStats;
 
 
 /***/ }),
-/* 127 */
+/* 130 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Construct a {@link TrackTransceiver}.
+ * @class
+ * @classdesc A {@link TrackTransceiver} represents either one or more
+ *   local RTCRtpSenders or RTCDataChannels, or a single RTCRtpReceiver
+ *   or remote RTCDataChannel.
+ * @param {Track.ID} id
+ * @param {Track.kind} kind
+ * @property {Track.ID} id
+ * @property {Track.kind} kind
+ */
+function TrackTransceiver(id, kind) {
+  Object.defineProperties(this, {
+    id: {
+      enumerable: true,
+      value: id
+    },
+    kind: {
+      enumerable: true,
+      value: kind
+    }
+  });
+}
+
+module.exports = TrackTransceiver;
+
+
+/***/ }),
+/* 131 */
 /***/ (function(module, exports) {
 
 module.exports = WebSocket;
 
 
 /***/ }),
-/* 128 */
+/* 132 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAA0lBMVEUAAADRAC7XACjYACfYACfYACfYACfYACfYACfbACTYACfYACfYACfVACvYACfYACfYACfYACfYACfYACfYACfYACfYACfYACfYACf/AADXACjYACfYACfYACfZACbXACjXACjZACbaACXbACTXACjYACfXACjXACjYACfZACa/AEDXACjYACfYACfVACv/AADZACbYACfYACfYACfYACfWACnXACjVACvfACDYACfTACzYACfYACfYACfZACbYACfZACbaACbWACnXACjYACcAAADC3TaqAAAARHRSTlMAC01wiqS+2PIVYrL3BmnD/f7r0biehLfCAVre2os8Rs54KRy72VM55+gEX/iJDAOM9VWw4zLIGAghF/xC9kNjs0RFRwN34T8AAAABYktHRACIBR1IAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QwBCQA0QuUn2QAAAkJJREFUWMOlV+l6qkAMjbu2gKLVXnfcl6ot1u7aRc/7P1MHLF4dGIUv+QNDcs5kwkwmIVJILJ5IptKZbDaTTiUT8RhFktzVtYYT0a6vcmHRupEvOBizWLopVyrl21LRdMaFf4YeAl6t1R3rRrN1ZK23mg3na71WvYRvW8LO6nT9mm7HVbXPwnt9YTMYqtTDgVD3e2r8aAxMjKnaYGpMgPFIpb6bwZwvzi9xMTcxuwtU3T8A9vJylJc28HAfgH8EVk+X8URPK+DRzyDmf34Jgyd6eRY++NYv8K/h8ESvgkGKw2iGVcj5XR9WmJ38i94Ydqj1H+JgY3y8H/owQ8T/WJYm+v9HbWAeDU80Bw67umphsohKsJjA8k5WDTCi4okMoLZ/0+sYTKMTTAeo6x6VdP7e3oMQ72+n46HneB6WhP+w13782v6QGCzknUeugI40lY3Np4z/3MCWHOug4OTJL0DOP+uNj0HgN7JbXeBLPL7R8LnrmP8cf/jZBDhFDXyL/K+hSZcYgvHUhBajONAKCLkD2XqDrezQn7SAOCVgBmZ7waD9MWy1YDzpJhKURJECRcA0d7e3tQOVLEUkKYUSqRl2RDs1nkpIURo3Cq079W7nORIkt0hTBmWV2p1874ZCyshQFhU6x3AOTxVk+QTsJbCDyP6N7I3E3srsw8Q+zuyEwk9p7KTKTuv8i4V9tbEvV/71zi4w+CUOv8hil3n8QpNf6vKLbXa5T+yGg/gtD7/pInbbR/zGk9itryu85nsvYdv/X8Bwn69lWqRKAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDE3LTEyLTAxVDA5OjAwOjUyKzAxOjAwQE2/aQAAACV0RVh0ZGF0ZTptb2RpZnkAMjAxNy0xMi0wMVQwOTowMDo1MiswMTowMDEQB9UAAAAZdEVYdFNvZnR3YXJlAHd3dy5pbmtzY2FwZS5vcmeb7jwaAAAAAElFTkSuQmCC"
 
 /***/ }),
-/* 129 */
+/* 133 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfhCw4KGBQTle1XAAAEH0lEQVRo3sWZXWxURRTHf+12BWpBYqWiUhDKhwQoLUr4MPCgPkkMJHwkBHnwxQAxARJiQggxmvpiTQz6QHzCEI2NgklNIYHUBhINn4akqZHwAAFbrSyF2JYFusD40N2759w7dz+6c9mzL5OZ/5z/f8/MvTPnXBiLLeYMh1kwprlO7BAGQ4pWasoj4BQm/etl45Onn8jvngCD4SRznxT1HHbRyQMeKwGGB7QwIVrqGO/S4xE+8gkwGK7xTpTklxVZyiLAYNgZBf0qH/loyO0C7rp+KmJ8zEML0f0QAa1u6Wfwq5VmgD5L7xB7qAr4WMZBPuG5sdC/xp0AyTDfsoY4HYGR73nJ4uO79GiChcXSN3HbRzHCAe+f/KxG/uANq4/VAvM3DcXQLyThoz+qHLSrwMdDvOxTHq5aY2S12fT79vwOH+LL9EhbTqczuOmLVG0h9FWcU9P6WBHAzKGbjpDAS2tmQPm6wLj8Aj5SU25QX2jgrNbELeVvf74JS9Vb7ibzSqIHaFT7KcnMXOC4eusN0lwyPcAihoXXjlzQ91S43ndCD7BL+V0XBqtU/7/TGT1Uqo19PezoXq/eeS87FACLGBHeN9lBFwTkM6f0AC3C+092jfK1O825gCni+brHpEx3pQd4S4Db6HUuIMEJrz2etUHAcRGB5c7pATYLhmP+wbh4Vu8Qi0RANUNikdOLkFmCFTztAU/zKBIBSdrFH27QAl4RwF8ioQfoEe16LWCqGOqOTIDc2tO0gOfFUCIyAX+FR0AKuFUOAdklMAxEJqAPEyZA7vuqgh0Waw9FO6YFZLdHRQSv4YzVUuG1+8MEUOIlLJdNEe1/yyFAZkhliUBTYQIaIxPwpmj/qYcmiZTbeZKdthj/iYwqriMwyEkPWB1+bSzJlmevIZwipQVAm4BuiUTAdtG2XHkncs8LUIo65/T1KuWxFjmPRnopbRXez9ohmwQkpR6Z0m2myo7W2kFPcUVlsu4uZhV0qTS9Igz4tkqhdjsTsEP53ZoLKosvwyxxQr9Uhb8n92nboEpwtx1ImK8qBCP591aLClepEqZzQ/nbm39KNWd9EvJXCZr5gUu8Guh/3VdR/K2wjf2sKEuP1klm5UA/w1fpauph38hOlREb+grPuF/kmpp6IBS5VVTUukT/fI4pD4b+4so9s/lHTD5oxSzgtKLIJDQv8HWgwpwo/gtTo1i/4JeAGj4PFO07Gc96jogzJUu/uFh6gFrauM9jfgxU9zbSGyAxJBi09Bq6Cq+RBm0CkwN9H1pp7F8RUuwVR74TqyEZIiAY+m6WuSUftU9DBCR95BvCD53SLMYHlm8Jhrte62J05Bmr41Dg490QSTrYxvRoqbO2kku+3R7xt8Og6cVoL93hWKyOb9KL8UV5BACs5Ajncx5ZofY/OFEQlTARm74AAAAldEVYdGRhdGU6Y3JlYXRlADIwMTctMTEtMTRUMTA6MjQ6MjArMDE6MDDIo8WAAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE3LTExLTE0VDEwOjI0OjIwKzAxOjAwuf59PAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAASUVORK5CYII="
 
 /***/ }),
-/* 130 */
+/* 134 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17290,31 +17571,31 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(21);
+var _react = __webpack_require__(23);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _TwilioAudio = __webpack_require__(178);
+var _TwilioAudio = __webpack_require__(181);
 
 var _TwilioAudio2 = _interopRequireDefault(_TwilioAudio);
 
-var _TwilioVideo = __webpack_require__(80);
+var _TwilioVideo = __webpack_require__(81);
 
 var _TwilioVideo2 = _interopRequireDefault(_TwilioVideo);
 
-var _TwilioSecondaryParticipants = __webpack_require__(180);
+var _TwilioSecondaryParticipants = __webpack_require__(183);
 
 var _TwilioSecondaryParticipants2 = _interopRequireDefault(_TwilioSecondaryParticipants);
 
-var _Draggable = __webpack_require__(177);
+var _Draggable = __webpack_require__(180);
 
 var _Draggable2 = _interopRequireDefault(_Draggable);
 
-var _reactLoading = __webpack_require__(270);
+var _reactLoading = __webpack_require__(273);
 
 var _reactLoading2 = _interopRequireDefault(_reactLoading);
 
-var _VideoControls = __webpack_require__(181);
+var _VideoControls = __webpack_require__(184);
 
 var _VideoControls2 = _interopRequireDefault(_VideoControls);
 
@@ -17326,7 +17607,7 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var reconnectIcon = __webpack_require__(129);
+var reconnectIcon = __webpack_require__(133);
 
 var TwilioRemoteAndLocalHolder = function (_Component) {
     _inherits(TwilioRemoteAndLocalHolder, _Component);
@@ -17644,35 +17925,35 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
 exports.default = TwilioRemoteAndLocalHolder;
 
 /***/ }),
-/* 131 */
+/* 135 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var version = __webpack_require__(75).version;
+var version = __webpack_require__(76).version;
 var Video = {};
 
 Object.defineProperties(Video, {
   connect: {
     enumerable: true,
-    value: __webpack_require__(285)
+    value: __webpack_require__(288)
   },
   createLocalAudioTrack: {
     enumerable: true,
-    value: __webpack_require__(113).audio
+    value: __webpack_require__(114).audio
   },
   createLocalTracks: {
     enumerable: true,
-    value: __webpack_require__(67)
+    value: __webpack_require__(69)
   },
   createLocalVideoTrack: {
     enumerable: true,
-    value: __webpack_require__(113).video
+    value: __webpack_require__(114).video
   },
   isSupported: {
     enumerable: true,
-    value: __webpack_require__(327)()
+    value: __webpack_require__(337)()
   },
   LocalAudioTrack: {
     enumerable: true,
@@ -17696,13 +17977,13 @@ module.exports = Video;
 
 
 /***/ }),
-/* 132 */
+/* 136 */
 /***/ (function(module, exports) {
 
-module.exports = {"_args":[["@twilio/sip.js@0.7.6","/Users/melonarg/Sites/devdesktop/react-twilio"]],"_from":"@twilio/sip.js@0.7.6","_id":"@twilio/sip.js@0.7.6","_inBundle":false,"_integrity":"sha1-kYbGlzay7AksAHkQh7Cnhol1wUw=","_location":"/@twilio/sip.js","_phantomChildren":{},"_requested":{"type":"version","registry":true,"raw":"@twilio/sip.js@0.7.6","name":"@twilio/sip.js","escapedName":"@twilio%2fsip.js","scope":"@twilio","rawSpec":"0.7.6","saveSpec":null,"fetchSpec":"0.7.6"},"_requiredBy":["/twilio-video"],"_resolved":"https://registry.npmjs.org/@twilio/sip.js/-/sip.js-0.7.6.tgz","_spec":"0.7.6","_where":"/Users/melonarg/Sites/devdesktop/react-twilio","author":{"name":"OnSIP","email":"developer@onsip.com","url":"http://sipjs.com/authors/"},"browser":{"./src/environment.js":"./src/environment_browser.js"},"bugs":{"url":"https://github.com/onsip/SIP.js/issues"},"contributors":[{"url":"https://github.com/onsip/SIP.js/blob/master/THANKS.md"}],"description":"A simple, intuitive, and powerful JavaScript signaling library","devDependencies":{"beefy":"^2.1.5","browserify":"^4.1.8","grunt":"~0.4.0","grunt-browserify":"^4.0.1","grunt-cli":"~0.1.6","grunt-contrib-copy":"^0.5.0","grunt-contrib-jasmine":"^1.0.3","grunt-contrib-jshint":">0.5.0","grunt-contrib-uglify":"~0.2.0","grunt-peg":"~1.3.1","grunt-trimtrailingspaces":"^0.4.0","pegjs":"^0.8.0","release-tool":"^0.2.2"},"engines":{"node":">=0.12"},"homepage":"http://sipjs.com","keywords":["sip","websocket","webrtc","library","javascript"],"license":"MIT","main":"src/index.js","name":"@twilio/sip.js","repository":{"type":"git","url":"git+https://github.com/onsip/SIP.js.git"},"scripts":{"build":"grunt build","repl":"beefy test/repl.js --open","test":"grunt travis --verbose"},"title":"SIP.js","version":"0.7.6"}
+module.exports = {"name":"@twilio/sip.js","title":"SIP.js","description":"A simple, intuitive, and powerful JavaScript signaling library","version":"0.7.7","main":"src/index.js","browser":{"./src/environment.js":"./src/environment_browser.js"},"homepage":"http://sipjs.com","author":"OnSIP <developer@onsip.com> (http://sipjs.com/authors/)","contributors":[{"url":"https://github.com/onsip/SIP.js/blob/master/THANKS.md"}],"repository":{"type":"git","url":"https://github.com/onsip/SIP.js.git"},"keywords":["sip","websocket","webrtc","library","javascript"],"devDependencies":{"beefy":"^2.1.5","browserify":"^4.1.8","grunt":"~0.4.0","grunt-browserify":"^4.0.1","grunt-cli":"~0.1.6","grunt-contrib-copy":"^0.5.0","grunt-contrib-jasmine":"^1.0.3","grunt-contrib-jshint":">0.5.0","grunt-contrib-uglify":"~0.2.0","grunt-peg":"~1.3.1","grunt-trimtrailingspaces":"^0.4.0","pegjs":"^0.8.0","release-tool":"^0.2.2"},"engines":{"node":">=0.12"},"license":"MIT","scripts":{"repl":"beefy test/repl.js --open","build":"grunt build","test":"grunt travis --verbose"}}
 
 /***/ }),
-/* 133 */
+/* 137 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -17813,7 +18094,7 @@ SIP.ClientContext = ClientContext;
 
 
 /***/ }),
-/* 134 */
+/* 138 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18020,7 +18301,7 @@ return {
 
 
 /***/ }),
-/* 135 */
+/* 139 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18121,7 +18402,7 @@ return RequestSender;
 
 
 /***/ }),
-/* 136 */
+/* 140 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18140,7 +18421,7 @@ return RequestSender;
  */
 module.exports = function (SIP) {
 
-var RequestSender = __webpack_require__(135)(SIP);
+var RequestSender = __webpack_require__(139)(SIP);
 
 var Dialog,
   C = {
@@ -18398,7 +18679,7 @@ SIP.Dialog = Dialog;
 
 
 /***/ }),
-/* 137 */
+/* 141 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18574,7 +18855,7 @@ return DigestAuthentication;
 
 
 /***/ }),
-/* 138 */
+/* 142 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18619,7 +18900,7 @@ return EventEmitter;
 
 
 /***/ }),
-/* 139 */
+/* 143 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -18679,12 +18960,12 @@ module.exports = {
 
 
 /***/ }),
-/* 140 */
+/* 144 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
-var Grammar = __webpack_require__(141);
+var Grammar = __webpack_require__(145);
 
 module.exports = function (SIP) {
 
@@ -18704,7 +18985,7 @@ return {
 
 
 /***/ }),
-/* 141 */
+/* 145 */
 /***/ (function(module, exports) {
 
 module.exports = (function() {
@@ -20059,7 +20340,7 @@ module.exports = (function() {
 })();
 
 /***/ }),
-/* 142 */
+/* 146 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20181,7 +20462,7 @@ return Hacks;
 
 
 /***/ }),
-/* 143 */
+/* 147 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20302,7 +20583,7 @@ return LoggerFactory;
 
 
 /***/ }),
-/* 144 */
+/* 148 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20362,7 +20643,7 @@ return MediaHandler;
 
 
 /***/ }),
-/* 145 */
+/* 149 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20470,7 +20751,7 @@ SIP.NameAddrHeader = NameAddrHeader;
 
 
 /***/ }),
-/* 146 */
+/* 150 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -20738,7 +21019,7 @@ SIP.Parser = Parser;
 
 
 /***/ }),
-/* 147 */
+/* 151 */
 /***/ (function(module, exports) {
 
 var localMinSE = 90;
@@ -20827,7 +21108,7 @@ return {
 
 
 /***/ }),
-/* 148 */
+/* 152 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -21118,7 +21399,7 @@ SIP.RegisterContext = RegisterContext;
 
 
 /***/ }),
-/* 149 */
+/* 153 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -21264,7 +21545,7 @@ SIP.RequestSender = RequestSender;
 
 
 /***/ }),
-/* 150 */
+/* 154 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -21276,7 +21557,7 @@ SIP.RequestSender = RequestSender;
 
 module.exports = function (environment) {
 
-var pkg = __webpack_require__(132);
+var pkg = __webpack_require__(136);
 
 var SIP = Object.defineProperties({}, {
   version: {
@@ -21287,39 +21568,39 @@ var SIP = Object.defineProperties({}, {
   }
 });
 
-__webpack_require__(162)(SIP, environment);
-SIP.LoggerFactory = __webpack_require__(143)(environment.console);
-SIP.EventEmitter = __webpack_require__(138)(environment.console);
-SIP.C = __webpack_require__(134)(SIP.name, SIP.version);
-SIP.Exceptions = __webpack_require__(139);
-SIP.Timers = __webpack_require__(157)(environment.timers);
+__webpack_require__(166)(SIP, environment);
+SIP.LoggerFactory = __webpack_require__(147)(environment.console);
+SIP.EventEmitter = __webpack_require__(142)(environment.console);
+SIP.C = __webpack_require__(138)(SIP.name, SIP.version);
+SIP.Exceptions = __webpack_require__(143);
+SIP.Timers = __webpack_require__(161)(environment.timers);
 SIP.Transport = environment.Transport(SIP, environment.WebSocket);
-__webpack_require__(146)(SIP);
-__webpack_require__(151)(SIP);
-__webpack_require__(161)(SIP);
-__webpack_require__(145)(SIP);
-__webpack_require__(158)(SIP);
-__webpack_require__(136)(SIP);
+__webpack_require__(150)(SIP);
+__webpack_require__(155)(SIP);
+__webpack_require__(165)(SIP);
 __webpack_require__(149)(SIP);
-__webpack_require__(148)(SIP);
-SIP.MediaHandler = __webpack_require__(144)(SIP.EventEmitter);
-__webpack_require__(133)(SIP);
+__webpack_require__(162)(SIP);
+__webpack_require__(140)(SIP);
 __webpack_require__(153)(SIP);
-__webpack_require__(154)(SIP, environment);
-__webpack_require__(156)(SIP);
-SIP.WebRTC = __webpack_require__(163)(SIP, environment);
-__webpack_require__(160)(SIP, environment);
-SIP.Hacks = __webpack_require__(142)(SIP);
 __webpack_require__(152)(SIP);
-SIP.DigestAuthentication = __webpack_require__(137)(SIP.Utils);
-SIP.Grammar = __webpack_require__(140)(SIP);
+SIP.MediaHandler = __webpack_require__(148)(SIP.EventEmitter);
+__webpack_require__(137)(SIP);
+__webpack_require__(157)(SIP);
+__webpack_require__(158)(SIP, environment);
+__webpack_require__(160)(SIP);
+SIP.WebRTC = __webpack_require__(167)(SIP, environment);
+__webpack_require__(164)(SIP, environment);
+SIP.Hacks = __webpack_require__(146)(SIP);
+__webpack_require__(156)(SIP);
+SIP.DigestAuthentication = __webpack_require__(141)(SIP.Utils);
+SIP.Grammar = __webpack_require__(144)(SIP);
 
 return SIP;
 };
 
 
 /***/ }),
-/* 151 */
+/* 155 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -21889,7 +22170,7 @@ SIP.IncomingResponse = IncomingResponse;
 
 
 /***/ }),
-/* 152 */
+/* 156 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -21909,14 +22190,12 @@ SIP.IncomingResponse = IncomingResponse;
  */
 module.exports = function (SIP) {
 var sanityCheck,
- logger,
- message, ua, transport,
  requests = [],
  responses = [],
  all = [];
 
 // Reply
-function reply(status_code) {
+function reply(status_code, message, transport) {
   var to,
     response = SIP.Utils.buildStatusLine(status_code),
     vias = message.getHeaders('via'),
@@ -21963,33 +22242,33 @@ function reply(status_code) {
  */
 
 // Sanity Check functions for requests
-function rfc3261_8_2_2_1() {
+function rfc3261_8_2_2_1(message, ua, transport) {
   if(!message.ruri || message.ruri.scheme !== 'sip') {
-    reply(416);
+    reply(416, message, transport);
     return false;
   }
 }
 
-function rfc3261_16_3_4() {
+function rfc3261_16_3_4(message, ua, transport) {
   if(!message.to_tag) {
     if(message.call_id.substr(0, 5) === ua.configuration.sipjsId) {
-      reply(482);
+      reply(482, message, transport);
       return false;
     }
   }
 }
 
-function rfc3261_18_3_request() {
+function rfc3261_18_3_request(message, ua, transport) {
   var len = SIP.Utils.str_utf8_length(message.body),
   contentLength = message.getHeader('content-length');
 
   if(len < contentLength) {
-    reply(400);
+    reply(400, message, transport);
     return false;
   }
 }
 
-function rfc3261_8_2_2_2() {
+function rfc3261_8_2_2_2(message, ua, transport) {
   var tr, idx,
     fromTag = message.from_tag,
     call_id = message.call_id,
@@ -22004,7 +22283,7 @@ function rfc3261_8_2_2_2() {
         for(idx in ua.transactions.ist) {
           tr = ua.transactions.ist[idx];
           if(tr.request.from_tag === fromTag && tr.request.call_id === call_id && tr.request.cseq === cseq) {
-            reply(482);
+            reply(482, message, transport);
             return false;
           }
         }
@@ -22017,7 +22296,7 @@ function rfc3261_8_2_2_2() {
         for(idx in ua.transactions.nist) {
           tr = ua.transactions.nist[idx];
           if(tr.request.from_tag === fromTag && tr.request.call_id === call_id && tr.request.cseq === cseq) {
-            reply(482);
+            reply(482, message, transport);
             return false;
           }
         }
@@ -22027,33 +22306,33 @@ function rfc3261_8_2_2_2() {
 }
 
 // Sanity Check functions for responses
-function rfc3261_8_1_3_3() {
+function rfc3261_8_1_3_3(message, ua) {
   if(message.getHeaders('via').length > 1) {
-    logger.warn('More than one Via header field present in the response. Dropping the response');
+    ua.getLogger('sip.sanitycheck').warn('More than one Via header field present in the response. Dropping the response');
     return false;
   }
 }
 
-function rfc3261_18_3_response() {
+function rfc3261_18_3_response(message, ua) {
   var
     len = SIP.Utils.str_utf8_length(message.body),
     contentLength = message.getHeader('content-length');
 
     if(len < contentLength) {
-      logger.warn('Message body length is lower than the value in Content-Length header field. Dropping the response');
+      ua.getLogger('sip.sanitycheck').warn('Message body length is lower than the value in Content-Length header field. Dropping the response');
       return false;
     }
 }
 
 // Sanity Check functions for requests and responses
-function minimumHeaders() {
+function minimumHeaders(message, ua) {
   var
     mandatoryHeaders = ['from', 'to', 'call_id', 'cseq', 'via'],
     idx = mandatoryHeaders.length;
 
   while(idx--) {
     if(!message.hasHeader(mandatoryHeaders[idx])) {
-      logger.warn('Missing mandatory header field : '+ mandatoryHeaders[idx] +'. Dropping the response');
+      ua.getLogger('sip.sanitycheck').warn('Missing mandatory header field : '+ mandatoryHeaders[idx] +'. Dropping the response');
       return false;
     }
   }
@@ -22070,18 +22349,12 @@ responses.push(rfc3261_18_3_response);
 
 all.push(minimumHeaders);
 
-sanityCheck = function(m, u, t) {
+sanityCheck = function(message, ua, transport) {
   var len, pass;
-
-  message = m;
-  ua = u;
-  transport = t;
-
-  logger = ua.getLogger('sip.sanitycheck');
 
   len = all.length;
   while(len--) {
-    pass = all[len](message);
+    pass = all[len](message, ua, transport);
     if(pass === false) {
       return false;
     }
@@ -22090,7 +22363,7 @@ sanityCheck = function(m, u, t) {
   if(message instanceof SIP.IncomingRequest) {
     len = requests.length;
     while(len--) {
-      pass = requests[len](message);
+      pass = requests[len](message, ua, transport);
       if(pass === false) {
         return false;
       }
@@ -22100,7 +22373,7 @@ sanityCheck = function(m, u, t) {
   else if(message instanceof SIP.IncomingResponse) {
     len = responses.length;
     while(len--) {
-      pass = responses[len](message);
+      pass = responses[len](message, ua, transport);
       if(pass === false) {
         return false;
       }
@@ -22116,7 +22389,7 @@ SIP.sanityCheck = sanityCheck;
 
 
 /***/ }),
-/* 153 */
+/* 157 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -22213,15 +22486,15 @@ SIP.ServerContext = ServerContext;
 
 
 /***/ }),
-/* 154 */
+/* 158 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 module.exports = function (SIP, environment) {
 
-var DTMF = __webpack_require__(155)(SIP);
-var RFC4028 = __webpack_require__(147)(SIP.Timers);
+var DTMF = __webpack_require__(159)(SIP);
+var RFC4028 = __webpack_require__(151)(SIP.Timers);
 
 var Session, InviteServerContext, InviteClientContext,
  C = {
@@ -24476,7 +24749,7 @@ SIP.InviteClientContext = InviteClientContext;
 
 
 /***/ }),
-/* 155 */
+/* 159 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -24663,7 +24936,7 @@ return DTMF;
 
 
 /***/ }),
-/* 156 */
+/* 160 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -24993,7 +25266,7 @@ SIP.Subscription.prototype = {
 
 
 /***/ }),
-/* 157 */
+/* 161 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -25041,7 +25314,7 @@ module.exports = function (timers) {
 
 
 /***/ }),
-/* 158 */
+/* 162 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -25765,7 +26038,7 @@ SIP.Transactions = {
 
 
 /***/ }),
-/* 159 */
+/* 163 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -26143,7 +26416,7 @@ return Transport;
 
 
 /***/ }),
-/* 160 */
+/* 164 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -27785,7 +28058,7 @@ SIP.UA = UA;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(47)))
 
 /***/ }),
-/* 161 */
+/* 165 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -28032,7 +28305,7 @@ SIP.URI = URI;
 
 
 /***/ }),
-/* 162 */
+/* 166 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -28534,7 +28807,7 @@ SIP.Utils = Utils;
 
 
 /***/ }),
-/* 163 */
+/* 167 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -28548,8 +28821,8 @@ var WebRTC;
 
 WebRTC = {};
 
-WebRTC.MediaHandler = __webpack_require__(164)(SIP);
-WebRTC.MediaStreamManager = __webpack_require__(165)(SIP, environment);
+WebRTC.MediaHandler = __webpack_require__(168)(SIP);
+WebRTC.MediaStreamManager = __webpack_require__(169)(SIP, environment);
 
 var _isSupported;
 
@@ -28580,7 +28853,7 @@ return WebRTC;
 
 
 /***/ }),
-/* 164 */
+/* 168 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -29186,7 +29459,7 @@ return MediaHandler;
 
 
 /***/ }),
-/* 165 */
+/* 169 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -29350,14 +29623,14 @@ return MediaStreamManager;
 
 
 /***/ }),
-/* 166 */
+/* 170 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 /* global webkitRTCPeerConnection, mozRTCPeerConnection */
 
 
-var flatMap = __webpack_require__(16).flatMap;
+var flatMap = __webpack_require__(20).flatMap;
 
 /**
  * Get the standardized {@link RTCPeerConnection} statistics.
@@ -29698,7 +29971,7 @@ module.exports = getStats;
 
 
 /***/ }),
-/* 167 */
+/* 171 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -29740,7 +30013,7 @@ module.exports = getUserMedia;
 
 
 /***/ }),
-/* 168 */
+/* 172 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -29757,7 +30030,7 @@ if (typeof MediaStreamTrack !== 'undefined') {
 
 
 /***/ }),
-/* 169 */
+/* 173 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -29776,19 +30049,21 @@ if (typeof RTCIceCandidate !== 'undefined') {
 
 
 /***/ }),
-/* 170 */
+/* 174 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 /* globals RTCDataChannel, RTCSessionDescription, webkitRTCPeerConnection */
 
 
-var ChromeRTCSessionDescription = __webpack_require__(77);
-var EventTarget = __webpack_require__(48);
+var ChromeRTCSessionDescription = __webpack_require__(78);
+var EventTarget = __webpack_require__(49);
 var inherits = __webpack_require__(1).inherits;
-var Latch = __webpack_require__(79);
-var updateTracksToSSRCs = __webpack_require__(35).updatePlanBTrackIdsToSSRCs;
-var util = __webpack_require__(16);
+var Latch = __webpack_require__(80);
+var MediaStream = __webpack_require__(77);
+var RTCRtpSenderShim = __webpack_require__(48);
+var updateTracksToSSRCs = __webpack_require__(50).updatePlanBTrackIdsToSSRCs;
+var util = __webpack_require__(20);
 
 var PeerConnection = typeof RTCPeerConnection !== 'undefined'
   ? RTCPeerConnection
@@ -29820,12 +30095,19 @@ function ChromeRTCPeerConnection(configuration) {
   util.interceptEvent(this, 'datachannel');
   util.interceptEvent(this, 'signalingstatechange');
 
+  // NOTE(mmalavalli): Because of a bug related to "ontrack", we prevent it
+  // from being delegated to ChromeRTCPeerConnection. For now, this bug
+  // manifests when we run Chrome with the flag: --enable-blink-features=RTCRtpSender
+  // Existing bug: https://bugs.chromium.org/p/chromium/issues/detail?id=774303
+  // Bug filed by us: https://bugs.chromium.org/p/chromium/issues/detail?id=783433
+  util.interceptEvent(this, 'track');
+
   /* eslint new-cap:0 */
   var peerConnection = new PeerConnection(newConfiguration);
 
   Object.defineProperties(this, {
-    _localStreams: {
-      value: new Set()
+    _localStream: {
+      value: new MediaStream()
     },
     _peerConnection: {
       value: peerConnection
@@ -29837,6 +30119,9 @@ function ChromeRTCPeerConnection(configuration) {
     _pendingRemoteOffer: {
       value: null,
       writable: true
+    },
+    _senders: {
+      value: new Map()
     },
     _signalingStateLatch: {
       value: new Latch()
@@ -29887,22 +30172,73 @@ function ChromeRTCPeerConnection(configuration) {
     // the ontrack property of the RTCPeerConnection.
   };
 
+  peerConnection.addStream(this._localStream);
   util.proxyProperties(PeerConnection.prototype, this, peerConnection);
 }
 
 inherits(ChromeRTCPeerConnection, EventTarget);
 
-ChromeRTCPeerConnection.prototype.addStream = function addStream(stream) {
-  if (this._localStreams.has(stream)) {
-    return;
+// NOTE(mmalavalli): This shim supports our limited case of adding
+// all MediaStreamTracks to one MediaStream. It has been implemented this
+// keeping in mind that this is to be maintained only until "addTrack" is
+// supported natively in Chrome.
+ChromeRTCPeerConnection.prototype.addTrack = function addTrack() {
+  var args = [].slice.call(arguments);
+  if (this._peerConnection.addTrack) {
+    return this._peerConnection.addTrack.apply(this._peerConnection, args);
   }
-  this._localStreams.add(stream);
-  this._peerConnection.addStream(stream);
+
+  var track = args[0];
+  if (this._peerConnection.signalingState === 'closed') {
+    throw new Error('Cannot add MediaStreamTrack [' + track.id + ', '
+      + track.kind + ']: RTCPeerConnection is closed');
+  }
+
+  var sender = this._senders.get(track);
+  if (sender && sender.track) {
+    throw new Error('Cannot add MediaStreamTrack [' + track.id + ', '
+      + track.kind + ']: RTCPeerConnection already has it');
+  }
+  this._peerConnection.removeStream(this._localStream);
+  this._localStream.addTrack(track);
+  this._peerConnection.addStream(this._localStream);
+
+  sender = new RTCRtpSenderShim(track);
+  this._senders.set(track, sender);
+  return sender;
 };
 
-ChromeRTCPeerConnection.prototype.removeStream = function removeStream(stream) {
-  this._localStreams.delete(stream);
-  this._peerConnection.removeStream(stream);
+// NOTE(mmalavalli): This shim supports our limited case of removing
+// MediaStreamTracks from one MediaStream. It has been implemented this
+// keeping in mind that this is to be maintained only until "removeTrack" is
+// supported natively in Chrome.
+ChromeRTCPeerConnection.prototype.removeTrack = function removeTrack(sender) {
+  if (this._peerConnection.removeTrack) {
+    this._peerConnection.removeTrack(sender);
+    return;
+  }
+  if (this._peerConnection.signalingState === 'closed') {
+    throw new Error('Cannot remove MediaStreamTrack: RTCPeerConnection is closed');
+  }
+
+  var track = sender.track;
+  if (!track) {
+    return;
+  }
+  sender = this._senders.get(track);
+  if (sender && sender.track) {
+    sender.track = null;
+    this._peerConnection.removeStream(this._localStream);
+    this._localStream.removeTrack(track);
+    this._peerConnection.addStream(this._localStream);
+  }
+};
+
+ChromeRTCPeerConnection.prototype.getSenders = function getSenders() {
+  if (this._peerConnection.getSenders) {
+    return this._peerConnection.getSenders();
+  }
+  return Array.from(this._senders.values());
 };
 
 ChromeRTCPeerConnection.prototype.addIceCandidate = function addIceCandidate(candidate) {
@@ -30030,10 +30366,6 @@ util.delegateMethods(
 // for the unreliable MediaStreamTrack#addtrack event. Do this only if
 // the native RTCPeerConnection has not implemented 'ontrack'.
 function maybeDispatchTrackEvents(peerConnection, mediaStreamTracks) {
-  if ('ontrack' in PeerConnection.prototype) {
-    return;
-  }
-
   var currentMediaStreamTracks = util.flatMap(peerConnection.getRemoteStreams(), function(mediaStream) {
     return mediaStream.getTracks();
   });
@@ -30214,19 +30546,19 @@ module.exports = ChromeRTCPeerConnection;
 
 
 /***/ }),
-/* 171 */
+/* 175 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 /* globals mozRTCPeerConnection, RTCPeerConnection */
 
 
-var EventTarget = __webpack_require__(48);
-var FirefoxRTCSessionDescription = __webpack_require__(78);
+var EventTarget = __webpack_require__(49);
+var FirefoxRTCSessionDescription = __webpack_require__(79);
+var RTCRtpSenderShim = __webpack_require__(48);
 var inherits = __webpack_require__(1).inherits;
-var MediaStream = __webpack_require__(76);
-var updateTracksToSSRCs = __webpack_require__(35).updateUnifiedPlanTrackIdsToSSRCs;
-var util = __webpack_require__(16);
+var updateTracksToSSRCs = __webpack_require__(50).updateUnifiedPlanTrackIdsToSSRCs;
+var util = __webpack_require__(20);
 
 var PeerConnection = typeof RTCPeerConnection !== 'undefined'
   ? RTCPeerConnection
@@ -30273,18 +30605,15 @@ function FirefoxRTCPeerConnection(configuration) {
       value: false,
       writable: true
     },
-    _localStream: {
-      value: new MediaStream()
-    },
     _peerConnection: {
       value: peerConnection
-    },
-    _remoteStream: {
-      value: new MediaStream()
     },
     _rollingBack: {
       value: false,
       writable: true
+    },
+    _senders: {
+      value: new Map()
     },
     _tracksToSSRCs: {
       value: new Map()
@@ -30330,92 +30659,9 @@ function FirefoxRTCPeerConnection(configuration) {
   });
 
   util.proxyProperties(PeerConnection.prototype, this, peerConnection);
-
-  // NOTE(mroberts): We use the adapter.js workaround for providing track events.
-  if (!('ontrack' in PeerConnection.prototype)) {
-    peerConnection.addEventListener('addstream', function onaddstream(addStreamEvent) {
-      var mediaStream = addStreamEvent.stream;
-
-      // NOTE(mmalavalli): We are not using MediaStream#onaddtrack event listeners
-      // for shimming PeerConnection#ontrack like we do for Chrome because it
-      // is not yet supported in Firefox (support is slated for Firefox 50).
-      // That's why we don't see this event being used in adapter.js's Firefox
-      // shim.
-      // Reference: https://developer.mozilla.org/en-US/docs/Web/API/MediaStream#Browser_compatibility
-
-      mediaStream.getTracks().forEach(function(mediaStreamTrack) {
-        var newEvent = new Event('track');
-        newEvent.track = mediaStreamTrack;
-        newEvent.streams = [mediaStream];
-        self.dispatchEvent(newEvent);
-      });
-    });
-  }
 }
 
 inherits(FirefoxRTCPeerConnection, EventTarget);
-
-// NOTE(mroberts): Until Chrome adds support for getSenders and getReceivers,
-// it makes sense for our RTCPeerConnection adapter to continue providing
-// support for the deprecated getLocalStreams and getRemoteStreams APIs.
-//
-// However, in order to implement these, we break an invariant of the legacy
-// API: we don't return the actual MediaStream objects negotiated. Instead, we
-// reuse the same one for each call to getLocalStreams or getRemoteStreams.
-//
-// This is sufficient for our use of the WebRTC APIs, although it wouldn't be
-// a good fit for others.
-//
-// We also include a workaround for the following Bugzilla issue:
-//
-//     https://bugzilla.mozilla.org/show_bug.cgi?id=1154084
-//
-FirefoxRTCPeerConnection.prototype.getLocalStreams = function getLocalStreams() {
-  if (this._isClosed) {
-    return [];
-  }
-
-  if (!this.getSenders) {
-    return this._peerConnection.getLocalStreams();
-  }
-
-  var stream = this._localStream;
-
-  stream.getTracks().forEach(stream.removeTrack, stream);
-
-  this.getSenders().forEach(function(sender) {
-    var track = sender.track;
-    if (track) {
-      stream.addTrack(track);
-    }
-  });
-
-  return [stream];
-};
-
-// NOTE(mroberts): See comment above.
-FirefoxRTCPeerConnection.prototype.getRemoteStreams = function getRemoteStreams() {
-  if (this._isClosed) {
-    return [];
-  }
-
-  if (!this.getReceivers) {
-    return this._peerConnection.getRemoteStreams();
-  }
-
-  var stream = this._remoteStream;
-
-  stream.getTracks().forEach(stream.removeTrack, stream);
-
-  this.getReceivers().forEach(function(receiver) {
-    var track = receiver.track;
-    if (track) {
-      stream.addTrack(track);
-    }
-  });
-
-  return [stream];
-};
 
 // NOTE(mmalavalli): Firefox throws a TypeError when the PeerConnection's
 // prototype's "peerIdentity" property is accessed. In order to overcome
@@ -30429,29 +30675,51 @@ Object.defineProperty(FirefoxRTCPeerConnection.prototype, 'peerIdentity', {
   })
 });
 
-// NOTE(mmalavalli): Firefox does not support RTCPeerConnection#removeStream(),
-// and calling it will screw up the RTCPeerConnection's internal state. So
-// for now, we don't do anything when it is called.
-// Bugzilla: https://bugzilla.mozilla.org/show_bug.cgi?id=842455
-//
-// UPDATE(mmalavalli): We tried to implement removeStream() using
-// RTCPeerConnection#removeTrack(), but ran into a Firefox bug in the
-// Firefox <--> Chrome interop case, which is mentioned below.
+// NOTE(mmalavalli): Because we are not delegating to the native
+// RTCPeerConnection#removeTrack(), we have to manually maintain a list of added
+// tracks. So we disable the delegation to the native RTCPeerConnection#addTrack()
+// for now.
+FirefoxRTCPeerConnection.prototype.addTrack = function addTrack() {
+  var args = [].slice.call(arguments);
+  var track = args[0];
+  var sender = this._senders.get(track);
+  if (sender && sender.track) {
+    throw new Error('Cannot add MediaStreamTrack [' + track.id + ', '
+      + track.kind + ']: RTCPeerConnection already has it');
+  }
+  sender = getActiveSenders(this._peerConnection).get(track)
+    || this._peerConnection.addTrack.apply(this._peerConnection, args);
+
+  this._senders.set(track, sender);
+  return sender;
+};
+
+// NOTE(mmalavalli): RTCPeerConnection#removeTrack() has a bug in the
+// Firefox <--> Chrome interop case, which is mentioned below. So we disable
+// its delegation for now. Also, we maintain only one RTCRtpSender per
+// MediaStreamTrack for our use case, and not worry about multiple RTCRtpSenders
+// due to replaceTrack().
 // Bugzilla: https://bugzilla.mozilla.org/show_bug.cgi?id=1133874
-FirefoxRTCPeerConnection.prototype.removeStream = function removeStream() {};
+FirefoxRTCPeerConnection.prototype.removeTrack = function removeTrack(sender) {
+  if (this._isClosed) {
+    throw new Error('Cannot remove MediaStreamTrack: RTCPeerConnection is closed');
+  }
+  var track = sender.track;
+  if (!track) {
+    return;
+  }
+  sender = this._senders.get(track);
+  if (sender && sender.track) {
+    this._senders.set(track, new RTCRtpSenderShim(null));
+  }
+};
 
-// NOTE(mmalavalli): We implement addStream() by calling
-// RTCPeerConnection#addTrack() on each of the MediaStreamTracks in the
-// given MediaStream that have not already been added.
-FirefoxRTCPeerConnection.prototype.addStream = function addStream(mediaStream) {
-  var localTracks = this._peerConnection.getSenders().map(function(sender) {
-    return sender.track;
-  });
-  var newLocalTracks = util.difference(mediaStream.getTracks(), localTracks);
-
-  newLocalTracks.forEach(function(mediaStreamTrack) {
-    this._peerConnection.addTrack(mediaStreamTrack, mediaStream);
-  }, this);
+// NOTE(mmalavalli): Because we are not delegating to the native
+// RTCPeerConnection#removeTrack(), we have to manually maintain a list of added
+// tracks. So we disable the delegation to the native RTCPeerConnection#getSenders()
+// for now.
+FirefoxRTCPeerConnection.prototype.getSenders = function getSenders() {
+  return Array.from(this._senders.values());
 };
 
 FirefoxRTCPeerConnection.prototype.createAnswer = function createAnswer() {
@@ -30651,27 +30919,40 @@ function overwriteWithInitiallyNegotiatedDtlsRole(description, dtlsRole) {
   return description;
 }
 
+/**
+ * Gets the active RTCRtpSenders of the RTCPeerConnection.
+ * @param peerConnection
+ * @returns {Map<MediaStreamTrack, RTCRtpSender>}
+ */
+function getActiveSenders(peerConnection) {
+  return new Map(peerConnection.getSenders().filter(function(sender) {
+    return sender.track;
+  }).map(function(sender) {
+    return [sender.track, sender];
+  }));
+}
+
 module.exports = FirefoxRTCPeerConnection;
 
 
 /***/ }),
-/* 172 */
+/* 176 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var guessBrowser = __webpack_require__(16).guessBrowser;
+var guessBrowser = __webpack_require__(20).guessBrowser;
 
 switch (guessBrowser()) {
   case 'chrome':
-    module.exports = __webpack_require__(170);
+    module.exports = __webpack_require__(174);
     break;
   case 'firefox':
-    module.exports = __webpack_require__(171);
+    module.exports = __webpack_require__(175);
     break;
   case 'safari':
-    module.exports = __webpack_require__(173);
+    module.exports = __webpack_require__(177);
     break;
   default:
     if (typeof RTCPeerConnection === 'undefined') {
@@ -30682,19 +30963,19 @@ switch (guessBrowser()) {
 
 
 /***/ }),
-/* 173 */
+/* 177 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 /* globals RTCPeerConnection, RTCSessionDescription */
 
 
-var EventTarget = __webpack_require__(48);
+var EventTarget = __webpack_require__(49);
 var inherits = __webpack_require__(1).inherits;
-var Latch = __webpack_require__(79);
-var TrackMatcher = __webpack_require__(175);
-var updateTracksToSSRCs = __webpack_require__(35).updatePlanBTrackIdsToSSRCs;
-var util = __webpack_require__(16);
+var Latch = __webpack_require__(80);
+var RTCRtpSenderShim = __webpack_require__(48);
+var updateTracksToSSRCs = __webpack_require__(50).updatePlanBTrackIdsToSSRCs;
+var util = __webpack_require__(20);
 
 function SafariRTCPeerConnection(configuration) {
   if (!(this instanceof SafariRTCPeerConnection)) {
@@ -30706,9 +30987,6 @@ function SafariRTCPeerConnection(configuration) {
   util.interceptEvent(this, 'datachannel');
   util.interceptEvent(this, 'iceconnectionstatechange');
   util.interceptEvent(this, 'signalingstatechange');
-  util.interceptEvent(this, 'track');
-
-  var trackMatcher = new TrackMatcher();
 
   var peerConnection = new RTCPeerConnection(configuration);
 
@@ -30721,9 +30999,6 @@ function SafariRTCPeerConnection(configuration) {
       value: false,
       writable: true
     },
-    _localStreams: {
-      value: new Map()
-    },
     _peerConnection: {
       value: peerConnection
     },
@@ -30735,8 +31010,8 @@ function SafariRTCPeerConnection(configuration) {
       value: null,
       writable: true
     },
-    _remoteStreams: {
-      value: new Set()
+    _senders: {
+      value: new Map()
     },
     _signalingStateLatch: {
       value: new Latch()
@@ -30820,23 +31095,6 @@ function SafariRTCPeerConnection(configuration) {
     if (!self._pendingLocalOffer && !self._pendingRemoteOffer) {
       self.dispatchEvent.apply(self, arguments);
     }
-  });
-
-  peerConnection.addEventListener('track', function ontrack(event) {
-    var sdp = self.remoteDescription ? self.remoteDescription.sdp : null;
-    if (sdp) {
-      trackMatcher.update(sdp);
-      var id = trackMatcher.match(event.track.kind);
-      if (id) {
-        Object.defineProperty(event.track, 'id', {
-          value: id
-        });
-      }
-    }
-    event.streams.forEach(function(stream) {
-      self._remoteStreams.add(stream);
-    });
-    self.dispatchEvent(event);
   });
 
   util.proxyProperties(RTCPeerConnection.prototype, this, peerConnection);
@@ -30924,47 +31182,57 @@ SafariRTCPeerConnection.prototype.close = function close() {
   });
 };
 
-SafariRTCPeerConnection.prototype.addStream = function addStream(stream) {
-  if (this._localStreams.has(stream)) {
+// NOTE(mmalavalli): Because we are not delegating to the native
+// RTCPeerConnection#removeTrack(), we have to manually maintain a list of added
+// tracks. So we disable the delegation to the native RTCPeerConnection#addTrack()
+// for now. Also, we maintain only one RTCRtpSender per MediaStreamTrack for our
+// use case, and not worry about multiple RTCRtpSenders due to replaceTrack().
+SafariRTCPeerConnection.prototype.addTrack = function addTrack() {
+  var args = [].slice.call(arguments);
+  var track = args[0];
+  var sender = this._senders.get(track);
+  if (sender && sender.track) {
+    throw new Error('Cannot add MediaStreamTrack [' + track.id + ', '
+      + track.kind + ']: RTCPeerConnection already has it');
+  }
+  sender = getActiveSenders(this._peerConnection).get(track)
+    || this._peerConnection.addTrack.apply(this._peerConnection, args);
+
+  // NOTE(mmalavalli): webrtc-adapter has a bug where the "addTrack" shim
+  // does not return an RTCRtpSender and returns undefined instead. An issue
+  // [https://github.com/webrtc/adapter/issues/714] has been filed. For now,
+  // we manually get the RTCRtpSender associated with the added track and
+  // return it.
+  sender = sender || getActiveSenders(this._peerConnection).get(track);
+  this._senders.set(track, sender);
+  return sender;
+};
+
+// NOTE(mroberts): We can't really remove tracks right now, at least if we
+// ever want to add them back...
+//
+//     https://bugs.webkit.org/show_bug.cgi?id=174327
+//
+SafariRTCPeerConnection.prototype.removeTrack = function removeTrack(sender) {
+  if (this._isClosed) {
+    throw new Error('Cannot remove MediaStreamTrack: RTCPeerConnection is closed');
+  }
+  var track = sender.track;
+  if (!track) {
     return;
   }
-  var tracks = new Set(stream.getTracks());
-  this._peerConnection.getSenders().forEach(function(sender) {
-    if (tracks.has(sender.track)) {
-      tracks.delete(sender.track);
-    }
-  });
-  tracks.forEach(function(track) {
-    try {
-      this.addTrack(track, stream);
-    } catch (error) {
-      // Do nothing.
-    }
-  }, this);
-  this._localStreams.set(stream, new Set(tracks));
+  sender = this._senders.get(track);
+  if (sender && sender.track) {
+    this._senders.set(track, new RTCRtpSenderShim(null));
+  }
 };
 
-SafariRTCPeerConnection.prototype.removeStream = function removeStream(stream) {
-  // NOTE(mroberts): We can't really remove tracks right now, at least if we
-  // ever want to add them back...
-  //
-  //     https://bugs.webkit.org/show_bug.cgi?id=174327
-  //
-  // var tracks = this._localStreams.get(stream) || new Set();
-  // this.getSenders().forEach(function(sender) {
-  //   if (tracks.has(sender.track)) {
-  //     this.removeTrack(sender);
-  //   }
-  // }, this);
-  this._localStreams.delete(stream);
-};
-
-SafariRTCPeerConnection.prototype.getLocalStreams = function getLocalStreams() {
-  return Array.from(this._localStreams.keys());
-};
-
-SafariRTCPeerConnection.prototype.getRemoteStreams = function getRemoteStreams() {
-  return Array.from(this._remoteStreams);
+// NOTE(mmalavalli): Because we are not delegating to the native
+// RTCPeerConnection#removeTrack(), we have to manually maintain a list of added
+// tracks. So we disable the delegation to the native RTCPeerConnection#getSenders()
+// for now.
+SafariRTCPeerConnection.prototype.getSenders = function getSenders() {
+  return Array.from(this._senders.values());
 };
 
 util.delegateMethods(
@@ -31060,24 +31328,37 @@ function shimDataChannel(dataChannel) {
   });
 }
 
+/**
+ * Gets the active RTCRtpSenders of the RTCPeerConnection.
+ * @param peerConnection
+ * @returns {Map<MediaStreamTrack, RTCRtpSender>}
+ */
+function getActiveSenders(peerConnection) {
+  return new Map(peerConnection.getSenders().filter(function(sender) {
+    return sender.track;
+  }).map(function(sender) {
+    return [sender.track, sender];
+  }));
+}
+
 module.exports = SafariRTCPeerConnection;
 
 
 /***/ }),
-/* 174 */
+/* 178 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var guessBrowser = __webpack_require__(16).guessBrowser;
+var guessBrowser = __webpack_require__(20).guessBrowser;
 
 switch (guessBrowser()) {
   case 'chrome':
-    module.exports = __webpack_require__(77);
+    module.exports = __webpack_require__(78);
     break;
   case 'firefox':
-    module.exports = __webpack_require__(78);
+    module.exports = __webpack_require__(79);
     break;
   default:
     if (typeof RTCSessionDescription === 'undefined') {
@@ -31088,146 +31369,13 @@ switch (guessBrowser()) {
 
 
 /***/ }),
-/* 175 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-var util = __webpack_require__(16);
-var getMediaSections = __webpack_require__(35).getMediaSections;
-
-// NOTE(mroberts): TrackMatcher is meant to solve the problem identified in
-//
-//   https://bugs.webkit.org/show_bug.cgi?id=174519
-//
-// Namely that, without MIDs, we cannot "correctly" identify MediaStreamTracks
-// in Safari's current WebRTC implementation. So, this module tries to hack
-// around this by making a possibly dangerous assumption: "track" events will
-// be raised for MediaStreamTracks of a particular kind in the same order that
-// those kinds' MSIDs appear in the SDP. By calling `update` with an
-// RTCPeerConnection's `localDescription` and then invoking `match`, we ought
-// to be able to dequeue MediaStreamTrack IDs in the correct order to be
-// assigned to "track" events.
-
-/**
- * @typedef {string} ID
- */
-
-/**
- * @interface MatchedAndUnmatched
- * @property {Set<ID>} matched
- * @property {Set<ID>} unmatched
- */
-
-/**
- * Create a new instance of {@link MatchedAndUnmatched}.
- * @returns {MatchedAndUnmatched}
- */
-function create() {
-  return {
-    matched: new Set(),
-    unmatched: new Set()
-  };
-}
-
-/**
- * Attempt to match a MediaStreamTrack ID.
- * @param {MatchedAndUnmatched} mAndM
- * @returns {?string} id
- */
-function match(mAndM) {
-  var unmatched = Array.from(mAndM.unmatched);
-  if (!unmatched.length) {
-    return null;
-  }
-  var id = unmatched[0];
-  mAndM.matched.add(id);
-  mAndM.unmatched.delete(id);
-  return id;
-}
-
-/**
- * Update a {@link MatchedAndUnmatched}'s MediaStreamTrack IDs.
- * @param {MatchedAndUnmatched} mAndM
- * @param {Set<ID>} ids
- * @returns {void}
- */
-function update(mAndM, ids) {
-  ids = new Set(ids);
-  var removedMatchedIds = util.difference(mAndM.matched, ids);
-  removedMatchedIds.forEach(mAndM.matched.delete, mAndM.matched);
-  mAndM.unmatched = util.difference(ids, mAndM.matched);
-}
-
-/**
- * Parse MediaStreamTrack IDs of a particular kind from an SDP.
- * @param {string} kind
- * @param {string} sdp
- * @returns {Set<ID>} ids
- */
-function parse(kind, sdp) {
-  var mediaSections = getMediaSections(sdp, kind);
-  var pattern = 'msid: ?(.+) +(.+) ?$';
-  return new Set(util.flatMap(mediaSections, function(mediaSection) {
-    return mediaSection.match(new RegExp(pattern, 'mg')) || [];
-  }).map(function(msid) {
-    return msid.match(new RegExp(pattern))[2];
-  }));
-}
-
-/**
- * A {@link TrackMatcher} is used to match RTCTrackEvents.
- * @property {MatchedAndUnmatched} audio
- * @property {MatchedAndUnmatched} video
- */
-function TrackMatcher() {
-  if (!(this instanceof TrackMatcher)) {
-    return new TrackMatcher();
-  }
-  Object.defineProperties(this, {
-    audio: {
-      enumerable: true,
-      value: create()
-    },
-    video: {
-      enumerable: true,
-      value: create()
-    }
-  });
-}
-
-/**
- * Attempt to match a new MediaStreamTrack ID.
- * @param {string} kind - "audio" or "video"
- * @returns {?ID} id
- */
-TrackMatcher.prototype.match = function(kind) {
-  return match(this[kind]);
-};
-
-/**
- * Update the {@link TrackMatcher} with a new SDP.
- * @param {string} sdp
- * @returns {void}
- */
-TrackMatcher.prototype.update = function(sdp) {
-  ['audio', 'video'].forEach(function(kind) {
-    update(this[kind], parse(kind, sdp));
-  }, this);
-};
-
-module.exports = TrackMatcher;
-
-
-/***/ }),
-/* 176 */
+/* 179 */
 /***/ (function(module, exports) {
 
-module.exports = {"_args":[["@twilio/webrtc@1.1.0","/Users/melonarg/Sites/devdesktop/react-twilio"]],"_from":"@twilio/webrtc@1.1.0","_id":"@twilio/webrtc@1.1.0","_inBundle":false,"_integrity":"sha1-INcphfKuVg4GsOyorFWbv6ABtPk=","_location":"/@twilio/webrtc","_phantomChildren":{},"_requested":{"type":"version","registry":true,"raw":"@twilio/webrtc@1.1.0","name":"@twilio/webrtc","escapedName":"@twilio%2fwebrtc","scope":"@twilio","rawSpec":"1.1.0","saveSpec":null,"fetchSpec":"1.1.0"},"_requiredBy":["/twilio-video"],"_resolved":"https://registry.npmjs.org/@twilio/webrtc/-/webrtc-1.1.0.tgz","_spec":"1.1.0","_where":"/Users/melonarg/Sites/devdesktop/react-twilio","author":{"name":"Manjesh Malavalli","email":"mmalavalli@twilio.com"},"bugs":{"url":"https://github.com/twilio/twilio-webrtc.js/issues"},"contributors":[{"name":"Mark Roberts","email":"mroberts@twilio.com"},{"name":"Ryan Rowland","email":"rrowland@twilio.com"}],"description":"WebRTC-related APIs and shims used by twilio-video.js","devDependencies":{"browserify":"^14.4.0","envify":"^4.1.0","eslint":"^4.4.1","istanbul":"^0.4.5","karma":"^1.7.0","karma-browserify":"^5.1.1","karma-chrome-launcher":"^2.2.0","karma-firefox-launcher":"^1.0.1","karma-mocha":"^1.3.0","karma-safaritechpreview-launcher":"0.0.6","karma-spec-reporter":"0.0.31","mocha":"^3.5.0","npm-run-all":"^4.0.2","release-tool":"^0.2.2","rimraf":"^2.6.1","travis-multirunner":"^4.2.3","watchify":"^3.9.0","webrtc-adapter":"^5.0.3"},"homepage":"https://github.com/twilio/twilio-webrtc.js#readme","keywords":["shim","twilio","video","webrtc"],"license":"BSD-3-Clause","main":"./lib/index.js","name":"@twilio/webrtc","repository":{"type":"git","url":"git+https://github.com/twilio/twilio-webrtc.js.git"},"scripts":{"build":"npm-run-all clean lint test","clean":"rimraf coverage","lint":"eslint ./lib","test":"npm-run-all test:*","test:integration":"npm-run-all test:integration:*","test:integration:adapter":"karma start karma/integration.adapter.conf.js","test:integration:native":"karma start karma/integration.conf.js","test:unit":"istanbul cover node_modules/mocha/bin/_mocha -- ./test/unit/index.js"},"version":"1.1.0"}
+module.exports = {"name":"@twilio/webrtc","version":"2.0.0","description":"WebRTC-related APIs and shims used by twilio-video.js","scripts":{"build":"npm-run-all clean lint test","clean":"rimraf coverage","lint":"eslint ./lib","test:unit":"istanbul cover node_modules/mocha/bin/_mocha -- ./test/unit/index.js","test:integration:native":"karma start karma/integration.conf.js","test:integration:adapter":"karma start karma/integration.adapter.conf.js","test:integration":"npm-run-all test:integration:*","test":"npm-run-all test:*"},"repository":{"type":"git","url":"git+https://github.com/twilio/twilio-webrtc.js.git"},"keywords":["shim","twilio","video","webrtc"],"author":"Manjesh Malavalli <mmalavalli@twilio.com>","contributors":["Mark Roberts <mroberts@twilio.com>","Ryan Rowland <rrowland@twilio.com>"],"license":"BSD-3-Clause","main":"./lib/index.js","bugs":{"url":"https://github.com/twilio/twilio-webrtc.js/issues"},"homepage":"https://github.com/twilio/twilio-webrtc.js#readme","devDependencies":{"browserify":"^14.4.0","envify":"^4.1.0","eslint":"^4.4.1","istanbul":"^0.4.5","karma":"^1.7.0","karma-browserify":"^5.1.1","karma-chrome-launcher":"^2.2.0","karma-firefox-launcher":"^1.0.1","karma-mocha":"^1.3.0","karma-safaritechpreview-launcher":"0.0.6","karma-spec-reporter":"0.0.31","mocha":"^3.5.0","npm-run-all":"^4.0.2","release-tool":"^0.2.2","rimraf":"^2.6.1","travis-multirunner":"^4.2.3","watchify":"^3.9.0","webrtc-adapter":"^6.0.1"}}
 
 /***/ }),
-/* 177 */
+/* 180 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -31241,11 +31389,11 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(21);
+var _react = __webpack_require__(23);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _reactDom = __webpack_require__(199);
+var _reactDom = __webpack_require__(202);
 
 var _reactDom2 = _interopRequireDefault(_reactDom);
 
@@ -31342,7 +31490,7 @@ var Draggable1 = function (_Component) {
 exports.default = Draggable1;
 
 /***/ }),
-/* 178 */
+/* 181 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -31354,11 +31502,11 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(21);
+var _react = __webpack_require__(23);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _propTypes = __webpack_require__(34);
+var _propTypes = __webpack_require__(35);
 
 var _propTypes2 = _interopRequireDefault(_propTypes);
 
@@ -31381,7 +31529,7 @@ var TwilioAudio = function (_Component) {
 
         _this.state = {};
         _this.alreadyAdded = [];
-        _this.mute = true;
+        _this.mute = props.mute;
         return _this;
     }
 
@@ -31397,7 +31545,7 @@ var TwilioAudio = function (_Component) {
                 tracks = nextProps.tracks;
 
             if (mute != this.mute) {
-                this.toggleAudioTrack(tracks);
+                //this.toggleAudioTrack(tracks);
             }
         }
     }, {
@@ -31463,7 +31611,7 @@ TwilioAudio.propTypes = {
 exports.default = TwilioAudio;
 
 /***/ }),
-/* 179 */
+/* 182 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -31477,15 +31625,15 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(21);
+var _react = __webpack_require__(23);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _TwilioRemoteAndLocalHolder = __webpack_require__(130);
+var _TwilioRemoteAndLocalHolder = __webpack_require__(134);
 
 var _TwilioRemoteAndLocalHolder2 = _interopRequireDefault(_TwilioRemoteAndLocalHolder);
 
-var _propTypes = __webpack_require__(34);
+var _propTypes = __webpack_require__(35);
 
 var _propTypes2 = _interopRequireDefault(_propTypes);
 
@@ -31499,7 +31647,8 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var Video = __webpack_require__(131);
+var Video = __webpack_require__(135);
+var getUserMedia = __webpack_require__(19).getUserMedia;
 
 var TwilioConnectionManager = function (_Component) {
     _inherits(TwilioConnectionManager, _Component);
@@ -31536,6 +31685,15 @@ var TwilioConnectionManager = function (_Component) {
         value: function componentWillUnMount() {
             //dispose off Video Component
             this.disconnectCall();
+
+            getUserMedia({
+                audio: true,
+                video: true
+            }).then(function (stream) {
+                stream.getTracks().forEach(function (track) {
+                    return track.stop();
+                });
+            });
         }
     }, {
         key: 'componentWillReceiveProps',
@@ -31554,7 +31712,10 @@ var TwilioConnectionManager = function (_Component) {
 
             this.token = token;
             //throw new Error();
-            Video.createLocalTracks().then(function (localTrack) {
+            Video.createLocalTracks({
+                audio: true,
+                video: true // TODO: try with video: false
+            }).then(function (localTrack) {
                 _this2.localTrack = localTrack;
                 Video.connect(token, { name: roomName, track: localTrack }).then(function (room) {
                     _this2.setState(function (prevState) {
@@ -31723,7 +31884,7 @@ TwilioConnectionManager.defaultProps = {
 exports.default = TwilioConnectionManager;
 
 /***/ }),
-/* 180 */
+/* 183 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -31737,11 +31898,11 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(21);
+var _react = __webpack_require__(23);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _TwilioVideo = __webpack_require__(80);
+var _TwilioVideo = __webpack_require__(81);
 
 var _TwilioVideo2 = _interopRequireDefault(_TwilioVideo);
 
@@ -31755,7 +31916,7 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var closeIcon = __webpack_require__(128);
+var closeIcon = __webpack_require__(132);
 
 var TwilioSecondaryParticipants = function (_Component) {
     _inherits(TwilioSecondaryParticipants, _Component);
@@ -31825,7 +31986,7 @@ var TwilioSecondaryParticipants = function (_Component) {
 exports.default = TwilioSecondaryParticipants;
 
 /***/ }),
-/* 181 */
+/* 184 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -31839,11 +32000,11 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(21);
+var _react = __webpack_require__(23);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _propTypes = __webpack_require__(34);
+var _propTypes = __webpack_require__(35);
 
 var _propTypes2 = _interopRequireDefault(_propTypes);
 
@@ -31855,14 +32016,14 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var mute = __webpack_require__(333);
-var unmute = __webpack_require__(336);
-var camera = __webpack_require__(331);
-var uncamera = __webpack_require__(335);
-var disconnect = __webpack_require__(332);
-var reconnectIcon = __webpack_require__(129);
-var closeIcon = __webpack_require__(128);
-var showBar = __webpack_require__(334);
+var mute = __webpack_require__(344);
+var unmute = __webpack_require__(347);
+var camera = __webpack_require__(342);
+var uncamera = __webpack_require__(346);
+var disconnect = __webpack_require__(343);
+var reconnectIcon = __webpack_require__(133);
+var closeIcon = __webpack_require__(132);
+var showBar = __webpack_require__(345);
 
 var VideoControls = function (_Component) {
     _inherits(VideoControls, _Component);
@@ -31950,7 +32111,7 @@ var VideoControls = function (_Component) {
 exports.default = VideoControls;
 
 /***/ }),
-/* 182 */
+/* 185 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -32226,6 +32387,27 @@ function factory(ReactComponent, isValidElement, ReactNoopUpdateQueue) {
      */
     componentWillUnmount: 'DEFINE_MANY',
 
+    /**
+     * Replacement for (deprecated) `componentWillMount`.
+     *
+     * @optional
+     */
+    UNSAFE_componentWillMount: 'DEFINE_MANY',
+
+    /**
+     * Replacement for (deprecated) `componentWillReceiveProps`.
+     *
+     * @optional
+     */
+    UNSAFE_componentWillReceiveProps: 'DEFINE_MANY',
+
+    /**
+     * Replacement for (deprecated) `componentWillUpdate`.
+     *
+     * @optional
+     */
+    UNSAFE_componentWillUpdate: 'DEFINE_MANY',
+
     // ==== Advanced methods ====
 
     /**
@@ -32239,6 +32421,23 @@ function factory(ReactComponent, isValidElement, ReactNoopUpdateQueue) {
      * @overridable
      */
     updateComponent: 'OVERRIDE_BASE'
+  };
+
+  /**
+   * Similar to ReactClassInterface but for static methods.
+   */
+  var ReactClassStaticInterface = {
+    /**
+     * This method is invoked after a component is instantiated and when it
+     * receives new props. Return an object to update state in response to
+     * prop changes. Return null to indicate no change to state.
+     *
+     * If an object is returned, its keys will be merged into the existing state.
+     *
+     * @return {object || null}
+     * @optional
+     */
+    getDerivedStateFromProps: 'DEFINE_MANY_MERGED'
   };
 
   /**
@@ -32475,6 +32674,7 @@ function factory(ReactComponent, isValidElement, ReactNoopUpdateQueue) {
     if (!statics) {
       return;
     }
+
     for (var name in statics) {
       var property = statics[name];
       if (!statics.hasOwnProperty(name)) {
@@ -32491,14 +32691,25 @@ function factory(ReactComponent, isValidElement, ReactNoopUpdateQueue) {
         name
       );
 
-      var isInherited = name in Constructor;
-      _invariant(
-        !isInherited,
-        'ReactClass: You are attempting to define ' +
-          '`%s` on your component more than once. This conflict may be ' +
-          'due to a mixin.',
-        name
-      );
+      var isAlreadyDefined = name in Constructor;
+      if (isAlreadyDefined) {
+        var specPolicy = ReactClassStaticInterface.hasOwnProperty(name)
+          ? ReactClassStaticInterface[name]
+          : null;
+
+        _invariant(
+          specPolicy === 'DEFINE_MANY_MERGED',
+          'ReactClass: You are attempting to define ' +
+            '`%s` on your component more than once. This conflict may be ' +
+            'due to a mixin.',
+          name
+        );
+
+        Constructor[name] = createMergedResultFunction(Constructor[name], property);
+
+        return;
+      }
+
       Constructor[name] = property;
     }
   }
@@ -32808,6 +33019,12 @@ function factory(ReactComponent, isValidElement, ReactNoopUpdateQueue) {
           'componentWillRecieveProps(). Did you mean componentWillReceiveProps()?',
         spec.displayName || 'A component'
       );
+      warning(
+        !Constructor.prototype.UNSAFE_componentWillRecieveProps,
+        '%s has a method called UNSAFE_componentWillRecieveProps(). ' +
+          'Did you mean UNSAFE_componentWillReceiveProps()?',
+        spec.displayName || 'A component'
+      );
     }
 
     // Reduce time spent doing lookups by setting these on the prototype.
@@ -32828,7 +33045,7 @@ module.exports = factory;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 183 */
+/* 186 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -32863,7 +33080,7 @@ function camelize(string) {
 module.exports = camelize;
 
 /***/ }),
-/* 184 */
+/* 187 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -32878,7 +33095,7 @@ module.exports = camelize;
 
 
 
-var camelize = __webpack_require__(183);
+var camelize = __webpack_require__(186);
 
 var msPattern = /^-ms-/;
 
@@ -32906,7 +33123,7 @@ function camelizeStyleName(string) {
 module.exports = camelizeStyleName;
 
 /***/ }),
-/* 185 */
+/* 188 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -32921,7 +33138,7 @@ module.exports = camelizeStyleName;
  * 
  */
 
-var isTextNode = __webpack_require__(193);
+var isTextNode = __webpack_require__(196);
 
 /*eslint-disable no-bitwise */
 
@@ -32949,7 +33166,7 @@ function containsNode(outerNode, innerNode) {
 module.exports = containsNode;
 
 /***/ }),
-/* 186 */
+/* 189 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33080,7 +33297,7 @@ module.exports = createArrayFromMixed;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 187 */
+/* 190 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33099,8 +33316,8 @@ module.exports = createArrayFromMixed;
 
 var ExecutionEnvironment = __webpack_require__(8);
 
-var createArrayFromMixed = __webpack_require__(186);
-var getMarkupWrap = __webpack_require__(188);
+var createArrayFromMixed = __webpack_require__(189);
+var getMarkupWrap = __webpack_require__(191);
 var invariant = __webpack_require__(2);
 
 /**
@@ -33168,7 +33385,7 @@ module.exports = createNodesFromMarkup;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 188 */
+/* 191 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33267,7 +33484,7 @@ module.exports = getMarkupWrap;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 189 */
+/* 192 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33309,7 +33526,7 @@ function getUnboundedScrollPosition(scrollable) {
 module.exports = getUnboundedScrollPosition;
 
 /***/ }),
-/* 190 */
+/* 193 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33345,7 +33562,7 @@ function hyphenate(string) {
 module.exports = hyphenate;
 
 /***/ }),
-/* 191 */
+/* 194 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33360,7 +33577,7 @@ module.exports = hyphenate;
 
 
 
-var hyphenate = __webpack_require__(190);
+var hyphenate = __webpack_require__(193);
 
 var msPattern = /^ms-/;
 
@@ -33387,7 +33604,7 @@ function hyphenateStyleName(string) {
 module.exports = hyphenateStyleName;
 
 /***/ }),
-/* 192 */
+/* 195 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33415,7 +33632,7 @@ function isNode(object) {
 module.exports = isNode;
 
 /***/ }),
-/* 193 */
+/* 196 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33430,7 +33647,7 @@ module.exports = isNode;
  * @typechecks
  */
 
-var isNode = __webpack_require__(192);
+var isNode = __webpack_require__(195);
 
 /**
  * @param {*} object The object to check.
@@ -33443,7 +33660,7 @@ function isTextNode(object) {
 module.exports = isTextNode;
 
 /***/ }),
-/* 194 */
+/* 197 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33476,7 +33693,7 @@ function memoizeStringOnly(callback) {
 module.exports = memoizeStringOnly;
 
 /***/ }),
-/* 195 */
+/* 198 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33502,7 +33719,7 @@ if (ExecutionEnvironment.canUseDOM) {
 module.exports = performance || {};
 
 /***/ }),
-/* 196 */
+/* 199 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33517,7 +33734,7 @@ module.exports = performance || {};
  * @typechecks
  */
 
-var performance = __webpack_require__(195);
+var performance = __webpack_require__(198);
 
 var performanceNow;
 
@@ -33539,7 +33756,7 @@ if (performance.now) {
 module.exports = performanceNow;
 
 /***/ }),
-/* 197 */
+/* 200 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33555,7 +33772,7 @@ module.exports = performanceNow;
 if (process.env.NODE_ENV !== 'production') {
   var invariant = __webpack_require__(2);
   var warning = __webpack_require__(3);
-  var ReactPropTypesSecret = __webpack_require__(50);
+  var ReactPropTypesSecret = __webpack_require__(52);
   var loggedTypeFailures = {};
 }
 
@@ -33606,7 +33823,7 @@ module.exports = checkPropTypes;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 198 */
+/* 201 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33621,7 +33838,7 @@ module.exports = checkPropTypes;
 
 var emptyFunction = __webpack_require__(12);
 var invariant = __webpack_require__(2);
-var ReactPropTypesSecret = __webpack_require__(50);
+var ReactPropTypesSecret = __webpack_require__(52);
 
 module.exports = function() {
   function shim(props, propName, componentName, location, propFullName, secret) {
@@ -33671,17 +33888,17 @@ module.exports = function() {
 
 
 /***/ }),
-/* 199 */
+/* 202 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-module.exports = __webpack_require__(213);
+module.exports = __webpack_require__(216);
 
 
 /***/ }),
-/* 200 */
+/* 203 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33758,7 +33975,7 @@ var ARIADOMPropertyConfig = {
 module.exports = ARIADOMPropertyConfig;
 
 /***/ }),
-/* 201 */
+/* 204 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33774,7 +33991,7 @@ module.exports = ARIADOMPropertyConfig;
 
 var ReactDOMComponentTree = __webpack_require__(7);
 
-var focusNode = __webpack_require__(82);
+var focusNode = __webpack_require__(83);
 
 var AutoFocusUtils = {
   focusDOMComponent: function () {
@@ -33785,7 +34002,7 @@ var AutoFocusUtils = {
 module.exports = AutoFocusUtils;
 
 /***/ }),
-/* 202 */
+/* 205 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -33799,11 +34016,11 @@ module.exports = AutoFocusUtils;
 
 
 
-var EventPropagators = __webpack_require__(29);
+var EventPropagators = __webpack_require__(30);
 var ExecutionEnvironment = __webpack_require__(8);
-var FallbackCompositionState = __webpack_require__(208);
-var SyntheticCompositionEvent = __webpack_require__(251);
-var SyntheticInputEvent = __webpack_require__(254);
+var FallbackCompositionState = __webpack_require__(211);
+var SyntheticCompositionEvent = __webpack_require__(254);
+var SyntheticInputEvent = __webpack_require__(257);
 
 var END_KEYCODES = [9, 13, 27, 32]; // Tab, Return, Esc, Space
 var START_KEYCODE = 229;
@@ -34172,7 +34389,7 @@ var BeforeInputEventPlugin = {
 module.exports = BeforeInputEventPlugin;
 
 /***/ }),
-/* 203 */
+/* 206 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -34186,14 +34403,14 @@ module.exports = BeforeInputEventPlugin;
 
 
 
-var CSSProperty = __webpack_require__(86);
+var CSSProperty = __webpack_require__(87);
 var ExecutionEnvironment = __webpack_require__(8);
 var ReactInstrumentation = __webpack_require__(13);
 
-var camelizeStyleName = __webpack_require__(184);
-var dangerousStyleValue = __webpack_require__(261);
-var hyphenateStyleName = __webpack_require__(191);
-var memoizeStringOnly = __webpack_require__(194);
+var camelizeStyleName = __webpack_require__(187);
+var dangerousStyleValue = __webpack_require__(264);
+var hyphenateStyleName = __webpack_require__(194);
+var memoizeStringOnly = __webpack_require__(197);
 var warning = __webpack_require__(3);
 
 var processStyleName = memoizeStringOnly(function (styleName) {
@@ -34391,7 +34608,7 @@ module.exports = CSSPropertyOperations;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 204 */
+/* 207 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -34405,17 +34622,17 @@ module.exports = CSSPropertyOperations;
 
 
 
-var EventPluginHub = __webpack_require__(28);
-var EventPropagators = __webpack_require__(29);
+var EventPluginHub = __webpack_require__(29);
+var EventPropagators = __webpack_require__(30);
 var ExecutionEnvironment = __webpack_require__(8);
 var ReactDOMComponentTree = __webpack_require__(7);
 var ReactUpdates = __webpack_require__(14);
-var SyntheticEvent = __webpack_require__(17);
+var SyntheticEvent = __webpack_require__(16);
 
-var inputValueTracking = __webpack_require__(103);
-var getEventTarget = __webpack_require__(62);
-var isEventSupported = __webpack_require__(63);
-var isTextInputElement = __webpack_require__(105);
+var inputValueTracking = __webpack_require__(104);
+var getEventTarget = __webpack_require__(64);
+var isEventSupported = __webpack_require__(65);
+var isTextInputElement = __webpack_require__(106);
 
 var eventTypes = {
   change: {
@@ -34706,7 +34923,7 @@ var ChangeEventPlugin = {
 module.exports = ChangeEventPlugin;
 
 /***/ }),
-/* 205 */
+/* 208 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -34722,10 +34939,10 @@ module.exports = ChangeEventPlugin;
 
 var _prodInvariant = __webpack_require__(4);
 
-var DOMLazyTree = __webpack_require__(25);
+var DOMLazyTree = __webpack_require__(26);
 var ExecutionEnvironment = __webpack_require__(8);
 
-var createNodesFromMarkup = __webpack_require__(187);
+var createNodesFromMarkup = __webpack_require__(190);
 var emptyFunction = __webpack_require__(12);
 var invariant = __webpack_require__(2);
 
@@ -34756,7 +34973,7 @@ module.exports = Danger;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 206 */
+/* 209 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -34785,7 +35002,7 @@ var DefaultEventPluginOrder = ['ResponderEventPlugin', 'SimpleEventPlugin', 'Tap
 module.exports = DefaultEventPluginOrder;
 
 /***/ }),
-/* 207 */
+/* 210 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -34799,7 +35016,7 @@ module.exports = DefaultEventPluginOrder;
 
 
 
-var EventPropagators = __webpack_require__(29);
+var EventPropagators = __webpack_require__(30);
 var ReactDOMComponentTree = __webpack_require__(7);
 var SyntheticMouseEvent = __webpack_require__(39);
 
@@ -34886,7 +35103,7 @@ var EnterLeaveEventPlugin = {
 module.exports = EnterLeaveEventPlugin;
 
 /***/ }),
-/* 208 */
+/* 211 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -34902,9 +35119,9 @@ module.exports = EnterLeaveEventPlugin;
 
 var _assign = __webpack_require__(6);
 
-var PooledClass = __webpack_require__(23);
+var PooledClass = __webpack_require__(24);
 
-var getTextContentAccessor = __webpack_require__(102);
+var getTextContentAccessor = __webpack_require__(103);
 
 /**
  * This helper class stores information about text content of a target node,
@@ -34984,7 +35201,7 @@ PooledClass.addPoolingTo(FallbackCompositionState);
 module.exports = FallbackCompositionState;
 
 /***/ }),
-/* 209 */
+/* 212 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -34998,7 +35215,7 @@ module.exports = FallbackCompositionState;
 
 
 
-var DOMProperty = __webpack_require__(18);
+var DOMProperty = __webpack_require__(21);
 
 var MUST_USE_PROPERTY = DOMProperty.injection.MUST_USE_PROPERTY;
 var HAS_BOOLEAN_VALUE = DOMProperty.injection.HAS_BOOLEAN_VALUE;
@@ -35224,7 +35441,7 @@ var HTMLDOMPropertyConfig = {
 module.exports = HTMLDOMPropertyConfig;
 
 /***/ }),
-/* 210 */
+/* 213 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -35238,12 +35455,12 @@ module.exports = HTMLDOMPropertyConfig;
 
 
 
-var ReactReconciler = __webpack_require__(26);
+var ReactReconciler = __webpack_require__(27);
 
-var instantiateReactComponent = __webpack_require__(104);
-var KeyEscapeUtils = __webpack_require__(54);
-var shouldUpdateReactComponent = __webpack_require__(64);
-var traverseAllChildren = __webpack_require__(107);
+var instantiateReactComponent = __webpack_require__(105);
+var KeyEscapeUtils = __webpack_require__(56);
+var shouldUpdateReactComponent = __webpack_require__(66);
+var traverseAllChildren = __webpack_require__(108);
 var warning = __webpack_require__(3);
 
 var ReactComponentTreeHook;
@@ -35381,7 +35598,7 @@ module.exports = ReactChildReconciler;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 211 */
+/* 214 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -35395,8 +35612,8 @@ module.exports = ReactChildReconciler;
 
 
 
-var DOMChildrenOperations = __webpack_require__(51);
-var ReactDOMIDOperations = __webpack_require__(218);
+var DOMChildrenOperations = __webpack_require__(53);
+var ReactDOMIDOperations = __webpack_require__(221);
 
 /**
  * Abstracts away all functionality of the reconciler that requires knowledge of
@@ -35412,7 +35629,7 @@ var ReactComponentBrowserEnvironment = {
 module.exports = ReactComponentBrowserEnvironment;
 
 /***/ }),
-/* 212 */
+/* 215 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -35429,23 +35646,23 @@ module.exports = ReactComponentBrowserEnvironment;
 var _prodInvariant = __webpack_require__(4),
     _assign = __webpack_require__(6);
 
-var React = __webpack_require__(32);
-var ReactComponentEnvironment = __webpack_require__(56);
+var React = __webpack_require__(33);
+var ReactComponentEnvironment = __webpack_require__(58);
 var ReactCurrentOwner = __webpack_require__(15);
-var ReactErrorUtils = __webpack_require__(57);
-var ReactInstanceMap = __webpack_require__(30);
+var ReactErrorUtils = __webpack_require__(59);
+var ReactInstanceMap = __webpack_require__(31);
 var ReactInstrumentation = __webpack_require__(13);
-var ReactNodeTypes = __webpack_require__(96);
-var ReactReconciler = __webpack_require__(26);
+var ReactNodeTypes = __webpack_require__(97);
+var ReactReconciler = __webpack_require__(27);
 
 if (process.env.NODE_ENV !== 'production') {
-  var checkReactTypeSpec = __webpack_require__(260);
+  var checkReactTypeSpec = __webpack_require__(263);
 }
 
 var emptyObject = __webpack_require__(36);
 var invariant = __webpack_require__(2);
-var shallowEqual = __webpack_require__(49);
-var shouldUpdateReactComponent = __webpack_require__(64);
+var shallowEqual = __webpack_require__(51);
+var shouldUpdateReactComponent = __webpack_require__(66);
 var warning = __webpack_require__(3);
 
 var CompositeTypes = {
@@ -36316,7 +36533,7 @@ module.exports = ReactCompositeComponent;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 213 */
+/* 216 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -36333,15 +36550,15 @@ module.exports = ReactCompositeComponent;
 
 
 var ReactDOMComponentTree = __webpack_require__(7);
-var ReactDefaultInjection = __webpack_require__(230);
-var ReactMount = __webpack_require__(95);
-var ReactReconciler = __webpack_require__(26);
+var ReactDefaultInjection = __webpack_require__(233);
+var ReactMount = __webpack_require__(96);
+var ReactReconciler = __webpack_require__(27);
 var ReactUpdates = __webpack_require__(14);
-var ReactVersion = __webpack_require__(245);
+var ReactVersion = __webpack_require__(248);
 
-var findDOMNode = __webpack_require__(262);
-var getHostComponentFromComposite = __webpack_require__(101);
-var renderSubtreeIntoContainer = __webpack_require__(269);
+var findDOMNode = __webpack_require__(265);
+var getHostComponentFromComposite = __webpack_require__(102);
+var renderSubtreeIntoContainer = __webpack_require__(272);
 var warning = __webpack_require__(3);
 
 ReactDefaultInjection.inject();
@@ -36418,9 +36635,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 if (process.env.NODE_ENV !== 'production') {
   var ReactInstrumentation = __webpack_require__(13);
-  var ReactDOMUnknownPropertyHook = __webpack_require__(227);
-  var ReactDOMNullInputValuePropHook = __webpack_require__(221);
-  var ReactDOMInvalidARIAHook = __webpack_require__(220);
+  var ReactDOMUnknownPropertyHook = __webpack_require__(230);
+  var ReactDOMNullInputValuePropHook = __webpack_require__(224);
+  var ReactDOMInvalidARIAHook = __webpack_require__(223);
 
   ReactInstrumentation.debugTool.addHook(ReactDOMUnknownPropertyHook);
   ReactInstrumentation.debugTool.addHook(ReactDOMNullInputValuePropHook);
@@ -36431,7 +36648,7 @@ module.exports = ReactDOM;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 214 */
+/* 217 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -36450,32 +36667,32 @@ module.exports = ReactDOM;
 var _prodInvariant = __webpack_require__(4),
     _assign = __webpack_require__(6);
 
-var AutoFocusUtils = __webpack_require__(201);
-var CSSPropertyOperations = __webpack_require__(203);
-var DOMLazyTree = __webpack_require__(25);
-var DOMNamespaces = __webpack_require__(52);
-var DOMProperty = __webpack_require__(18);
-var DOMPropertyOperations = __webpack_require__(88);
-var EventPluginHub = __webpack_require__(28);
+var AutoFocusUtils = __webpack_require__(204);
+var CSSPropertyOperations = __webpack_require__(206);
+var DOMLazyTree = __webpack_require__(26);
+var DOMNamespaces = __webpack_require__(54);
+var DOMProperty = __webpack_require__(21);
+var DOMPropertyOperations = __webpack_require__(89);
+var EventPluginHub = __webpack_require__(29);
 var EventPluginRegistry = __webpack_require__(37);
 var ReactBrowserEventEmitter = __webpack_require__(38);
-var ReactDOMComponentFlags = __webpack_require__(89);
+var ReactDOMComponentFlags = __webpack_require__(90);
 var ReactDOMComponentTree = __webpack_require__(7);
-var ReactDOMInput = __webpack_require__(219);
-var ReactDOMOption = __webpack_require__(222);
-var ReactDOMSelect = __webpack_require__(90);
-var ReactDOMTextarea = __webpack_require__(225);
+var ReactDOMInput = __webpack_require__(222);
+var ReactDOMOption = __webpack_require__(225);
+var ReactDOMSelect = __webpack_require__(91);
+var ReactDOMTextarea = __webpack_require__(228);
 var ReactInstrumentation = __webpack_require__(13);
-var ReactMultiChild = __webpack_require__(238);
-var ReactServerRenderingTransaction = __webpack_require__(243);
+var ReactMultiChild = __webpack_require__(241);
+var ReactServerRenderingTransaction = __webpack_require__(246);
 
 var emptyFunction = __webpack_require__(12);
 var escapeTextContentForBrowser = __webpack_require__(41);
 var invariant = __webpack_require__(2);
-var isEventSupported = __webpack_require__(63);
-var shallowEqual = __webpack_require__(49);
-var inputValueTracking = __webpack_require__(103);
-var validateDOMNesting = __webpack_require__(65);
+var isEventSupported = __webpack_require__(65);
+var shallowEqual = __webpack_require__(51);
+var inputValueTracking = __webpack_require__(104);
+var validateDOMNesting = __webpack_require__(67);
 var warning = __webpack_require__(3);
 
 var Flags = ReactDOMComponentFlags;
@@ -37449,7 +37666,7 @@ module.exports = ReactDOMComponent;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 215 */
+/* 218 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -37463,7 +37680,7 @@ module.exports = ReactDOMComponent;
 
 
 
-var validateDOMNesting = __webpack_require__(65);
+var validateDOMNesting = __webpack_require__(67);
 
 var DOC_NODE_TYPE = 9;
 
@@ -37486,7 +37703,7 @@ module.exports = ReactDOMContainerInfo;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 216 */
+/* 219 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -37502,7 +37719,7 @@ module.exports = ReactDOMContainerInfo;
 
 var _assign = __webpack_require__(6);
 
-var DOMLazyTree = __webpack_require__(25);
+var DOMLazyTree = __webpack_require__(26);
 var ReactDOMComponentTree = __webpack_require__(7);
 
 var ReactDOMEmptyComponent = function (instantiate) {
@@ -37549,7 +37766,7 @@ _assign(ReactDOMEmptyComponent.prototype, {
 module.exports = ReactDOMEmptyComponent;
 
 /***/ }),
-/* 217 */
+/* 220 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -37571,7 +37788,7 @@ var ReactDOMFeatureFlags = {
 module.exports = ReactDOMFeatureFlags;
 
 /***/ }),
-/* 218 */
+/* 221 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -37585,7 +37802,7 @@ module.exports = ReactDOMFeatureFlags;
 
 
 
-var DOMChildrenOperations = __webpack_require__(51);
+var DOMChildrenOperations = __webpack_require__(53);
 var ReactDOMComponentTree = __webpack_require__(7);
 
 /**
@@ -37607,7 +37824,7 @@ var ReactDOMIDOperations = {
 module.exports = ReactDOMIDOperations;
 
 /***/ }),
-/* 219 */
+/* 222 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -37624,8 +37841,8 @@ module.exports = ReactDOMIDOperations;
 var _prodInvariant = __webpack_require__(4),
     _assign = __webpack_require__(6);
 
-var DOMPropertyOperations = __webpack_require__(88);
-var LinkedValueUtils = __webpack_require__(55);
+var DOMPropertyOperations = __webpack_require__(89);
+var LinkedValueUtils = __webpack_require__(57);
 var ReactDOMComponentTree = __webpack_require__(7);
 var ReactUpdates = __webpack_require__(14);
 
@@ -37898,7 +38115,7 @@ module.exports = ReactDOMInput;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 220 */
+/* 223 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -37912,7 +38129,7 @@ module.exports = ReactDOMInput;
 
 
 
-var DOMProperty = __webpack_require__(18);
+var DOMProperty = __webpack_require__(21);
 var ReactComponentTreeHook = __webpack_require__(11);
 
 var warning = __webpack_require__(3);
@@ -37995,7 +38212,7 @@ module.exports = ReactDOMInvalidARIAHook;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 221 */
+/* 224 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38042,7 +38259,7 @@ module.exports = ReactDOMNullInputValuePropHook;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 222 */
+/* 225 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38058,9 +38275,9 @@ module.exports = ReactDOMNullInputValuePropHook;
 
 var _assign = __webpack_require__(6);
 
-var React = __webpack_require__(32);
+var React = __webpack_require__(33);
 var ReactDOMComponentTree = __webpack_require__(7);
-var ReactDOMSelect = __webpack_require__(90);
+var ReactDOMSelect = __webpack_require__(91);
 
 var warning = __webpack_require__(3);
 var didWarnInvalidOptionChildren = false;
@@ -38168,7 +38385,7 @@ module.exports = ReactDOMOption;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 223 */
+/* 226 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38184,8 +38401,8 @@ module.exports = ReactDOMOption;
 
 var ExecutionEnvironment = __webpack_require__(8);
 
-var getNodeForCharacterOffset = __webpack_require__(266);
-var getTextContentAccessor = __webpack_require__(102);
+var getNodeForCharacterOffset = __webpack_require__(269);
+var getTextContentAccessor = __webpack_require__(103);
 
 /**
  * While `isCollapsed` is available on the Selection object and `collapsed`
@@ -38383,7 +38600,7 @@ var ReactDOMSelection = {
 module.exports = ReactDOMSelection;
 
 /***/ }),
-/* 224 */
+/* 227 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38400,13 +38617,13 @@ module.exports = ReactDOMSelection;
 var _prodInvariant = __webpack_require__(4),
     _assign = __webpack_require__(6);
 
-var DOMChildrenOperations = __webpack_require__(51);
-var DOMLazyTree = __webpack_require__(25);
+var DOMChildrenOperations = __webpack_require__(53);
+var DOMLazyTree = __webpack_require__(26);
 var ReactDOMComponentTree = __webpack_require__(7);
 
 var escapeTextContentForBrowser = __webpack_require__(41);
 var invariant = __webpack_require__(2);
-var validateDOMNesting = __webpack_require__(65);
+var validateDOMNesting = __webpack_require__(67);
 
 /**
  * Text nodes violate a couple assumptions that React makes about components:
@@ -38549,7 +38766,7 @@ module.exports = ReactDOMTextComponent;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 225 */
+/* 228 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38566,7 +38783,7 @@ module.exports = ReactDOMTextComponent;
 var _prodInvariant = __webpack_require__(4),
     _assign = __webpack_require__(6);
 
-var LinkedValueUtils = __webpack_require__(55);
+var LinkedValueUtils = __webpack_require__(57);
 var ReactDOMComponentTree = __webpack_require__(7);
 var ReactUpdates = __webpack_require__(14);
 
@@ -38713,7 +38930,7 @@ module.exports = ReactDOMTextarea;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 226 */
+/* 229 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38853,7 +39070,7 @@ module.exports = {
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 227 */
+/* 230 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38867,7 +39084,7 @@ module.exports = {
 
 
 
-var DOMProperty = __webpack_require__(18);
+var DOMProperty = __webpack_require__(21);
 var EventPluginRegistry = __webpack_require__(37);
 var ReactComponentTreeHook = __webpack_require__(11);
 
@@ -38969,7 +39186,7 @@ module.exports = ReactDOMUnknownPropertyHook;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 228 */
+/* 231 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -38984,12 +39201,12 @@ module.exports = ReactDOMUnknownPropertyHook;
 
 
 
-var ReactInvalidSetStateWarningHook = __webpack_require__(236);
-var ReactHostOperationHistoryHook = __webpack_require__(234);
+var ReactInvalidSetStateWarningHook = __webpack_require__(239);
+var ReactHostOperationHistoryHook = __webpack_require__(237);
 var ReactComponentTreeHook = __webpack_require__(11);
 var ExecutionEnvironment = __webpack_require__(8);
 
-var performanceNow = __webpack_require__(196);
+var performanceNow = __webpack_require__(199);
 var warning = __webpack_require__(3);
 
 var hooks = [];
@@ -39334,7 +39551,7 @@ module.exports = ReactDebugTool;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 229 */
+/* 232 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39405,7 +39622,7 @@ var ReactDefaultBatchingStrategy = {
 module.exports = ReactDefaultBatchingStrategy;
 
 /***/ }),
-/* 230 */
+/* 233 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39419,25 +39636,25 @@ module.exports = ReactDefaultBatchingStrategy;
 
 
 
-var ARIADOMPropertyConfig = __webpack_require__(200);
-var BeforeInputEventPlugin = __webpack_require__(202);
-var ChangeEventPlugin = __webpack_require__(204);
-var DefaultEventPluginOrder = __webpack_require__(206);
-var EnterLeaveEventPlugin = __webpack_require__(207);
-var HTMLDOMPropertyConfig = __webpack_require__(209);
-var ReactComponentBrowserEnvironment = __webpack_require__(211);
-var ReactDOMComponent = __webpack_require__(214);
+var ARIADOMPropertyConfig = __webpack_require__(203);
+var BeforeInputEventPlugin = __webpack_require__(205);
+var ChangeEventPlugin = __webpack_require__(207);
+var DefaultEventPluginOrder = __webpack_require__(209);
+var EnterLeaveEventPlugin = __webpack_require__(210);
+var HTMLDOMPropertyConfig = __webpack_require__(212);
+var ReactComponentBrowserEnvironment = __webpack_require__(214);
+var ReactDOMComponent = __webpack_require__(217);
 var ReactDOMComponentTree = __webpack_require__(7);
-var ReactDOMEmptyComponent = __webpack_require__(216);
-var ReactDOMTreeTraversal = __webpack_require__(226);
-var ReactDOMTextComponent = __webpack_require__(224);
-var ReactDefaultBatchingStrategy = __webpack_require__(229);
-var ReactEventListener = __webpack_require__(233);
-var ReactInjection = __webpack_require__(235);
-var ReactReconcileTransaction = __webpack_require__(241);
-var SVGDOMPropertyConfig = __webpack_require__(246);
-var SelectEventPlugin = __webpack_require__(247);
-var SimpleEventPlugin = __webpack_require__(248);
+var ReactDOMEmptyComponent = __webpack_require__(219);
+var ReactDOMTreeTraversal = __webpack_require__(229);
+var ReactDOMTextComponent = __webpack_require__(227);
+var ReactDefaultBatchingStrategy = __webpack_require__(232);
+var ReactEventListener = __webpack_require__(236);
+var ReactInjection = __webpack_require__(238);
+var ReactReconcileTransaction = __webpack_require__(244);
+var SVGDOMPropertyConfig = __webpack_require__(249);
+var SelectEventPlugin = __webpack_require__(250);
+var SimpleEventPlugin = __webpack_require__(251);
 
 var alreadyInjected = false;
 
@@ -39494,7 +39711,7 @@ module.exports = {
 };
 
 /***/ }),
-/* 231 */
+/* 234 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39517,7 +39734,7 @@ var REACT_ELEMENT_TYPE = typeof Symbol === 'function' && Symbol['for'] && Symbol
 module.exports = REACT_ELEMENT_TYPE;
 
 /***/ }),
-/* 232 */
+/* 235 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39531,7 +39748,7 @@ module.exports = REACT_ELEMENT_TYPE;
 
 
 
-var EventPluginHub = __webpack_require__(28);
+var EventPluginHub = __webpack_require__(29);
 
 function runEventQueueInBatch(events) {
   EventPluginHub.enqueueEvents(events);
@@ -39552,7 +39769,7 @@ var ReactEventEmitterMixin = {
 module.exports = ReactEventEmitterMixin;
 
 /***/ }),
-/* 233 */
+/* 236 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39568,14 +39785,14 @@ module.exports = ReactEventEmitterMixin;
 
 var _assign = __webpack_require__(6);
 
-var EventListener = __webpack_require__(81);
+var EventListener = __webpack_require__(82);
 var ExecutionEnvironment = __webpack_require__(8);
-var PooledClass = __webpack_require__(23);
+var PooledClass = __webpack_require__(24);
 var ReactDOMComponentTree = __webpack_require__(7);
 var ReactUpdates = __webpack_require__(14);
 
-var getEventTarget = __webpack_require__(62);
-var getUnboundedScrollPosition = __webpack_require__(189);
+var getEventTarget = __webpack_require__(64);
+var getUnboundedScrollPosition = __webpack_require__(192);
 
 /**
  * Find the deepest React component completely containing the root of the
@@ -39710,7 +39927,7 @@ var ReactEventListener = {
 module.exports = ReactEventListener;
 
 /***/ }),
-/* 234 */
+/* 237 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39747,7 +39964,7 @@ var ReactHostOperationHistoryHook = {
 module.exports = ReactHostOperationHistoryHook;
 
 /***/ }),
-/* 235 */
+/* 238 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39761,13 +39978,13 @@ module.exports = ReactHostOperationHistoryHook;
 
 
 
-var DOMProperty = __webpack_require__(18);
-var EventPluginHub = __webpack_require__(28);
-var EventPluginUtils = __webpack_require__(53);
-var ReactComponentEnvironment = __webpack_require__(56);
-var ReactEmptyComponent = __webpack_require__(91);
+var DOMProperty = __webpack_require__(21);
+var EventPluginHub = __webpack_require__(29);
+var EventPluginUtils = __webpack_require__(55);
+var ReactComponentEnvironment = __webpack_require__(58);
+var ReactEmptyComponent = __webpack_require__(92);
 var ReactBrowserEventEmitter = __webpack_require__(38);
-var ReactHostComponent = __webpack_require__(93);
+var ReactHostComponent = __webpack_require__(94);
 var ReactUpdates = __webpack_require__(14);
 
 var ReactInjection = {
@@ -39784,7 +40001,7 @@ var ReactInjection = {
 module.exports = ReactInjection;
 
 /***/ }),
-/* 236 */
+/* 239 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39825,7 +40042,7 @@ module.exports = ReactInvalidSetStateWarningHook;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 237 */
+/* 240 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39839,7 +40056,7 @@ module.exports = ReactInvalidSetStateWarningHook;
 
 
 
-var adler32 = __webpack_require__(259);
+var adler32 = __webpack_require__(262);
 
 var TAG_END = /\/?>/;
 var COMMENT_START = /^<\!\-\-/;
@@ -39878,7 +40095,7 @@ var ReactMarkupChecksum = {
 module.exports = ReactMarkupChecksum;
 
 /***/ }),
-/* 238 */
+/* 241 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -39894,16 +40111,16 @@ module.exports = ReactMarkupChecksum;
 
 var _prodInvariant = __webpack_require__(4);
 
-var ReactComponentEnvironment = __webpack_require__(56);
-var ReactInstanceMap = __webpack_require__(30);
+var ReactComponentEnvironment = __webpack_require__(58);
+var ReactInstanceMap = __webpack_require__(31);
 var ReactInstrumentation = __webpack_require__(13);
 
 var ReactCurrentOwner = __webpack_require__(15);
-var ReactReconciler = __webpack_require__(26);
-var ReactChildReconciler = __webpack_require__(210);
+var ReactReconciler = __webpack_require__(27);
+var ReactChildReconciler = __webpack_require__(213);
 
 var emptyFunction = __webpack_require__(12);
-var flattenChildren = __webpack_require__(263);
+var flattenChildren = __webpack_require__(266);
 var invariant = __webpack_require__(2);
 
 /**
@@ -40328,7 +40545,7 @@ module.exports = ReactMultiChild;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 239 */
+/* 242 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -40425,7 +40642,7 @@ module.exports = ReactOwner;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 240 */
+/* 243 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -40454,7 +40671,7 @@ module.exports = ReactPropTypeLocationNames;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 241 */
+/* 244 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -40470,13 +40687,13 @@ module.exports = ReactPropTypeLocationNames;
 
 var _assign = __webpack_require__(6);
 
-var CallbackQueue = __webpack_require__(87);
-var PooledClass = __webpack_require__(23);
+var CallbackQueue = __webpack_require__(88);
+var PooledClass = __webpack_require__(24);
 var ReactBrowserEventEmitter = __webpack_require__(38);
-var ReactInputSelection = __webpack_require__(94);
+var ReactInputSelection = __webpack_require__(95);
 var ReactInstrumentation = __webpack_require__(13);
 var Transaction = __webpack_require__(40);
-var ReactUpdateQueue = __webpack_require__(58);
+var ReactUpdateQueue = __webpack_require__(60);
 
 /**
  * Ensures that, when possible, the selection range (currently selected text
@@ -40636,7 +40853,7 @@ module.exports = ReactReconcileTransaction;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 242 */
+/* 245 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -40651,7 +40868,7 @@ module.exports = ReactReconcileTransaction;
 
 
 
-var ReactOwner = __webpack_require__(239);
+var ReactOwner = __webpack_require__(242);
 
 var ReactRef = {};
 
@@ -40728,7 +40945,7 @@ ReactRef.detachRefs = function (instance, element) {
 module.exports = ReactRef;
 
 /***/ }),
-/* 243 */
+/* 246 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -40744,10 +40961,10 @@ module.exports = ReactRef;
 
 var _assign = __webpack_require__(6);
 
-var PooledClass = __webpack_require__(23);
+var PooledClass = __webpack_require__(24);
 var Transaction = __webpack_require__(40);
 var ReactInstrumentation = __webpack_require__(13);
-var ReactServerUpdateQueue = __webpack_require__(244);
+var ReactServerUpdateQueue = __webpack_require__(247);
 
 /**
  * Executed within the scope of the `Transaction` instance. Consider these as
@@ -40822,7 +41039,7 @@ module.exports = ReactServerRenderingTransaction;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 244 */
+/* 247 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -40839,7 +41056,7 @@ module.exports = ReactServerRenderingTransaction;
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var ReactUpdateQueue = __webpack_require__(58);
+var ReactUpdateQueue = __webpack_require__(60);
 
 var warning = __webpack_require__(3);
 
@@ -40965,7 +41182,7 @@ module.exports = ReactServerUpdateQueue;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 245 */
+/* 248 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -40982,7 +41199,7 @@ module.exports = ReactServerUpdateQueue;
 module.exports = '15.6.2';
 
 /***/ }),
-/* 246 */
+/* 249 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41287,7 +41504,7 @@ Object.keys(ATTRS).forEach(function (key) {
 module.exports = SVGDOMPropertyConfig;
 
 /***/ }),
-/* 247 */
+/* 250 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41301,15 +41518,15 @@ module.exports = SVGDOMPropertyConfig;
 
 
 
-var EventPropagators = __webpack_require__(29);
+var EventPropagators = __webpack_require__(30);
 var ExecutionEnvironment = __webpack_require__(8);
 var ReactDOMComponentTree = __webpack_require__(7);
-var ReactInputSelection = __webpack_require__(94);
-var SyntheticEvent = __webpack_require__(17);
+var ReactInputSelection = __webpack_require__(95);
+var SyntheticEvent = __webpack_require__(16);
 
-var getActiveElement = __webpack_require__(83);
-var isTextInputElement = __webpack_require__(105);
-var shallowEqual = __webpack_require__(49);
+var getActiveElement = __webpack_require__(84);
+var isTextInputElement = __webpack_require__(106);
+var shallowEqual = __webpack_require__(51);
 
 var skipSelectionChangeEvent = ExecutionEnvironment.canUseDOM && 'documentMode' in document && document.documentMode <= 11;
 
@@ -41478,7 +41695,7 @@ var SelectEventPlugin = {
 module.exports = SelectEventPlugin;
 
 /***/ }),
-/* 248 */
+/* 251 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41495,23 +41712,23 @@ module.exports = SelectEventPlugin;
 
 var _prodInvariant = __webpack_require__(4);
 
-var EventListener = __webpack_require__(81);
-var EventPropagators = __webpack_require__(29);
+var EventListener = __webpack_require__(82);
+var EventPropagators = __webpack_require__(30);
 var ReactDOMComponentTree = __webpack_require__(7);
-var SyntheticAnimationEvent = __webpack_require__(249);
-var SyntheticClipboardEvent = __webpack_require__(250);
-var SyntheticEvent = __webpack_require__(17);
-var SyntheticFocusEvent = __webpack_require__(253);
-var SyntheticKeyboardEvent = __webpack_require__(255);
+var SyntheticAnimationEvent = __webpack_require__(252);
+var SyntheticClipboardEvent = __webpack_require__(253);
+var SyntheticEvent = __webpack_require__(16);
+var SyntheticFocusEvent = __webpack_require__(256);
+var SyntheticKeyboardEvent = __webpack_require__(258);
 var SyntheticMouseEvent = __webpack_require__(39);
-var SyntheticDragEvent = __webpack_require__(252);
-var SyntheticTouchEvent = __webpack_require__(256);
-var SyntheticTransitionEvent = __webpack_require__(257);
-var SyntheticUIEvent = __webpack_require__(31);
-var SyntheticWheelEvent = __webpack_require__(258);
+var SyntheticDragEvent = __webpack_require__(255);
+var SyntheticTouchEvent = __webpack_require__(259);
+var SyntheticTransitionEvent = __webpack_require__(260);
+var SyntheticUIEvent = __webpack_require__(32);
+var SyntheticWheelEvent = __webpack_require__(261);
 
 var emptyFunction = __webpack_require__(12);
-var getEventCharCode = __webpack_require__(60);
+var getEventCharCode = __webpack_require__(62);
 var invariant = __webpack_require__(2);
 
 /**
@@ -41708,7 +41925,7 @@ module.exports = SimpleEventPlugin;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 249 */
+/* 252 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41722,7 +41939,7 @@ module.exports = SimpleEventPlugin;
 
 
 
-var SyntheticEvent = __webpack_require__(17);
+var SyntheticEvent = __webpack_require__(16);
 
 /**
  * @interface Event
@@ -41750,7 +41967,7 @@ SyntheticEvent.augmentClass(SyntheticAnimationEvent, AnimationEventInterface);
 module.exports = SyntheticAnimationEvent;
 
 /***/ }),
-/* 250 */
+/* 253 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41764,7 +41981,7 @@ module.exports = SyntheticAnimationEvent;
 
 
 
-var SyntheticEvent = __webpack_require__(17);
+var SyntheticEvent = __webpack_require__(16);
 
 /**
  * @interface Event
@@ -41791,7 +42008,7 @@ SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 module.exports = SyntheticClipboardEvent;
 
 /***/ }),
-/* 251 */
+/* 254 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41805,7 +42022,7 @@ module.exports = SyntheticClipboardEvent;
 
 
 
-var SyntheticEvent = __webpack_require__(17);
+var SyntheticEvent = __webpack_require__(16);
 
 /**
  * @interface Event
@@ -41830,7 +42047,7 @@ SyntheticEvent.augmentClass(SyntheticCompositionEvent, CompositionEventInterface
 module.exports = SyntheticCompositionEvent;
 
 /***/ }),
-/* 252 */
+/* 255 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41869,7 +42086,7 @@ SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 module.exports = SyntheticDragEvent;
 
 /***/ }),
-/* 253 */
+/* 256 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41883,7 +42100,7 @@ module.exports = SyntheticDragEvent;
 
 
 
-var SyntheticUIEvent = __webpack_require__(31);
+var SyntheticUIEvent = __webpack_require__(32);
 
 /**
  * @interface FocusEvent
@@ -41908,7 +42125,7 @@ SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 module.exports = SyntheticFocusEvent;
 
 /***/ }),
-/* 254 */
+/* 257 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41922,7 +42139,7 @@ module.exports = SyntheticFocusEvent;
 
 
 
-var SyntheticEvent = __webpack_require__(17);
+var SyntheticEvent = __webpack_require__(16);
 
 /**
  * @interface Event
@@ -41948,7 +42165,7 @@ SyntheticEvent.augmentClass(SyntheticInputEvent, InputEventInterface);
 module.exports = SyntheticInputEvent;
 
 /***/ }),
-/* 255 */
+/* 258 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -41962,11 +42179,11 @@ module.exports = SyntheticInputEvent;
 
 
 
-var SyntheticUIEvent = __webpack_require__(31);
+var SyntheticUIEvent = __webpack_require__(32);
 
-var getEventCharCode = __webpack_require__(60);
-var getEventKey = __webpack_require__(264);
-var getEventModifierState = __webpack_require__(61);
+var getEventCharCode = __webpack_require__(62);
+var getEventKey = __webpack_require__(267);
+var getEventModifierState = __webpack_require__(63);
 
 /**
  * @interface KeyboardEvent
@@ -42035,7 +42252,7 @@ SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 module.exports = SyntheticKeyboardEvent;
 
 /***/ }),
-/* 256 */
+/* 259 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42049,9 +42266,9 @@ module.exports = SyntheticKeyboardEvent;
 
 
 
-var SyntheticUIEvent = __webpack_require__(31);
+var SyntheticUIEvent = __webpack_require__(32);
 
-var getEventModifierState = __webpack_require__(61);
+var getEventModifierState = __webpack_require__(63);
 
 /**
  * @interface TouchEvent
@@ -42083,7 +42300,7 @@ SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 module.exports = SyntheticTouchEvent;
 
 /***/ }),
-/* 257 */
+/* 260 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42097,7 +42314,7 @@ module.exports = SyntheticTouchEvent;
 
 
 
-var SyntheticEvent = __webpack_require__(17);
+var SyntheticEvent = __webpack_require__(16);
 
 /**
  * @interface Event
@@ -42125,7 +42342,7 @@ SyntheticEvent.augmentClass(SyntheticTransitionEvent, TransitionEventInterface);
 module.exports = SyntheticTransitionEvent;
 
 /***/ }),
-/* 258 */
+/* 261 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42179,7 +42396,7 @@ SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 module.exports = SyntheticWheelEvent;
 
 /***/ }),
-/* 259 */
+/* 262 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42226,7 +42443,7 @@ function adler32(data) {
 module.exports = adler32;
 
 /***/ }),
-/* 260 */
+/* 263 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42242,8 +42459,8 @@ module.exports = adler32;
 
 var _prodInvariant = __webpack_require__(4);
 
-var ReactPropTypeLocationNames = __webpack_require__(240);
-var ReactPropTypesSecret = __webpack_require__(97);
+var ReactPropTypeLocationNames = __webpack_require__(243);
+var ReactPropTypesSecret = __webpack_require__(98);
 
 var invariant = __webpack_require__(2);
 var warning = __webpack_require__(3);
@@ -42317,7 +42534,7 @@ module.exports = checkReactTypeSpec;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 261 */
+/* 264 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42331,7 +42548,7 @@ module.exports = checkReactTypeSpec;
 
 
 
-var CSSProperty = __webpack_require__(86);
+var CSSProperty = __webpack_require__(87);
 var warning = __webpack_require__(3);
 
 var isUnitlessNumber = CSSProperty.isUnitlessNumber;
@@ -42400,7 +42617,7 @@ module.exports = dangerousStyleValue;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 262 */
+/* 265 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42418,9 +42635,9 @@ var _prodInvariant = __webpack_require__(4);
 
 var ReactCurrentOwner = __webpack_require__(15);
 var ReactDOMComponentTree = __webpack_require__(7);
-var ReactInstanceMap = __webpack_require__(30);
+var ReactInstanceMap = __webpack_require__(31);
 
-var getHostComponentFromComposite = __webpack_require__(101);
+var getHostComponentFromComposite = __webpack_require__(102);
 var invariant = __webpack_require__(2);
 var warning = __webpack_require__(3);
 
@@ -42464,7 +42681,7 @@ module.exports = findDOMNode;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 263 */
+/* 266 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42479,8 +42696,8 @@ module.exports = findDOMNode;
 
 
 
-var KeyEscapeUtils = __webpack_require__(54);
-var traverseAllChildren = __webpack_require__(107);
+var KeyEscapeUtils = __webpack_require__(56);
+var traverseAllChildren = __webpack_require__(108);
 var warning = __webpack_require__(3);
 
 var ReactComponentTreeHook;
@@ -42544,7 +42761,7 @@ module.exports = flattenChildren;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 264 */
+/* 267 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42558,7 +42775,7 @@ module.exports = flattenChildren;
 
 
 
-var getEventCharCode = __webpack_require__(60);
+var getEventCharCode = __webpack_require__(62);
 
 /**
  * Normalization of deprecated HTML5 `key` values
@@ -42659,7 +42876,7 @@ function getEventKey(nativeEvent) {
 module.exports = getEventKey;
 
 /***/ }),
-/* 265 */
+/* 268 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42703,7 +42920,7 @@ function getIteratorFn(maybeIterable) {
 module.exports = getIteratorFn;
 
 /***/ }),
-/* 266 */
+/* 269 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42780,7 +42997,7 @@ function getNodeForCharacterOffset(root, offset) {
 module.exports = getNodeForCharacterOffset;
 
 /***/ }),
-/* 267 */
+/* 270 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42884,7 +43101,7 @@ function getVendorPrefixedEventName(eventName) {
 module.exports = getVendorPrefixedEventName;
 
 /***/ }),
-/* 268 */
+/* 271 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42913,7 +43130,7 @@ function quoteAttributeValueForBrowser(value) {
 module.exports = quoteAttributeValueForBrowser;
 
 /***/ }),
-/* 269 */
+/* 272 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -42927,15 +43144,15 @@ module.exports = quoteAttributeValueForBrowser;
 
 
 
-var ReactMount = __webpack_require__(95);
+var ReactMount = __webpack_require__(96);
 
 module.exports = ReactMount.renderSubtreeIntoContainer;
 
 /***/ }),
-/* 270 */
+/* 273 */
 /***/ (function(module, exports, __webpack_require__) {
 
-(function webpackUniversalModuleDefinition(root, factory) {
+/* WEBPACK VAR INJECTION */(function(process) {(function webpackUniversalModuleDefinition(root, factory) {
 	if(true)
 		module.exports = factory();
 	else if(typeof define === 'function' && define.amd)
@@ -42944,7 +43161,7 @@ module.exports = ReactMount.renderSubtreeIntoContainer;
 		exports["Loading"] = factory();
 	else
 		root["Loading"] = factory();
-})(this, function() {
+})(typeof self !== 'undefined' ? self : this, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -43007,201 +43224,11 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "/";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 8);
+/******/ 	return __webpack_require__(__webpack_require__.s = 7);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ (function(module, exports) {
-
-// shim for using process in browser
-var process = module.exports = {};
-
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-    throw new Error('setTimeout has not been defined');
-}
-function defaultClearTimeout () {
-    throw new Error('clearTimeout has not been defined');
-}
-(function () {
-    try {
-        if (typeof setTimeout === 'function') {
-            cachedSetTimeout = setTimeout;
-        } else {
-            cachedSetTimeout = defaultSetTimout;
-        }
-    } catch (e) {
-        cachedSetTimeout = defaultSetTimout;
-    }
-    try {
-        if (typeof clearTimeout === 'function') {
-            cachedClearTimeout = clearTimeout;
-        } else {
-            cachedClearTimeout = defaultClearTimeout;
-        }
-    } catch (e) {
-        cachedClearTimeout = defaultClearTimeout;
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    // if setTimeout wasn't available but was latter defined
-    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-        cachedSetTimeout = setTimeout;
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    // if clearTimeout wasn't available but was latter defined
-    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-        cachedClearTimeout = clearTimeout;
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
-};
-
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
-
-function noop() {}
-
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) { return [] }
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-};
-
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
-
-/***/ }),
-/* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -43243,11 +43270,11 @@ emptyFunction.thatReturnsArgument = function (arg) {
 module.exports = emptyFunction;
 
 /***/ }),
-/* 2 */
+/* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/**
+/**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
  * This source code is licensed under the MIT license found in the
@@ -43300,10 +43327,9 @@ function invariant(condition, format, a, b, c, d, e, f) {
 }
 
 module.exports = invariant;
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 3 */
+/* 2 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -43400,11 +43426,11 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 
 
 /***/ }),
-/* 4 */
+/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/**
+/**
  * Copyright (c) 2014-present, Facebook, Inc.
  *
  * This source code is licensed under the MIT license found in the
@@ -43414,7 +43440,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 
 
 
-var emptyFunction = __webpack_require__(1);
+var emptyFunction = __webpack_require__(0);
 
 /**
  * Similar to invariant but only logs a warning if the condition is not met.
@@ -43466,10 +43492,9 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 module.exports = warning;
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 5 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -43488,11 +43513,11 @@ module.exports = ReactPropTypesSecret;
 
 
 /***/ }),
-/* 6 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/**
+/**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
  * This source code is licensed under the MIT license found in the
@@ -43509,14 +43534,13 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 module.exports = emptyObject;
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 7 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/**
+/**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
  * This source code is licensed under the MIT license found in the
@@ -43526,9 +43550,9 @@ module.exports = emptyObject;
 
 
 if (process.env.NODE_ENV !== 'production') {
-  var invariant = __webpack_require__(2);
-  var warning = __webpack_require__(4);
-  var ReactPropTypesSecret = __webpack_require__(5);
+  var invariant = __webpack_require__(1);
+  var warning = __webpack_require__(3);
+  var ReactPropTypesSecret = __webpack_require__(4);
   var loggedTypeFailures = {};
 }
 
@@ -43576,10 +43600,9 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
 
 module.exports = checkPropTypes;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 8 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -43593,15 +43616,15 @@ var _extends = Object.assign || function (target) { for (var i = 1; i < argument
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-var _react = __webpack_require__(9);
+var _react = __webpack_require__(8);
 
 var _react2 = _interopRequireDefault(_react);
 
-var _propTypes = __webpack_require__(12);
+var _propTypes = __webpack_require__(11);
 
 var _propTypes2 = _interopRequireDefault(_propTypes);
 
-var _svg = __webpack_require__(15);
+var _svg = __webpack_require__(14);
 
 var svgSources = _interopRequireWildcard(_svg);
 
@@ -43709,26 +43732,25 @@ Loading.defaultProps = {
 exports.default = Loading;
 
 /***/ }),
+/* 8 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+if (process.env.NODE_ENV === 'production') {
+  module.exports = __webpack_require__(9);
+} else {
+  module.exports = __webpack_require__(10);
+}
+
+
+/***/ }),
 /* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {
-
-if (process.env.NODE_ENV === 'production') {
-  module.exports = __webpack_require__(10);
-} else {
-  module.exports = __webpack_require__(11);
-}
-
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
-
-/***/ }),
-/* 10 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-/** @license React v16.1.1
+/** @license React v16.2.0
  * react.production.min.js
  *
  * Copyright (c) 2013-present, Facebook, Inc.
@@ -43736,28 +43758,27 @@ if (process.env.NODE_ENV === 'production') {
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
-var m=__webpack_require__(3),n=__webpack_require__(6),p=__webpack_require__(1);
-function q(a){for(var b=arguments.length-1,e="Minified React error #"+a+"; visit http://facebook.github.io/react/docs/error-decoder.html?invariant\x3d"+a,d=0;d<b;d++)e+="\x26args[]\x3d"+encodeURIComponent(arguments[d+1]);b=Error(e+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings.");b.name="Invariant Violation";b.framesToPop=1;throw b;}
-var r={isMounted:function(){return!1},enqueueForceUpdate:function(){},enqueueReplaceState:function(){},enqueueSetState:function(){}};function t(a,b,e){this.props=a;this.context=b;this.refs=n;this.updater=e||r}t.prototype.isReactComponent={};t.prototype.setState=function(a,b){"object"!==typeof a&&"function"!==typeof a&&null!=a?q("85"):void 0;this.updater.enqueueSetState(this,a,b,"setState")};t.prototype.forceUpdate=function(a){this.updater.enqueueForceUpdate(this,a,"forceUpdate")};
-function u(a,b,e){this.props=a;this.context=b;this.refs=n;this.updater=e||r}function v(){}v.prototype=t.prototype;var w=u.prototype=new v;w.constructor=u;m(w,t.prototype);w.isPureReactComponent=!0;function x(a,b,e){this.props=a;this.context=b;this.refs=n;this.updater=e||r}var y=x.prototype=new v;y.constructor=x;m(y,t.prototype);y.unstable_isAsyncReactComponent=!0;y.render=function(){return this.props.children};
-var z={current:null},A=Object.prototype.hasOwnProperty,B="function"===typeof Symbol&&Symbol["for"]&&Symbol["for"]("react.element")||60103,C={key:!0,ref:!0,__self:!0,__source:!0};
-function D(a,b,e){var d,c={},h=null,k=null;if(null!=b)for(d in void 0!==b.ref&&(k=b.ref),void 0!==b.key&&(h=""+b.key),b)A.call(b,d)&&!C.hasOwnProperty(d)&&(c[d]=b[d]);var f=arguments.length-2;if(1===f)c.children=e;else if(1<f){for(var g=Array(f),l=0;l<f;l++)g[l]=arguments[l+2];c.children=g}if(a&&a.defaultProps)for(d in f=a.defaultProps,f)void 0===c[d]&&(c[d]=f[d]);return{$$typeof:B,type:a,key:h,ref:k,props:c,_owner:z.current}}function E(a){return"object"===typeof a&&null!==a&&a.$$typeof===B}
-var F="function"===typeof Symbol&&Symbol.iterator,G="function"===typeof Symbol&&Symbol["for"]&&Symbol["for"]("react.element")||60103,H="function"===typeof Symbol&&Symbol["for"]&&Symbol["for"]("react.portal")||60106;function escape(a){var b={"\x3d":"\x3d0",":":"\x3d2"};return"$"+(""+a).replace(/[=:]/g,function(a){return b[a]})}var I=/\/+/g,J=[];
-function K(a,b,e,d){if(J.length){var c=J.pop();c.result=a;c.keyPrefix=b;c.func=e;c.context=d;c.count=0;return c}return{result:a,keyPrefix:b,func:e,context:d,count:0}}function L(a){a.result=null;a.keyPrefix=null;a.func=null;a.context=null;a.count=0;10>J.length&&J.push(a)}
-function M(a,b,e,d){var c=typeof a;if("undefined"===c||"boolean"===c)a=null;if(null===a||"string"===c||"number"===c||"object"===c&&a.$$typeof===G||"object"===c&&a.$$typeof===H)return e(d,a,""===b?"."+N(a,0):b),1;var h=0;b=""===b?".":b+":";if(Array.isArray(a))for(var k=0;k<a.length;k++){c=a[k];var f=b+N(c,k);h+=M(c,f,e,d)}else if(f=F&&a[F]||a["@@iterator"],"function"===typeof f)for(a=f.call(a),k=0;!(c=a.next()).done;)c=c.value,f=b+N(c,k++),h+=M(c,f,e,d);else"object"===c&&(e=""+a,q("31","[object Object]"===
-e?"object with keys {"+Object.keys(a).join(", ")+"}":e,""));return h}function N(a,b){return"object"===typeof a&&null!==a&&null!=a.key?escape(a.key):b.toString(36)}function O(a,b){a.func.call(a.context,b,a.count++)}
-function P(a,b,e){var d=a.result,c=a.keyPrefix;a=a.func.call(a.context,b,a.count++);Array.isArray(a)?Q(a,d,e,p.thatReturnsArgument):null!=a&&(E(a)&&(b=c+(!a.key||b&&b.key===a.key?"":(""+a.key).replace(I,"$\x26/")+"/")+e,a={$$typeof:B,type:a.type,key:b,ref:a.ref,props:a.props,_owner:a._owner}),d.push(a))}function Q(a,b,e,d,c){var h="";null!=e&&(h=(""+e).replace(I,"$\x26/")+"/");b=K(b,h,d,c);null==a||M(a,"",P,b);L(b)}"function"===typeof Symbol&&Symbol["for"]&&Symbol["for"]("react.fragment");
-var R={Children:{map:function(a,b,e){if(null==a)return a;var d=[];Q(a,d,null,b,e);return d},forEach:function(a,b,e){if(null==a)return a;b=K(null,null,b,e);null==a||M(a,"",O,b);L(b)},count:function(a){return null==a?0:M(a,"",p.thatReturnsNull,null)},toArray:function(a){var b=[];Q(a,b,null,p.thatReturnsArgument);return b},only:function(a){E(a)?void 0:q("143");return a}},Component:t,PureComponent:u,unstable_AsyncComponent:x,createElement:D,cloneElement:function(a,b,e){var d=m({},a.props),c=a.key,h=a.ref,
-k=a._owner;if(null!=b){void 0!==b.ref&&(h=b.ref,k=z.current);void 0!==b.key&&(c=""+b.key);if(a.type&&a.type.defaultProps)var f=a.type.defaultProps;for(g in b)A.call(b,g)&&!C.hasOwnProperty(g)&&(d[g]=void 0===b[g]&&void 0!==f?f[g]:b[g])}var g=arguments.length-2;if(1===g)d.children=e;else if(1<g){f=Array(g);for(var l=0;l<g;l++)f[l]=arguments[l+2];d.children=f}return{$$typeof:B,type:a.type,key:c,ref:h,props:d,_owner:k}},createFactory:function(a){var b=D.bind(null,a);b.type=a;return b},isValidElement:E,
-version:"16.1.1",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentOwner:z,assign:m}},S=Object.freeze({default:R}),T=S&&R||S;module.exports=T["default"]?T["default"]:T;
+
+var m=__webpack_require__(2),n=__webpack_require__(5),p=__webpack_require__(0),q="function"===typeof Symbol&&Symbol["for"],r=q?Symbol["for"]("react.element"):60103,t=q?Symbol["for"]("react.call"):60104,u=q?Symbol["for"]("react.return"):60105,v=q?Symbol["for"]("react.portal"):60106,w=q?Symbol["for"]("react.fragment"):60107,x="function"===typeof Symbol&&Symbol.iterator;
+function y(a){for(var b=arguments.length-1,e="Minified React error #"+a+"; visit http://facebook.github.io/react/docs/error-decoder.html?invariant\x3d"+a,c=0;c<b;c++)e+="\x26args[]\x3d"+encodeURIComponent(arguments[c+1]);b=Error(e+" for the full message or use the non-minified dev environment for full errors and additional helpful warnings.");b.name="Invariant Violation";b.framesToPop=1;throw b;}
+var z={isMounted:function(){return!1},enqueueForceUpdate:function(){},enqueueReplaceState:function(){},enqueueSetState:function(){}};function A(a,b,e){this.props=a;this.context=b;this.refs=n;this.updater=e||z}A.prototype.isReactComponent={};A.prototype.setState=function(a,b){"object"!==typeof a&&"function"!==typeof a&&null!=a?y("85"):void 0;this.updater.enqueueSetState(this,a,b,"setState")};A.prototype.forceUpdate=function(a){this.updater.enqueueForceUpdate(this,a,"forceUpdate")};
+function B(a,b,e){this.props=a;this.context=b;this.refs=n;this.updater=e||z}function C(){}C.prototype=A.prototype;var D=B.prototype=new C;D.constructor=B;m(D,A.prototype);D.isPureReactComponent=!0;function E(a,b,e){this.props=a;this.context=b;this.refs=n;this.updater=e||z}var F=E.prototype=new C;F.constructor=E;m(F,A.prototype);F.unstable_isAsyncReactComponent=!0;F.render=function(){return this.props.children};var G={current:null},H=Object.prototype.hasOwnProperty,I={key:!0,ref:!0,__self:!0,__source:!0};
+function J(a,b,e){var c,d={},g=null,k=null;if(null!=b)for(c in void 0!==b.ref&&(k=b.ref),void 0!==b.key&&(g=""+b.key),b)H.call(b,c)&&!I.hasOwnProperty(c)&&(d[c]=b[c]);var f=arguments.length-2;if(1===f)d.children=e;else if(1<f){for(var h=Array(f),l=0;l<f;l++)h[l]=arguments[l+2];d.children=h}if(a&&a.defaultProps)for(c in f=a.defaultProps,f)void 0===d[c]&&(d[c]=f[c]);return{$$typeof:r,type:a,key:g,ref:k,props:d,_owner:G.current}}function K(a){return"object"===typeof a&&null!==a&&a.$$typeof===r}
+function escape(a){var b={"\x3d":"\x3d0",":":"\x3d2"};return"$"+(""+a).replace(/[=:]/g,function(a){return b[a]})}var L=/\/+/g,M=[];function N(a,b,e,c){if(M.length){var d=M.pop();d.result=a;d.keyPrefix=b;d.func=e;d.context=c;d.count=0;return d}return{result:a,keyPrefix:b,func:e,context:c,count:0}}function O(a){a.result=null;a.keyPrefix=null;a.func=null;a.context=null;a.count=0;10>M.length&&M.push(a)}
+function P(a,b,e,c){var d=typeof a;if("undefined"===d||"boolean"===d)a=null;var g=!1;if(null===a)g=!0;else switch(d){case "string":case "number":g=!0;break;case "object":switch(a.$$typeof){case r:case t:case u:case v:g=!0}}if(g)return e(c,a,""===b?"."+Q(a,0):b),1;g=0;b=""===b?".":b+":";if(Array.isArray(a))for(var k=0;k<a.length;k++){d=a[k];var f=b+Q(d,k);g+=P(d,f,e,c)}else if(null===a||"undefined"===typeof a?f=null:(f=x&&a[x]||a["@@iterator"],f="function"===typeof f?f:null),"function"===typeof f)for(a=
+f.call(a),k=0;!(d=a.next()).done;)d=d.value,f=b+Q(d,k++),g+=P(d,f,e,c);else"object"===d&&(e=""+a,y("31","[object Object]"===e?"object with keys {"+Object.keys(a).join(", ")+"}":e,""));return g}function Q(a,b){return"object"===typeof a&&null!==a&&null!=a.key?escape(a.key):b.toString(36)}function R(a,b){a.func.call(a.context,b,a.count++)}
+function S(a,b,e){var c=a.result,d=a.keyPrefix;a=a.func.call(a.context,b,a.count++);Array.isArray(a)?T(a,c,e,p.thatReturnsArgument):null!=a&&(K(a)&&(b=d+(!a.key||b&&b.key===a.key?"":(""+a.key).replace(L,"$\x26/")+"/")+e,a={$$typeof:r,type:a.type,key:b,ref:a.ref,props:a.props,_owner:a._owner}),c.push(a))}function T(a,b,e,c,d){var g="";null!=e&&(g=(""+e).replace(L,"$\x26/")+"/");b=N(b,g,c,d);null==a||P(a,"",S,b);O(b)}
+var U={Children:{map:function(a,b,e){if(null==a)return a;var c=[];T(a,c,null,b,e);return c},forEach:function(a,b,e){if(null==a)return a;b=N(null,null,b,e);null==a||P(a,"",R,b);O(b)},count:function(a){return null==a?0:P(a,"",p.thatReturnsNull,null)},toArray:function(a){var b=[];T(a,b,null,p.thatReturnsArgument);return b},only:function(a){K(a)?void 0:y("143");return a}},Component:A,PureComponent:B,unstable_AsyncComponent:E,Fragment:w,createElement:J,cloneElement:function(a,b,e){var c=m({},a.props),
+d=a.key,g=a.ref,k=a._owner;if(null!=b){void 0!==b.ref&&(g=b.ref,k=G.current);void 0!==b.key&&(d=""+b.key);if(a.type&&a.type.defaultProps)var f=a.type.defaultProps;for(h in b)H.call(b,h)&&!I.hasOwnProperty(h)&&(c[h]=void 0===b[h]&&void 0!==f?f[h]:b[h])}var h=arguments.length-2;if(1===h)c.children=e;else if(1<h){f=Array(h);for(var l=0;l<h;l++)f[l]=arguments[l+2];c.children=f}return{$$typeof:r,type:a.type,key:d,ref:g,props:c,_owner:k}},createFactory:function(a){var b=J.bind(null,a);b.type=a;return b},
+isValidElement:K,version:"16.2.0",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurrentOwner:G,assign:m}},V=Object.freeze({default:U}),W=V&&U||V;module.exports=W["default"]?W["default"]:W;
 
 
 /***/ }),
-/* 11 */
+/* 10 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/** @license React v16.1.1
+/** @license React v16.2.0
  * react.development.js
  *
  * Copyright (c) 2013-present, Facebook, Inc.
@@ -43768,20 +43789,46 @@ version:"16.1.1",__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED:{ReactCurren
 
 
 
+
+
 if (process.env.NODE_ENV !== "production") {
   (function() {
 'use strict';
 
-var _assign = __webpack_require__(3);
-var invariant = __webpack_require__(2);
-var emptyObject = __webpack_require__(6);
-var warning = __webpack_require__(4);
-var emptyFunction = __webpack_require__(1);
-var checkPropTypes = __webpack_require__(7);
+var _assign = __webpack_require__(2);
+var emptyObject = __webpack_require__(5);
+var invariant = __webpack_require__(1);
+var warning = __webpack_require__(3);
+var emptyFunction = __webpack_require__(0);
+var checkPropTypes = __webpack_require__(6);
 
 // TODO: this is special because it gets imported during build.
 
-var ReactVersion = '16.1.1';
+var ReactVersion = '16.2.0';
+
+// The Symbol used to tag the ReactElement-like types. If there is no native Symbol
+// nor polyfill, then a plain number is used for performance.
+var hasSymbol = typeof Symbol === 'function' && Symbol['for'];
+
+var REACT_ELEMENT_TYPE = hasSymbol ? Symbol['for']('react.element') : 0xeac7;
+var REACT_CALL_TYPE = hasSymbol ? Symbol['for']('react.call') : 0xeac8;
+var REACT_RETURN_TYPE = hasSymbol ? Symbol['for']('react.return') : 0xeac9;
+var REACT_PORTAL_TYPE = hasSymbol ? Symbol['for']('react.portal') : 0xeaca;
+var REACT_FRAGMENT_TYPE = hasSymbol ? Symbol['for']('react.fragment') : 0xeacb;
+
+var MAYBE_ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
+var FAUX_ITERATOR_SYMBOL = '@@iterator';
+
+function getIteratorFn(maybeIterable) {
+  if (maybeIterable === null || typeof maybeIterable === 'undefined') {
+    return null;
+  }
+  var maybeIterator = MAYBE_ITERATOR_SYMBOL && maybeIterable[MAYBE_ITERATOR_SYMBOL] || maybeIterable[FAUX_ITERATOR_SYMBOL];
+  if (typeof maybeIterator === 'function') {
+    return maybeIterator;
+  }
+  return null;
+}
 
 /**
  * WARNING: DO NOT manually require this module.
@@ -43789,21 +43836,6 @@ var ReactVersion = '16.1.1';
  * and will _only_ be required by the corresponding babel pass.
  * It always throws.
  */
-
-// Exports React.Fragment
-var enableReactFragment = false;
-// Exports ReactDOM.createRoot
-
-
-
-// Mutating mode (React DOM, React ART, React Native):
-
-// Experimental noop mode (currently unused):
-
-// Experimental persistent mode (CS):
-
-
-// Only used in www builds.
 
 /**
  * Forked from fbjs/warning:
@@ -44084,10 +44116,6 @@ var ReactCurrentOwner = {
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
 
-// The Symbol used to tag the ReactElement type. If there is no native Symbol
-// nor polyfill, then a plain number is used for performance.
-var REACT_ELEMENT_TYPE$1 = typeof Symbol === 'function' && Symbol['for'] && Symbol['for']('react.element') || 0xeac7;
-
 var RESERVED_PROPS = {
   key: true,
   ref: true,
@@ -44173,7 +44201,7 @@ function defineRefPropWarningGetter(props, displayName) {
 var ReactElement = function (type, key, ref, self, source, owner, props) {
   var element = {
     // This tag allow us to uniquely identify this as a React Element
-    $$typeof: REACT_ELEMENT_TYPE$1,
+    $$typeof: REACT_ELEMENT_TYPE,
 
     // Built-in properties that belong on the element
     type: type,
@@ -44288,7 +44316,7 @@ function createElement(type, config, children) {
   }
   {
     if (key || ref) {
-      if (typeof props.$$typeof === 'undefined' || props.$$typeof !== REACT_ELEMENT_TYPE$1) {
+      if (typeof props.$$typeof === 'undefined' || props.$$typeof !== REACT_ELEMENT_TYPE) {
         var displayName = typeof type === 'function' ? type.displayName || type.name || 'Unknown' : type;
         if (key) {
           defineKeyPropWarningGetter(props, displayName);
@@ -44388,7 +44416,7 @@ function cloneElement(element, config, children) {
  * @final
  */
 function isValidElement(object) {
-  return typeof object === 'object' && object !== null && object.$$typeof === REACT_ELEMENT_TYPE$1;
+  return typeof object === 'object' && object !== null && object.$$typeof === REACT_ELEMENT_TYPE;
 }
 
 var ReactDebugCurrentFrame = {};
@@ -44406,12 +44434,6 @@ var ReactDebugCurrentFrame = {};
   };
 }
 
-var ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
-var FAUX_ITERATOR_SYMBOL = '@@iterator'; // Before Symbol spec.
-// The Symbol used to tag the ReactElement type. If there is no native Symbol
-// nor polyfill, then a plain number is used for performance.
-var REACT_ELEMENT_TYPE = typeof Symbol === 'function' && Symbol['for'] && Symbol['for']('react.element') || 0xeac7;
-var REACT_PORTAL_TYPE = typeof Symbol === 'function' && Symbol['for'] && Symbol['for']('react.portal') || 0xeaca;
 var SEPARATOR = '.';
 var SUBSEPARATOR = ':';
 
@@ -44495,10 +44517,28 @@ function traverseAllChildrenImpl(children, nameSoFar, callback, traverseContext)
     children = null;
   }
 
-  if (children === null || type === 'string' || type === 'number' ||
-  // The following is inlined from ReactElement. This means we can optimize
-  // some checks. React Fiber also inlines this logic for similar purposes.
-  type === 'object' && children.$$typeof === REACT_ELEMENT_TYPE || type === 'object' && children.$$typeof === REACT_PORTAL_TYPE) {
+  var invokeCallback = false;
+
+  if (children === null) {
+    invokeCallback = true;
+  } else {
+    switch (type) {
+      case 'string':
+      case 'number':
+        invokeCallback = true;
+        break;
+      case 'object':
+        switch (children.$$typeof) {
+          case REACT_ELEMENT_TYPE:
+          case REACT_CALL_TYPE:
+          case REACT_RETURN_TYPE:
+          case REACT_PORTAL_TYPE:
+            invokeCallback = true;
+        }
+    }
+  }
+
+  if (invokeCallback) {
     callback(traverseContext, children,
     // If it's the only child, treat the name as if it was wrapped in an array
     // so that it's consistent if the number of children grows.
@@ -44518,7 +44558,7 @@ function traverseAllChildrenImpl(children, nameSoFar, callback, traverseContext)
       subtreeCount += traverseAllChildrenImpl(child, nextName, callback, traverseContext);
     }
   } else {
-    var iteratorFn = ITERATOR_SYMBOL && children[ITERATOR_SYMBOL] || children[FAUX_ITERATOR_SYMBOL];
+    var iteratorFn = getIteratorFn(children);
     if (typeof iteratorFn === 'function') {
       {
         // Warn about using Maps as children
@@ -44742,6 +44782,8 @@ function getComponentName(fiber) {
 {
   var currentlyValidatingElement = null;
 
+  var propTypesMisspellWarningShown = false;
+
   var getDisplayName = function (element) {
     if (element == null) {
       return '#empty';
@@ -44749,7 +44791,7 @@ function getComponentName(fiber) {
       return '#text';
     } else if (typeof element.type === 'string') {
       return element.type;
-    } else if (element.type === REACT_FRAGMENT_TYPE$1) {
+    } else if (element.type === REACT_FRAGMENT_TYPE) {
       return 'React.Fragment';
     } else {
       return element.type.displayName || element.type.name || 'Unknown';
@@ -44767,13 +44809,8 @@ function getComponentName(fiber) {
     return stack;
   };
 
-  var REACT_FRAGMENT_TYPE$1 = typeof Symbol === 'function' && Symbol['for'] && Symbol['for']('react.fragment') || 0xeacb;
-
   var VALID_FRAGMENT_PROPS = new Map([['children', true], ['key', true]]);
 }
-
-var ITERATOR_SYMBOL$1 = typeof Symbol === 'function' && Symbol.iterator;
-var FAUX_ITERATOR_SYMBOL$1 = '@@iterator'; // Before Symbol spec.
 
 function getDeclarationErrorAddendum() {
   if (ReactCurrentOwner.current) {
@@ -44879,7 +44916,7 @@ function validateChildKeys(node, parentType) {
       node._store.validated = true;
     }
   } else if (node) {
-    var iteratorFn = ITERATOR_SYMBOL$1 && node[ITERATOR_SYMBOL$1] || node[FAUX_ITERATOR_SYMBOL$1];
+    var iteratorFn = getIteratorFn(node);
     if (typeof iteratorFn === 'function') {
       // Entry iterators used to provide implicit keys,
       // but now we print a separate warning for them later.
@@ -44909,11 +44946,13 @@ function validatePropTypes(element) {
   }
   var name = componentClass.displayName || componentClass.name;
   var propTypes = componentClass.propTypes;
-
   if (propTypes) {
     currentlyValidatingElement = element;
     checkPropTypes(propTypes, element.props, 'prop', name, getStackAddendum);
     currentlyValidatingElement = null;
+  } else if (componentClass.PropTypes !== undefined && !propTypesMisspellWarningShown) {
+    propTypesMisspellWarningShown = true;
+    warning(false, 'Component %s declared `PropTypes` instead of `propTypes`. Did you misspell the property assignment?', name || 'Unknown');
   }
   if (typeof componentClass.getDefaultProps === 'function') {
     warning(componentClass.getDefaultProps.isReactClassApproved, 'getDefaultProps is only used on classic React.createClass ' + 'definitions. Use a static property named `defaultProps` instead.');
@@ -45003,7 +45042,7 @@ function createElementWithValidation(type, props, children) {
     }
   }
 
-  if (typeof type === 'symbol' && type === REACT_FRAGMENT_TYPE$1) {
+  if (typeof type === 'symbol' && type === REACT_FRAGMENT_TYPE) {
     validateFragmentProps(element);
   } else {
     validatePropTypes(element);
@@ -45042,8 +45081,6 @@ function cloneElementWithValidation(element, props, children) {
   return newElement;
 }
 
-var REACT_FRAGMENT_TYPE = typeof Symbol === 'function' && Symbol['for'] && Symbol['for']('react.fragment') || 0xeacb;
-
 var React = {
   Children: {
     map: mapChildren,
@@ -45056,6 +45093,8 @@ var React = {
   Component: Component,
   PureComponent: PureComponent,
   unstable_AsyncComponent: AsyncComponent,
+
+  Fragment: REACT_FRAGMENT_TYPE,
 
   createElement: createElementWithValidation,
   cloneElement: cloneElementWithValidation,
@@ -45070,10 +45109,6 @@ var React = {
     assign: _assign
   }
 };
-
-if (enableReactFragment) {
-  React.Fragment = REACT_FRAGMENT_TYPE;
-}
 
 {
   _assign(React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED, {
@@ -45101,13 +45136,12 @@ module.exports = react;
   })();
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 12 */
+/* 11 */
 /***/ (function(module, exports, __webpack_require__) {
 
-/* WEBPACK VAR INJECTION */(function(process) {/**
+/**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
  * This source code is licensed under the MIT license found in the
@@ -45129,21 +45163,20 @@ if (process.env.NODE_ENV !== 'production') {
   // By explicitly using `prop-types` you are opting into new development behavior.
   // http://fb.me/prop-types-in-prod
   var throwOnDirectAccess = true;
-  module.exports = __webpack_require__(13)(isValidElement, throwOnDirectAccess);
+  module.exports = __webpack_require__(12)(isValidElement, throwOnDirectAccess);
 } else {
   // By explicitly using `prop-types` you are opting into new production behavior.
   // http://fb.me/prop-types-in-prod
-  module.exports = __webpack_require__(14)();
+  module.exports = __webpack_require__(13)();
 }
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 13 */
+/* 12 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
-/* WEBPACK VAR INJECTION */(function(process) {/**
+/**
  * Copyright (c) 2013-present, Facebook, Inc.
  *
  * This source code is licensed under the MIT license found in the
@@ -45152,13 +45185,13 @@ if (process.env.NODE_ENV !== 'production') {
 
 
 
-var emptyFunction = __webpack_require__(1);
-var invariant = __webpack_require__(2);
-var warning = __webpack_require__(4);
-var assign = __webpack_require__(3);
+var emptyFunction = __webpack_require__(0);
+var invariant = __webpack_require__(1);
+var warning = __webpack_require__(3);
+var assign = __webpack_require__(2);
 
-var ReactPropTypesSecret = __webpack_require__(5);
-var checkPropTypes = __webpack_require__(7);
+var ReactPropTypesSecret = __webpack_require__(4);
+var checkPropTypes = __webpack_require__(6);
 
 module.exports = function(isValidElement, throwOnDirectAccess) {
   /* global Symbol */
@@ -45686,10 +45719,9 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
   return ReactPropTypes;
 };
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 14 */
+/* 13 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -45702,9 +45734,9 @@ module.exports = function(isValidElement, throwOnDirectAccess) {
 
 
 
-var emptyFunction = __webpack_require__(1);
-var invariant = __webpack_require__(2);
-var ReactPropTypesSecret = __webpack_require__(5);
+var emptyFunction = __webpack_require__(0);
+var invariant = __webpack_require__(1);
+var ReactPropTypesSecret = __webpack_require__(4);
 
 module.exports = function() {
   function shim(props, propName, componentName, location, propFullName, secret) {
@@ -45754,7 +45786,7 @@ module.exports = function() {
 
 
 /***/ }),
-/* 15 */
+/* 14 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -45764,7 +45796,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _blank = __webpack_require__(16);
+var _blank = __webpack_require__(15);
 
 Object.defineProperty(exports, 'blank', {
   enumerable: true,
@@ -45773,7 +45805,7 @@ Object.defineProperty(exports, 'blank', {
   }
 });
 
-var _loadingBalls = __webpack_require__(17);
+var _loadingBalls = __webpack_require__(16);
 
 Object.defineProperty(exports, 'balls', {
   enumerable: true,
@@ -45782,7 +45814,7 @@ Object.defineProperty(exports, 'balls', {
   }
 });
 
-var _loadingBars = __webpack_require__(18);
+var _loadingBars = __webpack_require__(17);
 
 Object.defineProperty(exports, 'bars', {
   enumerable: true,
@@ -45791,7 +45823,7 @@ Object.defineProperty(exports, 'bars', {
   }
 });
 
-var _loadingBubbles = __webpack_require__(19);
+var _loadingBubbles = __webpack_require__(18);
 
 Object.defineProperty(exports, 'bubbles', {
   enumerable: true,
@@ -45800,7 +45832,7 @@ Object.defineProperty(exports, 'bubbles', {
   }
 });
 
-var _loadingCubes = __webpack_require__(20);
+var _loadingCubes = __webpack_require__(19);
 
 Object.defineProperty(exports, 'cubes', {
   enumerable: true,
@@ -45809,7 +45841,7 @@ Object.defineProperty(exports, 'cubes', {
   }
 });
 
-var _loadingCylon = __webpack_require__(21);
+var _loadingCylon = __webpack_require__(20);
 
 Object.defineProperty(exports, 'cylon', {
   enumerable: true,
@@ -45818,7 +45850,7 @@ Object.defineProperty(exports, 'cylon', {
   }
 });
 
-var _loadingSpin = __webpack_require__(22);
+var _loadingSpin = __webpack_require__(21);
 
 Object.defineProperty(exports, 'spin', {
   enumerable: true,
@@ -45827,7 +45859,7 @@ Object.defineProperty(exports, 'spin', {
   }
 });
 
-var _loadingSpinningBubbles = __webpack_require__(23);
+var _loadingSpinningBubbles = __webpack_require__(22);
 
 Object.defineProperty(exports, 'spinningBubbles', {
   enumerable: true,
@@ -45836,7 +45868,7 @@ Object.defineProperty(exports, 'spinningBubbles', {
   }
 });
 
-var _loadingSpokes = __webpack_require__(24);
+var _loadingSpokes = __webpack_require__(23);
 
 Object.defineProperty(exports, 'spokes', {
   enumerable: true,
@@ -45848,55 +45880,55 @@ Object.defineProperty(exports, 'spokes', {
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 /***/ }),
-/* 16 */
+/* 15 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg class=\"icon-blank\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\"></svg>\n"
 
 /***/ }),
-/* 17 */
+/* 16 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg class=\"icon-loading\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <path transform=\"translate(-8 0)\" d=\"M4 12 A4 4 0 0 0 4 20 A4 4 0 0 0 4 12\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"-8 0; 2 0; 2 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.25;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(2 0)\" d=\"M4 12 A4 4 0 0 0 4 20 A4 4 0 0 0 4 12\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"2 0; 12 0; 12 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.35;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(12 0)\" d=\"M4 12 A4 4 0 0 0 4 20 A4 4 0 0 0 4 12\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"12 0; 22 0; 22 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.45;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(24 0)\" d=\"M4 12 A4 4 0 0 0 4 20 A4 4 0 0 0 4 12\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"22 0; 32 0; 32 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.55;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n</svg>\n"
 
 /***/ }),
-/* 18 */
+/* 17 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <path transform=\"translate(2)\" d=\"M0 12 V20 H4 V12z\"> \n    <animate attributeName=\"d\" values=\"M0 12 V20 H4 V12z; M0 4 V28 H4 V4z; M0 12 V20 H4 V12z; M0 12 V20 H4 V12z\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.2;.5;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.8 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(8)\" d=\"M0 12 V20 H4 V12z\">\n    <animate attributeName=\"d\" values=\"M0 12 V20 H4 V12z; M0 4 V28 H4 V4z; M0 12 V20 H4 V12z; M0 12 V20 H4 V12z\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0.2\" keytimes=\"0;.2;.5;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.8 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(14)\" d=\"M0 12 V20 H4 V12z\">\n    <animate attributeName=\"d\" values=\"M0 12 V20 H4 V12z; M0 4 V28 H4 V4z; M0 12 V20 H4 V12z; M0 12 V20 H4 V12z\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0.4\" keytimes=\"0;.2;.5;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.8 0.4 0.8\" calcMode=\"spline\" />\n  </path>\n  <path transform=\"translate(20)\" d=\"M0 12 V20 H4 V12z\">\n    <animate attributeName=\"d\" values=\"M0 12 V20 H4 V12z; M0 4 V28 H4 V4z; M0 12 V20 H4 V12z; M0 12 V20 H4 V12z\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0.6\" keytimes=\"0;.2;.5;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.8 0.4 0.8\" calcMode=\"spline\" />\n  </path>\n  <path transform=\"translate(26)\" d=\"M0 12 V20 H4 V12z\">\n    <animate attributeName=\"d\" values=\"M0 12 V20 H4 V12z; M0 4 V28 H4 V4z; M0 12 V20 H4 V12z; M0 12 V20 H4 V12z\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0.8\" keytimes=\"0;.2;.5;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.8 0.4 0.8\" calcMode=\"spline\" />\n  </path>\n</svg>\n"
 
 /***/ }),
-/* 19 */
+/* 18 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <circle transform=\"translate(8 0)\" cx=\"0\" cy=\"16\" r=\"0\"> \n    <animate attributeName=\"r\" values=\"0; 4; 0; 0\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0\"\n      keytimes=\"0;0.2;0.7;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"translate(16 0)\" cx=\"0\" cy=\"16\" r=\"0\"> \n    <animate attributeName=\"r\" values=\"0; 4; 0; 0\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0.3\"\n      keytimes=\"0;0.2;0.7;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"translate(24 0)\" cx=\"0\" cy=\"16\" r=\"0\"> \n    <animate attributeName=\"r\" values=\"0; 4; 0; 0\" dur=\"1.2s\" repeatCount=\"indefinite\" begin=\"0.6\"\n      keytimes=\"0;0.2;0.7;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n</svg>\n"
 
 /***/ }),
-/* 20 */
+/* 19 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <path transform=\"translate(-8 0)\" d=\"M0 12 V20 H8 V12z\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"-8 0; 2 0; 2 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.25;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(2 0)\" d=\"M0 12 V20 H8 V12z\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"2 0; 12 0; 12 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.35;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(12 0)\" d=\"M0 12 V20 H8 V12z\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"12 0; 22 0; 22 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.45;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n  <path transform=\"translate(24 0)\" d=\"M0 12 V20 H8 V12z\"> \n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"22 0; 32 0; 32 0;\" dur=\"0.8s\" repeatCount=\"indefinite\" begin=\"0\" keytimes=\"0;.55;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.6 0.4 0.8\" calcMode=\"spline\"  />\n  </path>\n</svg>\n"
 
 /***/ }),
-/* 21 */
+/* 20 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <path transform=\"translate(0 0)\" d=\"M0 12 V20 H4 V12z\">\n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"0 0; 28 0; 0 0; 0 0\" dur=\"1.5s\" begin=\"0\" repeatCount=\"indefinite\" keytimes=\"0;0.3;0.6;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </path>\n  <path opacity=\"0.5\" transform=\"translate(0 0)\" d=\"M0 12 V20 H4 V12z\">\n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"0 0; 28 0; 0 0; 0 0\" dur=\"1.5s\" begin=\"0.1s\" repeatCount=\"indefinite\" keytimes=\"0;0.3;0.6;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </path>\n  <path opacity=\"0.25\" transform=\"translate(0 0)\" d=\"M0 12 V20 H4 V12z\">\n    <animateTransform attributeName=\"transform\" type=\"translate\" values=\"0 0; 28 0; 0 0; 0 0\" dur=\"1.5s\" begin=\"0.2s\" repeatCount=\"indefinite\" keytimes=\"0;0.3;0.6;1\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </path>\n</svg>\n"
 
 /***/ }),
-/* 22 */
+/* 21 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <path opacity=\".25\" d=\"M16 0 A16 16 0 0 0 16 32 A16 16 0 0 0 16 0 M16 4 A12 12 0 0 1 16 28 A12 12 0 0 1 16 4\"/>\n  <path d=\"M16 0 A16 16 0 0 1 32 16 L28 16 A12 12 0 0 0 16 4z\">\n    <animateTransform attributeName=\"transform\" type=\"rotate\" from=\"0 16 16\" to=\"360 16 16\" dur=\"0.8s\" repeatCount=\"indefinite\" />\n  </path>\n</svg>\n"
 
 /***/ }),
-/* 23 */
+/* 22 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <circle cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(45 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.125s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(90 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.25s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(135 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.375s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(180 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.5s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(225 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.625s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(270 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.75s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(315 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.875s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n  <circle transform=\"rotate(180 16 16)\" cx=\"16\" cy=\"3\" r=\"0\">\n    <animate attributeName=\"r\" values=\"0;3;0;0\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.5s\" keySplines=\"0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8;0.2 0.2 0.4 0.8\" calcMode=\"spline\" />\n  </circle>\n</svg>\n"
 
 /***/ }),
-/* 24 */
+/* 23 */
 /***/ (function(module, exports) {
 
 module.exports = "<svg id=\"loading\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 32\">\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(0 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0\"/>\n  </path>\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(45 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.125s\"/>\n  </path>\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(90 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.25s\"/>\n  </path>\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(135 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.375s\"/>\n  </path>\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(180 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.5s\"/>\n  </path>\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(225 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.675s\"/>\n  </path>\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(270 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.75s\"/>\n  </path>\n  <path opacity=\".1\" d=\"M14 0 H18 V8 H14 z\" transform=\"rotate(315 16 16)\">\n    <animate attributeName=\"opacity\" from=\"1\" to=\".1\" dur=\"1s\" repeatCount=\"indefinite\" begin=\"0.875s\"/>\n  </path>\n</svg>\n"
@@ -45904,10 +45936,11 @@ module.exports = "<svg id=\"loading\" xmlns=\"http://www.w3.org/2000/svg\" viewB
 /***/ })
 /******/ ]);
 });
-//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8vd2VicGFjay91bml2ZXJzYWxNb2R1bGVEZWZpbml0aW9uIiwid2VicGFjazovLy93ZWJwYWNrL2Jvb3RzdHJhcCA5YjFkYjZmOGNjZThiZTkzYmY4MCIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvcHJvY2Vzcy9icm93c2VyLmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9mYmpzL2xpYi9lbXB0eUZ1bmN0aW9uLmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9mYmpzL2xpYi9pbnZhcmlhbnQuanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL29iamVjdC1hc3NpZ24vaW5kZXguanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL2ZianMvbGliL3dhcm5pbmcuanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvbGliL1JlYWN0UHJvcFR5cGVzU2VjcmV0LmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9mYmpzL2xpYi9lbXB0eU9iamVjdC5qcyIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvcHJvcC10eXBlcy9jaGVja1Byb3BUeXBlcy5qcyIsIndlYnBhY2s6Ly8vLi9saWIvcmVhY3QtbG9hZGluZy5qc3giLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL3JlYWN0L2luZGV4LmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9yZWFjdC9janMvcmVhY3QucHJvZHVjdGlvbi5taW4uanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL3JlYWN0L2Nqcy9yZWFjdC5kZXZlbG9wbWVudC5qcyIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvcHJvcC10eXBlcy9pbmRleC5qcyIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvcHJvcC10eXBlcy9mYWN0b3J5V2l0aFR5cGVDaGVja2Vycy5qcyIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvcHJvcC10eXBlcy9mYWN0b3J5V2l0aFRocm93aW5nU2hpbXMuanMiLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9pbmRleC5qcyIsIndlYnBhY2s6Ly8vLi9saWIvc3ZnL2JsYW5rLnN2ZyIsIndlYnBhY2s6Ly8vLi9saWIvc3ZnL2xvYWRpbmctYmFsbHMuc3ZnIiwid2VicGFjazovLy8uL2xpYi9zdmcvbG9hZGluZy1iYXJzLnN2ZyIsIndlYnBhY2s6Ly8vLi9saWIvc3ZnL2xvYWRpbmctYnViYmxlcy5zdmciLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9sb2FkaW5nLWN1YmVzLnN2ZyIsIndlYnBhY2s6Ly8vLi9saWIvc3ZnL2xvYWRpbmctY3lsb24uc3ZnIiwid2VicGFjazovLy8uL2xpYi9zdmcvbG9hZGluZy1zcGluLnN2ZyIsIndlYnBhY2s6Ly8vLi9saWIvc3ZnL2xvYWRpbmctc3Bpbm5pbmctYnViYmxlcy5zdmciLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9sb2FkaW5nLXNwb2tlcy5zdmciXSwibmFtZXMiOlsic3ZnU291cmNlcyIsIkxvYWRpbmciLCJzdGF0ZSIsImRlbGF5ZWQiLCJwcm9wcyIsImRlbGF5IiwidGltZW91dCIsInNldFRpbWVvdXQiLCJzZXRTdGF0ZSIsImNsZWFyVGltZW91dCIsImNvbG9yIiwidHlwZSIsImhlaWdodCIsIndpZHRoIiwicmVzdFByb3BzIiwic2VsZWN0ZWRUeXBlIiwic3ZnIiwic3R5bGUiLCJmaWxsIiwiX19odG1sIiwicHJvcFR5cGVzIiwic3RyaW5nIiwibnVtYmVyIiwib25lT2ZUeXBlIiwiZGVmYXVsdFByb3BzIiwiZGVmYXVsdCJdLCJtYXBwaW5ncyI6IkFBQUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsQ0FBQztBQUNELE87QUNWQTtBQUNBOztBQUVBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTs7O0FBR0E7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Q0g7QUFDQTtBQUNBO0FBQ0E7QUFDQSxLQUFLO0FBQ0w7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0EsS0FBSztBQUNMO0FBQ0E7O0FBRUE7O0FBRUE7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLG1CQUFtQixzQkFBc0I7QUFDekM7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQSxHQUFHO0FBQ0g7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsU0FBUztBQUNUO0FBQ0E7QUFDQSxLQUFLO0FBQ0w7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0EsaUJBQWlCLHNCQUFzQjtBQUN2QztBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsR0FBRzs7QUFFSDtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLEdBQUc7QUFDSDs7OztBQUlBO0FBQ0E7QUFDQSxDQUFDOztBQUVEOztBQUVBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBLEdBQUc7QUFDSDs7Ozs7Ozs7QUM5ekNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQSxDQUFDO0FBQ0Q7QUFDQTtBQUNBO0FBQ0E7Ozs7Ozs7OztBQzNCQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQSwwQ0FBMEM7O0FBRTFDO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxhQUFhLFFBQVE7QUFDckIsY0FBYztBQUNkO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLFVBQVU7QUFDViw2QkFBNkI7QUFDN0IsUUFBUTtBQUNSO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsK0JBQStCLEtBQUs7QUFDcEM7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLFNBQVM7QUFDVCw0QkFBNEI7QUFDNUIsT0FBTztBQUNQO0FBQ0E7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxLQUFLO0FBQ0w7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLFNBQVM7QUFDVDtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxPQUFPO0FBQ1A7QUFDQTtBQUNBOztBQUVBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLHFCQUFxQixzQkFBc0I7QUFDM0M7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQSxxQkFBcUIsMkJBQTJCO0FBQ2hEO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQSxtQkFBbUIsZ0NBQWdDO0FBQ25EO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBLHFCQUFxQixnQ0FBZ0M7QUFDckQ7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLDZCQUE2QjtBQUM3QjtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLFdBQVc7QUFDWDtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLFNBQVM7QUFDVDtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxPQUFPO0FBQ1A7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7Ozs7Ozs7OztBQzdoQkE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBOztBQUVBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7MENDekRTd0IsTzs7Ozs7Ozs7O2lEQUNBQSxPOzs7Ozs7Ozs7Z0RBQ0FBLE87Ozs7Ozs7OzttREFDQUEsTzs7Ozs7Ozs7O2lEQUNBQSxPOzs7Ozs7Ozs7aURBQ0FBLE87Ozs7Ozs7OztnREFDQUEsTzs7Ozs7Ozs7OzJEQUNBQSxPOzs7Ozs7Ozs7a0RBQ0FBLE87Ozs7Ozs7Ozs7QUNSVCxnSDs7Ozs7O0FDQUEsbVJBQW1SLEtBQUssS0FBSyxvRUFBb0UsSUFBSSxpQ0FBaUMsNE5BQTROLE1BQU0sTUFBTSxvRUFBb0UsSUFBSSxpQ0FBaUMsOE5BQThOLE1BQU0sTUFBTSxvRUFBb0UsSUFBSSxpQ0FBaUMsOE5BQThOLE1BQU0sTUFBTSxvRUFBb0UsSUFBSSxpQ0FBaUMsK0Q7Ozs7OztBQ0E3M0MsOE1BQThNLGlCQUFpQixtQkFBbUIsc0ZBQXNGLEdBQUcsR0FBRyxpQ0FBaUMsZ0JBQWdCLCtLQUErSyxpQkFBaUIsbUJBQW1CLHdGQUF3RixHQUFHLEdBQUcsaUNBQWlDLGdCQUFnQixnTEFBZ0wsaUJBQWlCLG1CQUFtQix3RkFBd0YsR0FBRyxHQUFHLGlDQUFpQyxnQkFBZ0IsK0tBQStLLGlCQUFpQixtQkFBbUIsd0ZBQXdGLEdBQUcsR0FBRyxpQ0FBaUMsZ0JBQWdCLCtLQUErSyxpQkFBaUIsbUJBQW1CLHdGQUF3RixHQUFHLEdBQUcsaUNBQWlDLGdCQUFnQiw4RDs7Ozs7O0FDQXh3RCxxTUFBcU0sR0FBRyxHQUFHLDZFQUE2RSxJQUFJLElBQUksaUNBQWlDLGdCQUFnQix5S0FBeUssR0FBRyxHQUFHLCtFQUErRSxJQUFJLElBQUksaUNBQWlDLGdCQUFnQix5S0FBeUssR0FBRyxHQUFHLCtFQUErRSxJQUFJLElBQUksaUNBQWlDLGdCQUFnQixnRTs7Ozs7O0FDQS83Qix3T0FBd08sS0FBSyxLQUFLLG9FQUFvRSxJQUFJLGlDQUFpQyx3TUFBd00sTUFBTSxNQUFNLG9FQUFvRSxJQUFJLGlDQUFpQywwTUFBME0sTUFBTSxNQUFNLG9FQUFvRSxJQUFJLGlDQUFpQywwTUFBME0sTUFBTSxNQUFNLG9FQUFvRSxJQUFJLGlDQUFpQywrRDs7Ozs7O0FDQXR4QyxxT0FBcU8sTUFBTSxLQUFLLHdFQUF3RSxJQUFJLElBQUksaUNBQWlDLGdCQUFnQixzTkFBc04sTUFBTSxLQUFLLDJFQUEyRSxJQUFJLElBQUksaUNBQWlDLGdCQUFnQix1TkFBdU4sTUFBTSxLQUFLLDJFQUEyRSxJQUFJLElBQUksaUNBQWlDLGdCQUFnQiw4RDs7Ozs7O0FDQTVqQyxrYjs7Ozs7O0FDQUEsdUtBQXVLLEVBQUUsRUFBRSxtRkFBbUYsZ0JBQWdCLHlLQUF5SyxFQUFFLEVBQUUsd0ZBQXdGLGdCQUFnQix5S0FBeUssRUFBRSxFQUFFLHVGQUF1RixnQkFBZ0IsMEtBQTBLLEVBQUUsRUFBRSx3RkFBd0YsZ0JBQWdCLDBLQUEwSyxFQUFFLEVBQUUsc0ZBQXNGLGdCQUFnQiwwS0FBMEssRUFBRSxFQUFFLHdGQUF3RixnQkFBZ0IsMEtBQTBLLEVBQUUsRUFBRSx1RkFBdUYsZ0JBQWdCLDBLQUEwSyxFQUFFLEVBQUUsd0ZBQXdGLGdCQUFnQiwwS0FBMEssRUFBRSxFQUFFLHNGQUFzRixnQkFBZ0IsZ0U7Ozs7OztBQ0F0N0UsdXZEIiwiZmlsZSI6InJlYWN0LWxvYWRpbmcuanMiLCJzb3VyY2VzQ29udGVudCI6WyIoZnVuY3Rpb24gd2VicGFja1VuaXZlcnNhbE1vZHVsZURlZmluaXRpb24ocm9vdCwgZmFjdG9yeSkge1xuXHRpZih0eXBlb2YgZXhwb3J0cyA9PT0gJ29iamVjdCcgJiYgdHlwZW9mIG1vZHVsZSA9PT0gJ29iamVjdCcpXG5cdFx0bW9kdWxlLmV4cG9ydHMgPSBmYWN0b3J5KCk7XG5cdGVsc2UgaWYodHlwZW9mIGRlZmluZSA9PT0gJ2Z1bmN0aW9uJyAmJiBkZWZpbmUuYW1kKVxuXHRcdGRlZmluZShbXSwgZmFjdG9yeSk7XG5cdGVsc2UgaWYodHlwZW9mIGV4cG9ydHMgPT09ICdvYmplY3QnKVxuXHRcdGV4cG9ydHNbXCJMb2FkaW5nXCJdID0gZmFjdG9yeSgpO1xuXHRlbHNlXG5cdFx0cm9vdFtcIkxvYWRpbmdcIl0gPSBmYWN0b3J5KCk7XG59KSh0aGlzLCBmdW5jdGlvbigpIHtcbnJldHVybiBcblxuXG4vLyBXRUJQQUNLIEZPT1RFUiAvL1xuLy8gd2VicGFjay91bml2ZXJzYWxNb2R1bGVEZWZpbml0aW9uIiwiIFx0Ly8gVGhlIG1vZHVsZSBjYWNoZVxuIFx0dmFyIGluc3RhbGxlZE1vZHVsZXMgPSB7fTtcblxuIFx0Ly8gVGhlIHJlcXVpcmUgZnVuY3Rpb25cbiBcdGZ1bmN0aW9uIF9fd2VicGFja19yZXF1aXJlX18obW9kdWxlSWQpIHtcblxuIFx0XHQvLyBDaGVjayBpZiBtb2R1bGUgaXMgaW4gY2FjaGVcbiBcdFx0aWYoaW5zdGFsbGVkTW9kdWxlc1ttb2R1bGVJZF0pIHtcbiBcdFx0XHRyZXR1cm4gaW5zdGFsbGVkTW9kdWxlc1ttb2R1bGVJZF0uZXhwb3J0cztcbiBcdFx0fVxuIFx0XHQvLyBDcmVhdGUgYSBuZXcgbW9kdWxlIChhbmQgcHV0IGl0IGludG8gdGhlIGNhY2hlKVxuIFx0XHR2YXIgbW9kdWxlID0gaW5zdGFsbGVkTW9kdWxlc1ttb2R1bGVJZF0gPSB7XG4gXHRcdFx0aTogbW9kdWxlSWQsXG4gXHRcdFx0bDogZmFsc2UsXG4gXHRcdFx0ZXhwb3J0czoge31cbiBcdFx0fTtcblxuIFx0XHQvLyBFeGVjdXRlIHRoZSBtb2R1bGUgZnVuY3Rpb25cbiBcdFx0bW9kdWxlc1ttb2R1bGVJZF0uY2FsbChtb2R1bGUuZXhwb3J0cywgbW9kdWxlLCBtb2R1bGUuZXhwb3J0cywgX193ZWJwYWNrX3JlcXVpcmVfXyk7XG5cbiBcdFx0Ly8gRmxhZyB0aGUgbW9kdWxlIGFzIGxvYWRlZFxuIFx0XHRtb2R1bGUubCA9IHRydWU7XG5cbiBcdFx0Ly8gUmV0dXJuIHRoZSBleHBvcnRzIG9mIHRoZSBtb2R1bGVcbiBcdFx0cmV0dXJuIG1vZHVsZS5leHBvcnRzO1xuIFx0fVxuXG5cbiBcdC8vIGV4cG9zZSB0aGUgbW9kdWxlcyBvYmplY3QgKF9fd2VicGFja19tb2R1bGVzX18pXG4gXHRfX3dlYnBhY2tfcmVxdWlyZV9fLm0gPSBtb2R1bGVzO1xuXG4gXHQvLyBleHBvc2UgdGhlIG1vZHVsZSBjYWNoZVxuIFx0X193ZWJwYWNrX3JlcXVpcmVfXy5jID0gaW5zdGFsbGVkTW9kdWxlcztcblxuIFx0Ly8gZGVmaW5lIGdldHRlciBmdW5jdGlvbiBmb3IgaGFybW9ueSBleHBvcnRzXG4gXHRfX3dlYnBhY2tfcmVxdWlyZV9fLmQgPSBmdW5jdGlvbihleHBvcnRzLCBuYW1lLCBnZXR0ZXIpIHtcbiBcdFx0aWYoIV9fd2VicGFja19yZXF1aXJlX18ubyhleHBvcnRzLCBuYW1lKSkge1xuIFx0XHRcdE9iamVjdC5kZWZpbmVQcm9wZXJ0eShleHBvcnRzLCBuYW1lLCB7XG4gXHRcdFx0XHRjb25maWd1cmFibGU6IGZhbHNlLFxuIFx0XHRcdFx0ZW51bWVyYWJsZTogdHJ1ZSxcbiBcdFx0XHRcdGdldDogZ2V0dGVyXG4gXHRcdFx0fSk7XG4gXHRcdH1cbiBcdH07XG5cbiBcdC8vIGdldERlZmF1bHRFeHBvcnQgZnVuY3Rpb24gZm9yIGNvbXBhdGliaWxpdHkgd2l0aCBub24taGFybW9ueSBtb2R1bGVzXG4gXHRfX3dlYnBhY2tfcmVxdWlyZV9fLm4gPSBmdW5jdGlvbihtb2R1bGUpIHtcbiBcdFx0dmFyIGdldHRlciA9IG1vZHVsZSAmJiBtb2R1bGUuX19lc01vZHVsZSA/XG4gXHRcdFx0ZnVuY3Rpb24gZ2V0RGVmYXVsdCgpIHsgcmV0dXJuIG1vZHVsZVsnZGVmYXVsdCddOyB9IDpcbiBcdFx0XHRmdW5jdGlvbiBnZXRNb2R1bGVFeHBvcnRzKCkgeyByZXR1cm4gbW9kdWxlOyB9O1xuIFx0XHRfX3dlYnBhY2tfcmVxdWlyZV9fLmQoZ2V0dGVyLCAnYScsIGdldHRlcik7XG4gXHRcdHJldHVybiBnZXR0ZXI7XG4gXHR9O1xuXG4gXHQvLyBPYmplY3QucHJvdG90eXBlLmhhc093blByb3BlcnR5LmNhbGxcbiBcdF9fd2VicGFja19yZXF1aXJlX18ubyA9IGZ1bmN0aW9uKG9iamVjdCwgcHJvcGVydHkpIHsgcmV0dXJuIE9iamVjdC5wcm90b3R5cGUuaGFzT3duUHJvcGVydHkuY2FsbChvYmplY3QsIHByb3BlcnR5KTsgfTtcblxuIFx0Ly8gX193ZWJwYWNrX3B1YmxpY19wYXRoX19cbiBcdF9fd2VicGFja19yZXF1aXJlX18ucCA9IFwiL1wiO1xuXG4gXHQvLyBMb2FkIGVudHJ5IG1vZHVsZSBhbmQgcmV0dXJuIGV4cG9ydHNcbiBcdHJldHVybiBfX3dlYnBhY2tfcmVxdWlyZV9fKF9fd2VicGFja19yZXF1aXJlX18ucyA9IDgpO1xuXG5cblxuLy8gV0VCUEFDSyBGT09URVIgLy9cbi8vIHdlYnBhY2svYm9vdHN0cmFwIDliMWRiNmY4Y2NlOGJlOTNiZjgwIiwiLy8gc2hpbSBmb3IgdXNpbmcgcHJvY2VzcyBpbiBicm93c2VyXG52YXIgcHJvY2VzcyA9IG1vZHVsZS5leHBvcnRzID0ge307XG5cbi8vIGNhY2hlZCBmcm9tIHdoYXRldmVyIGdsb2JhbCBpcyBwcmVzZW50IHNvIHRoYXQgdGVzdCBydW5uZXJzIHRoYXQgc3R1YiBpdFxuLy8gZG9uJ3QgYnJlYWsgdGhpbmdzLiAgQnV0IHdlIG5lZWQgdG8gd3JhcCBpdCBpbiBhIHRyeSBjYXRjaCBpbiBjYXNlIGl0IGlzXG4vLyB3cmFwcGVkIGluIHN0cmljdCBtb2RlIGNvZGUgd2hpY2ggZG9lc24ndCBkZWZpbmUgYW55IGdsb2JhbHMuICBJdCdzIGluc2lkZSBhXG4vLyBmdW5jdGlvbiBiZWNhdXNlIHRyeS9jYXRjaGVzIGRlb3B0aW1pemUgaW4gY2VydGFpbiBlbmdpbmVzLlxuXG52YXIgY2FjaGVkU2V0VGltZW91dDtcbnZhciBjYWNoZWRDbGVhclRpbWVvdXQ7XG5cbmZ1bmN0aW9uIGRlZmF1bHRTZXRUaW1vdXQoKSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKCdzZXRUaW1lb3V0IGhhcyBub3QgYmVlbiBkZWZpbmVkJyk7XG59XG5mdW5jdGlvbiBkZWZhdWx0Q2xlYXJUaW1lb3V0ICgpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoJ2NsZWFyVGltZW91dCBoYXMgbm90IGJlZW4gZGVmaW5lZCcpO1xufVxuKGZ1bmN0aW9uICgpIHtcbiAgICB0cnkge1xuICAgICAgICBpZiAodHlwZW9mIHNldFRpbWVvdXQgPT09ICdmdW5jdGlvbicpIHtcbiAgICAgICAgICAgIGNhY2hlZFNldFRpbWVvdXQgPSBzZXRUaW1lb3V0O1xuICAgICAgICB9IGVsc2Uge1xuICAgICAgICAgICAgY2FjaGVkU2V0VGltZW91dCA9IGRlZmF1bHRTZXRUaW1vdXQ7XG4gICAgICAgIH1cbiAgICB9IGNhdGNoIChlKSB7XG4gICAgICAgIGNhY2hlZFNldFRpbWVvdXQgPSBkZWZhdWx0U2V0VGltb3V0O1xuICAgIH1cbiAgICB0cnkge1xuICAgICAgICBpZiAodHlwZW9mIGNsZWFyVGltZW91dCA9PT0gJ2Z1bmN0aW9uJykge1xuICAgICAgICAgICAgY2FjaGVkQ2xlYXJUaW1lb3V0ID0gY2xlYXJUaW1lb3V0O1xuICAgICAgICB9IGVsc2Uge1xuICAgICAgICAgICAgY2FjaGVkQ2xlYXJUaW1lb3V0ID0gZGVmYXVsdENsZWFyVGltZW91dDtcbiAgICAgICAgfVxuICAgIH0gY2F0Y2ggKGUpIHtcbiAgICAgICAgY2FjaGVkQ2xlYXJUaW1lb3V0ID0gZGVmYXVsdENsZWFyVGltZW91dDtcbiAgICB9XG59ICgpKVxuZnVuY3Rpb24gcnVuVGltZW91dChmdW4pIHtcbiAgICBpZiAoY2FjaGVkU2V0VGltZW91dCA9PT0gc2V0VGltZW91dCkge1xuICAgICAgICAvL25vcm1hbCBlbnZpcm9tZW50cyBpbiBzYW5lIHNpdHVhdGlvbnNcbiAgICAgICAgcmV0dXJuIHNldFRpbWVvdXQoZnVuLCAwKTtcbiAgICB9XG4gICAgLy8gaWYgc2V0VGltZW91dCB3YXNuJ3QgYXZhaWxhYmxlIGJ1dCB3YXMgbGF0dGVyIGRlZmluZWRcbiAgICBpZiAoKGNhY2hlZFNldFRpbWVvdXQgPT09IGRlZmF1bHRTZXRUaW1vdXQgfHwgIWNhY2hlZFNldFRpbWVvdXQpICYmIHNldFRpbWVvdXQpIHtcbiAgICAgICAgY2FjaGVkU2V0VGltZW91dCA9IHNldFRpbWVvdXQ7XG4gICAgICAgIHJldHVybiBzZXRUaW1lb3V0KGZ1biwgMCk7XG4gICAgfVxuICAgIHRyeSB7XG4gICAgICAgIC8vIHdoZW4gd2hlbiBzb21lYm9keSBoYXMgc2NyZXdlZCB3aXRoIHNldFRpbWVvdXQgYnV0IG5vIEkuRS4gbWFkZG5lc3NcbiAgICAgICAgcmV0dXJuIGNhY2hlZFNldFRpbWVvdXQoZnVuLCAwKTtcbiAgICB9IGNhdGNoKGUpe1xuICAgICAgICB0cnkge1xuICAgICAgICAgICAgLy8gV2hlbiB3ZSBhcmUgaW4gSS5FLiBidXQgdGhlIHNjcmlwdCBoYXMgYmVlbiBldmFsZWQgc28gSS5FLiBkb2Vzbid0IHRydXN0IHRoZSBnbG9iYWwgb2JqZWN0IHdoZW4gY2FsbGVkIG5vcm1hbGx5XG4gICAgICAgICAgICByZXR1cm4gY2FjaGVkU2V0VGltZW91dC5jYWxsKG51bGwsIGZ1biwgMCk7XG4gICAgICAgIH0gY2F0Y2goZSl7XG4gICAgICAgICAgICAvLyBzYW1lIGFzIGFib3ZlIGJ1dCB3aGVuIGl0J3MgYSB2ZXJzaW9uIG9mIEkuRS4gdGhhdCBtdXN0IGhhdmUgdGhlIGdsb2JhbCBvYmplY3QgZm9yICd0aGlzJywgaG9wZnVsbHkgb3VyIGNvbnRleHQgY29ycmVjdCBvdGhlcndpc2UgaXQgd2lsbCB0aHJvdyBhIGdsb2JhbCBlcnJvclxuICAgICAgICAgICAgcmV0dXJuIGNhY2hlZFNldFRpbWVvdXQuY2FsbCh0aGlzLCBmdW4sIDApO1xuICAgICAgICB9XG4gICAgfVxuXG5cbn1cbmZ1bmN0aW9uIHJ1bkNsZWFyVGltZW91dChtYXJrZXIpIHtcbiAgICBpZiAoY2FjaGVkQ2xlYXJUaW1lb3V0ID09PSBjbGVhclRpbWVvdXQpIHtcbiAgICAgICAgLy9ub3JtYWwgZW52aXJvbWVudHMgaW4gc2FuZSBzaXR1YXRpb25zXG4gICAgICAgIHJldHVybiBjbGVhclRpbWVvdXQobWFya2VyKTtcbiAgICB9XG4gICAgLy8gaWYgY2xlYXJUaW1lb3V0IHdhc24ndCBhdmFpbGFibGUgYnV0IHdhcyBsYXR0ZXIgZGVmaW5lZFxuICAgIGlmICgoY2FjaGVkQ2xlYXJUaW1lb3V0ID09PSBkZWZhdWx0Q2xlYXJUaW1lb3V0IHx8ICFjYWNoZWRDbGVhclRpbWVvdXQpICYmIGNsZWFyVGltZW91dCkge1xuICAgICAgICBjYWNoZWRDbGVhclRpbWVvdXQgPSBjbGVhclRpbWVvdXQ7XG4gICAgICAgIHJldHVybiBjbGVhclRpbWVvdXQobWFya2VyKTtcbiAgICB9XG4gICAgdHJ5IHtcbiAgICAgICAgLy8gd2hlbiB3aGVuIHNvbWVib2R5IGhhcyBzY3Jld2VkIHdpdGggc2V0VGltZW91dCBidXQgbm8gSS5FLiBtYWRkbmVzc1xuICAgICAgICByZXR1cm4gY2FjaGVkQ2xlYXJUaW1lb3V0KG1hcmtlcik7XG4gICAgfSBjYXRjaCAoZSl7XG4gICAgICAgIHRyeSB7XG4gICAgICAgICAgICAvLyBXaGVuIHdlIGFyZSBpbiBJLkUuIGJ1dCB0aGUgc2NyaXB0IGhhcyBiZWVuIGV2YWxlZCBzbyBJLkUuIGRvZXNuJ3QgIHRydXN0IHRoZSBnbG9iYWwgb2JqZWN0IHdoZW4gY2FsbGVkIG5vcm1hbGx5XG4gICAgICAgICAgICByZXR1cm4gY2FjaGVkQ2xlYXJUaW1lb3V0LmNhbGwobnVsbCwgbWFya2VyKTtcbiAgICAgICAgfSBjYXRjaCAoZSl7XG4gICAgICAgICAgICAvLyBzYW1lIGFzIGFib3ZlIGJ1dCB3aGVuIGl0J3MgYSB2ZXJzaW9uIG9mIEkuRS4gdGhhdCBtdXN0IGhhdmUgdGhlIGdsb2JhbCBvYmplY3QgZm9yICd0aGlzJywgaG9wZnVsbHkgb3VyIGNvbnRleHQgY29ycmVjdCBvdGhlcndpc2UgaXQgd2lsbCB0aHJvdyBhIGdsb2JhbCBlcnJvci5cbiAgICAgICAgICAgIC8vIFNvbWUgdmVyc2lvbnMgb2YgSS5FLiBoYXZlIGRpZmZlcmVudCBydWxlcyBmb3IgY2xlYXJUaW1lb3V0IHZzIHNldFRpbWVvdXRcbiAgICAgICAgICAgIHJldHVybiBjYWNoZWRDbGVhclRpbWVvdXQuY2FsbCh0aGlzLCBtYXJrZXIpO1xuICAgICAgICB9XG4gICAgfVxuXG5cblxufVxudmFyIHF1ZXVlID0gW107XG52YXIgZHJhaW5pbmcgPSBmYWxzZTtcbnZhciBjdXJyZW50UXVldWU7XG52YXIgcXVldWVJbmRleCA9IC0xO1xuXG5mdW5jdGlvbiBjbGVhblVwTmV4dFRpY2soKSB7XG4gICAgaWYgKCFkcmFpbmluZyB8fCAhY3VycmVudFF1ZXVlKSB7XG4gICAgICAgIHJldHVybjtcbiAgICB9XG4gICAgZHJhaW5pbmcgPSBmYWxzZTtcbiAgICBpZiAoY3VycmVudFF1ZXVlLmxlbmd0aCkge1xuICAgICAgICBxdWV1ZSA9IGN1cnJlbnRRdWV1ZS5jb25jYXQocXVldWUpO1xuICAgIH0gZWxzZSB7XG4gICAgICAgIHF1ZXVlSW5kZXggPSAtMTtcbiAgICB9XG4gICAgaWYgKHF1ZXVlLmxlbmd0aCkge1xuICAgICAgICBkcmFpblF1ZXVlKCk7XG4gICAgfVxufVxuXG5mdW5jdGlvbiBkcmFpblF1ZXVlKCkge1xuICAgIGlmIChkcmFpbmluZykge1xuICAgICAgICByZXR1cm47XG4gICAgfVxuICAgIHZhciB0aW1lb3V0ID0gcnVuVGltZW91dChjbGVhblVwTmV4dFRpY2spO1xuICAgIGRyYWluaW5nID0gdHJ1ZTtcblxuICAgIHZhciBsZW4gPSBxdWV1ZS5sZW5ndGg7XG4gICAgd2hpbGUobGVuKSB7XG4gICAgICAgIGN1cnJlbnRRdWV1ZSA9IHF1ZXVlO1xuICAgICAgICBxdWV1ZSA9IFtdO1xuICAgICAgICB3aGlsZSAoKytxdWV1ZUluZGV4IDwgbGVuKSB7XG4gICAgICAgICAgICBpZiAoY3VycmVudFF1ZXVlKSB7XG4gICAgICAgICAgICAgICAgY3VycmVudFF1ZXVlW3F1ZXVlSW5kZXhdLnJ1bigpO1xuICAgICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICAgIHF1ZXVlSW5kZXggPSAtMTtcbiAgICAgICAgbGVuID0gcXVldWUubGVuZ3RoO1xuICAgIH1cbiAgICBjdXJyZW50UXVldWUgPSBudWxsO1xuICAgIGRyYWluaW5nID0gZmFsc2U7XG4gICAgcnVuQ2xlYXJUaW1lb3V0KHRpbWVvdXQpO1xufVxuXG5wcm9jZXNzLm5leHRUaWNrID0gZnVuY3Rpb24gKGZ1bikge1xuICAgIHZhciBhcmdzID0gbmV3IEFycmF5KGFyZ3VtZW50cy5sZW5ndGggLSAxKTtcbiAgICBpZiAoYXJndW1lbnRzLmxlbmd0aCA+IDEpIHtcbiAgICAgICAgZm9yICh2YXIgaSA9IDE7IGkgPCBhcmd1bWVudHMubGVuZ3RoOyBpKyspIHtcbiAgICAgICAgICAgIGFyZ3NbaSAtIDFdID0gYXJndW1lbnRzW2ldO1xuICAgICAgICB9XG4gICAgfVxuICAgIHF1ZXVlLnB1c2gobmV3IEl0ZW0oZnVuLCBhcmdzKSk7XG4gICAgaWYgKHF1ZXVlLmxlbmd0aCA9PT0gMSAmJiAhZHJhaW5pbmcpIHtcbiAgICAgICAgcnVuVGltZW91dChkcmFpblF1ZXVlKTtcbiAgICB9XG59O1xuXG4vLyB2OCBsaWtlcyBwcmVkaWN0aWJsZSBvYmplY3RzXG5mdW5jdGlvbiBJdGVtKGZ1biwgYXJyYXkpIHtcbiAgICB0aGlzLmZ1biA9IGZ1bjtcbiAgICB0aGlzLmFycmF5ID0gYXJyYXk7XG59XG5JdGVtLnByb3RvdHlwZS5ydW4gPSBmdW5jdGlvbiAoKSB7XG4gICAgdGhpcy5mdW4uYXBwbHkobnVsbCwgdGhpcy5hcnJheSk7XG59O1xucHJvY2Vzcy50aXRsZSA9ICdicm93c2VyJztcbnByb2Nlc3MuYnJvd3NlciA9IHRydWU7XG5wcm9jZXNzLmVudiA9IHt9O1xucHJvY2Vzcy5hcmd2ID0gW107XG5wcm9jZXNzLnZlcnNpb24gPSAnJzsgLy8gZW1wdHkgc3RyaW5nIHRvIGF2b2lkIHJlZ2V4cCBpc3N1ZXNcbnByb2Nlc3MudmVyc2lvbnMgPSB7fTtcblxuZnVuY3Rpb24gbm9vcCgpIHt9XG5cbnByb2Nlc3Mub24gPSBub29wO1xucHJvY2Vzcy5hZGRMaXN0ZW5lciA9IG5vb3A7XG5wcm9jZXNzLm9uY2UgPSBub29wO1xucHJvY2Vzcy5vZmYgPSBub29wO1xucHJvY2Vzcy5yZW1vdmVMaXN0ZW5lciA9IG5vb3A7XG5wcm9jZXNzLnJlbW92ZUFsbExpc3RlbmVycyA9IG5vb3A7XG5wcm9jZXNzLmVtaXQgPSBub29wO1xucHJvY2Vzcy5wcmVwZW5kTGlzdGVuZXIgPSBub29wO1xucHJvY2Vzcy5wcmVwZW5kT25jZUxpc3RlbmVyID0gbm9vcDtcblxucHJvY2Vzcy5saXN0ZW5lcnMgPSBmdW5jdGlvbiAobmFtZSkgeyByZXR1cm4gW10gfVxuXG5wcm9jZXNzLmJpbmRpbmcgPSBmdW5jdGlvbiAobmFtZSkge1xuICAgIHRocm93IG5ldyBFcnJvcigncHJvY2Vzcy5iaW5kaW5nIGlzIG5vdCBzdXBwb3J0ZWQnKTtcbn07XG5cbnByb2Nlc3MuY3dkID0gZnVuY3Rpb24gKCkgeyByZXR1cm4gJy8nIH07XG5wcm9jZXNzLmNoZGlyID0gZnVuY3Rpb24gKGRpcikge1xuICAgIHRocm93IG5ldyBFcnJvcigncHJvY2Vzcy5jaGRpciBpcyBub3Qgc3VwcG9ydGVkJyk7XG59O1xucHJvY2Vzcy51bWFzayA9IGZ1bmN0aW9uKCkgeyByZXR1cm4gMDsgfTtcblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3Byb2Nlc3MvYnJvd3Nlci5qc1xuLy8gbW9kdWxlIGlkID0gMFxuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCJcInVzZSBzdHJpY3RcIjtcblxuLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTMtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqXG4gKiBcbiAqL1xuXG5mdW5jdGlvbiBtYWtlRW1wdHlGdW5jdGlvbihhcmcpIHtcbiAgcmV0dXJuIGZ1bmN0aW9uICgpIHtcbiAgICByZXR1cm4gYXJnO1xuICB9O1xufVxuXG4vKipcbiAqIFRoaXMgZnVuY3Rpb24gYWNjZXB0cyBhbmQgZGlzY2FyZHMgaW5wdXRzOyBpdCBoYXMgbm8gc2lkZSBlZmZlY3RzLiBUaGlzIGlzXG4gKiBwcmltYXJpbHkgdXNlZnVsIGlkaW9tYXRpY2FsbHkgZm9yIG92ZXJyaWRhYmxlIGZ1bmN0aW9uIGVuZHBvaW50cyB3aGljaFxuICogYWx3YXlzIG5lZWQgdG8gYmUgY2FsbGFibGUsIHNpbmNlIEpTIGxhY2tzIGEgbnVsbC1jYWxsIGlkaW9tIGFsYSBDb2NvYS5cbiAqL1xudmFyIGVtcHR5RnVuY3Rpb24gPSBmdW5jdGlvbiBlbXB0eUZ1bmN0aW9uKCkge307XG5cbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnMgPSBtYWtlRW1wdHlGdW5jdGlvbjtcbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNGYWxzZSA9IG1ha2VFbXB0eUZ1bmN0aW9uKGZhbHNlKTtcbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNUcnVlID0gbWFrZUVtcHR5RnVuY3Rpb24odHJ1ZSk7XG5lbXB0eUZ1bmN0aW9uLnRoYXRSZXR1cm5zTnVsbCA9IG1ha2VFbXB0eUZ1bmN0aW9uKG51bGwpO1xuZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc1RoaXMgPSBmdW5jdGlvbiAoKSB7XG4gIHJldHVybiB0aGlzO1xufTtcbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNBcmd1bWVudCA9IGZ1bmN0aW9uIChhcmcpIHtcbiAgcmV0dXJuIGFyZztcbn07XG5cbm1vZHVsZS5leHBvcnRzID0gZW1wdHlGdW5jdGlvbjtcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9mYmpzL2xpYi9lbXB0eUZ1bmN0aW9uLmpzXG4vLyBtb2R1bGUgaWQgPSAxXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKlxuICogQ29weXJpZ2h0IChjKSAyMDEzLXByZXNlbnQsIEZhY2Vib29rLCBJbmMuXG4gKlxuICogVGhpcyBzb3VyY2UgY29kZSBpcyBsaWNlbnNlZCB1bmRlciB0aGUgTUlUIGxpY2Vuc2UgZm91bmQgaW4gdGhlXG4gKiBMSUNFTlNFIGZpbGUgaW4gdGhlIHJvb3QgZGlyZWN0b3J5IG9mIHRoaXMgc291cmNlIHRyZWUuXG4gKlxuICovXG5cbid1c2Ugc3RyaWN0JztcblxuLyoqXG4gKiBVc2UgaW52YXJpYW50KCkgdG8gYXNzZXJ0IHN0YXRlIHdoaWNoIHlvdXIgcHJvZ3JhbSBhc3N1bWVzIHRvIGJlIHRydWUuXG4gKlxuICogUHJvdmlkZSBzcHJpbnRmLXN0eWxlIGZvcm1hdCAob25seSAlcyBpcyBzdXBwb3J0ZWQpIGFuZCBhcmd1bWVudHNcbiAqIHRvIHByb3ZpZGUgaW5mb3JtYXRpb24gYWJvdXQgd2hhdCBicm9rZSBhbmQgd2hhdCB5b3Ugd2VyZVxuICogZXhwZWN0aW5nLlxuICpcbiAqIFRoZSBpbnZhcmlhbnQgbWVzc2FnZSB3aWxsIGJlIHN0cmlwcGVkIGluIHByb2R1Y3Rpb24sIGJ1dCB0aGUgaW52YXJpYW50XG4gKiB3aWxsIHJlbWFpbiB0byBlbnN1cmUgbG9naWMgZG9lcyBub3QgZGlmZmVyIGluIHByb2R1Y3Rpb24uXG4gKi9cblxudmFyIHZhbGlkYXRlRm9ybWF0ID0gZnVuY3Rpb24gdmFsaWRhdGVGb3JtYXQoZm9ybWF0KSB7fTtcblxuaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgdmFsaWRhdGVGb3JtYXQgPSBmdW5jdGlvbiB2YWxpZGF0ZUZvcm1hdChmb3JtYXQpIHtcbiAgICBpZiAoZm9ybWF0ID09PSB1bmRlZmluZWQpIHtcbiAgICAgIHRocm93IG5ldyBFcnJvcignaW52YXJpYW50IHJlcXVpcmVzIGFuIGVycm9yIG1lc3NhZ2UgYXJndW1lbnQnKTtcbiAgICB9XG4gIH07XG59XG5cbmZ1bmN0aW9uIGludmFyaWFudChjb25kaXRpb24sIGZvcm1hdCwgYSwgYiwgYywgZCwgZSwgZikge1xuICB2YWxpZGF0ZUZvcm1hdChmb3JtYXQpO1xuXG4gIGlmICghY29uZGl0aW9uKSB7XG4gICAgdmFyIGVycm9yO1xuICAgIGlmIChmb3JtYXQgPT09IHVuZGVmaW5lZCkge1xuICAgICAgZXJyb3IgPSBuZXcgRXJyb3IoJ01pbmlmaWVkIGV4Y2VwdGlvbiBvY2N1cnJlZDsgdXNlIHRoZSBub24tbWluaWZpZWQgZGV2IGVudmlyb25tZW50ICcgKyAnZm9yIHRoZSBmdWxsIGVycm9yIG1lc3NhZ2UgYW5kIGFkZGl0aW9uYWwgaGVscGZ1bCB3YXJuaW5ncy4nKTtcbiAgICB9IGVsc2Uge1xuICAgICAgdmFyIGFyZ3MgPSBbYSwgYiwgYywgZCwgZSwgZl07XG4gICAgICB2YXIgYXJnSW5kZXggPSAwO1xuICAgICAgZXJyb3IgPSBuZXcgRXJyb3IoZm9ybWF0LnJlcGxhY2UoLyVzL2csIGZ1bmN0aW9uICgpIHtcbiAgICAgICAgcmV0dXJuIGFyZ3NbYXJnSW5kZXgrK107XG4gICAgICB9KSk7XG4gICAgICBlcnJvci5uYW1lID0gJ0ludmFyaWFudCBWaW9sYXRpb24nO1xuICAgIH1cblxuICAgIGVycm9yLmZyYW1lc1RvUG9wID0gMTsgLy8gd2UgZG9uJ3QgY2FyZSBhYm91dCBpbnZhcmlhbnQncyBvd24gZnJhbWVcbiAgICB0aHJvdyBlcnJvcjtcbiAgfVxufVxuXG5tb2R1bGUuZXhwb3J0cyA9IGludmFyaWFudDtcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9mYmpzL2xpYi9pbnZhcmlhbnQuanNcbi8vIG1vZHVsZSBpZCA9IDJcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLypcbm9iamVjdC1hc3NpZ25cbihjKSBTaW5kcmUgU29yaHVzXG5AbGljZW5zZSBNSVRcbiovXG5cbid1c2Ugc3RyaWN0Jztcbi8qIGVzbGludC1kaXNhYmxlIG5vLXVudXNlZC12YXJzICovXG52YXIgZ2V0T3duUHJvcGVydHlTeW1ib2xzID0gT2JqZWN0LmdldE93blByb3BlcnR5U3ltYm9scztcbnZhciBoYXNPd25Qcm9wZXJ0eSA9IE9iamVjdC5wcm90b3R5cGUuaGFzT3duUHJvcGVydHk7XG52YXIgcHJvcElzRW51bWVyYWJsZSA9IE9iamVjdC5wcm90b3R5cGUucHJvcGVydHlJc0VudW1lcmFibGU7XG5cbmZ1bmN0aW9uIHRvT2JqZWN0KHZhbCkge1xuXHRpZiAodmFsID09PSBudWxsIHx8IHZhbCA9PT0gdW5kZWZpbmVkKSB7XG5cdFx0dGhyb3cgbmV3IFR5cGVFcnJvcignT2JqZWN0LmFzc2lnbiBjYW5ub3QgYmUgY2FsbGVkIHdpdGggbnVsbCBvciB1bmRlZmluZWQnKTtcblx0fVxuXG5cdHJldHVybiBPYmplY3QodmFsKTtcbn1cblxuZnVuY3Rpb24gc2hvdWxkVXNlTmF0aXZlKCkge1xuXHR0cnkge1xuXHRcdGlmICghT2JqZWN0LmFzc2lnbikge1xuXHRcdFx0cmV0dXJuIGZhbHNlO1xuXHRcdH1cblxuXHRcdC8vIERldGVjdCBidWdneSBwcm9wZXJ0eSBlbnVtZXJhdGlvbiBvcmRlciBpbiBvbGRlciBWOCB2ZXJzaW9ucy5cblxuXHRcdC8vIGh0dHBzOi8vYnVncy5jaHJvbWl1bS5vcmcvcC92OC9pc3N1ZXMvZGV0YWlsP2lkPTQxMThcblx0XHR2YXIgdGVzdDEgPSBuZXcgU3RyaW5nKCdhYmMnKTsgIC8vIGVzbGludC1kaXNhYmxlLWxpbmUgbm8tbmV3LXdyYXBwZXJzXG5cdFx0dGVzdDFbNV0gPSAnZGUnO1xuXHRcdGlmIChPYmplY3QuZ2V0T3duUHJvcGVydHlOYW1lcyh0ZXN0MSlbMF0gPT09ICc1Jykge1xuXHRcdFx0cmV0dXJuIGZhbHNlO1xuXHRcdH1cblxuXHRcdC8vIGh0dHBzOi8vYnVncy5jaHJvbWl1bS5vcmcvcC92OC9pc3N1ZXMvZGV0YWlsP2lkPTMwNTZcblx0XHR2YXIgdGVzdDIgPSB7fTtcblx0XHRmb3IgKHZhciBpID0gMDsgaSA8IDEwOyBpKyspIHtcblx0XHRcdHRlc3QyWydfJyArIFN0cmluZy5mcm9tQ2hhckNvZGUoaSldID0gaTtcblx0XHR9XG5cdFx0dmFyIG9yZGVyMiA9IE9iamVjdC5nZXRPd25Qcm9wZXJ0eU5hbWVzKHRlc3QyKS5tYXAoZnVuY3Rpb24gKG4pIHtcblx0XHRcdHJldHVybiB0ZXN0MltuXTtcblx0XHR9KTtcblx0XHRpZiAob3JkZXIyLmpvaW4oJycpICE9PSAnMDEyMzQ1Njc4OScpIHtcblx0XHRcdHJldHVybiBmYWxzZTtcblx0XHR9XG5cblx0XHQvLyBodHRwczovL2J1Z3MuY2hyb21pdW0ub3JnL3AvdjgvaXNzdWVzL2RldGFpbD9pZD0zMDU2XG5cdFx0dmFyIHRlc3QzID0ge307XG5cdFx0J2FiY2RlZmdoaWprbG1ub3BxcnN0Jy5zcGxpdCgnJykuZm9yRWFjaChmdW5jdGlvbiAobGV0dGVyKSB7XG5cdFx0XHR0ZXN0M1tsZXR0ZXJdID0gbGV0dGVyO1xuXHRcdH0pO1xuXHRcdGlmIChPYmplY3Qua2V5cyhPYmplY3QuYXNzaWduKHt9LCB0ZXN0MykpLmpvaW4oJycpICE9PVxuXHRcdFx0XHQnYWJjZGVmZ2hpamtsbW5vcHFyc3QnKSB7XG5cdFx0XHRyZXR1cm4gZmFsc2U7XG5cdFx0fVxuXG5cdFx0cmV0dXJuIHRydWU7XG5cdH0gY2F0Y2ggKGVycikge1xuXHRcdC8vIFdlIGRvbid0IGV4cGVjdCBhbnkgb2YgdGhlIGFib3ZlIHRvIHRocm93LCBidXQgYmV0dGVyIHRvIGJlIHNhZmUuXG5cdFx0cmV0dXJuIGZhbHNlO1xuXHR9XG59XG5cbm1vZHVsZS5leHBvcnRzID0gc2hvdWxkVXNlTmF0aXZlKCkgPyBPYmplY3QuYXNzaWduIDogZnVuY3Rpb24gKHRhcmdldCwgc291cmNlKSB7XG5cdHZhciBmcm9tO1xuXHR2YXIgdG8gPSB0b09iamVjdCh0YXJnZXQpO1xuXHR2YXIgc3ltYm9scztcblxuXHRmb3IgKHZhciBzID0gMTsgcyA8IGFyZ3VtZW50cy5sZW5ndGg7IHMrKykge1xuXHRcdGZyb20gPSBPYmplY3QoYXJndW1lbnRzW3NdKTtcblxuXHRcdGZvciAodmFyIGtleSBpbiBmcm9tKSB7XG5cdFx0XHRpZiAoaGFzT3duUHJvcGVydHkuY2FsbChmcm9tLCBrZXkpKSB7XG5cdFx0XHRcdHRvW2tleV0gPSBmcm9tW2tleV07XG5cdFx0XHR9XG5cdFx0fVxuXG5cdFx0aWYgKGdldE93blByb3BlcnR5U3ltYm9scykge1xuXHRcdFx0c3ltYm9scyA9IGdldE93blByb3BlcnR5U3ltYm9scyhmcm9tKTtcblx0XHRcdGZvciAodmFyIGkgPSAwOyBpIDwgc3ltYm9scy5sZW5ndGg7IGkrKykge1xuXHRcdFx0XHRpZiAocHJvcElzRW51bWVyYWJsZS5jYWxsKGZyb20sIHN5bWJvbHNbaV0pKSB7XG5cdFx0XHRcdFx0dG9bc3ltYm9sc1tpXV0gPSBmcm9tW3N5bWJvbHNbaV1dO1xuXHRcdFx0XHR9XG5cdFx0XHR9XG5cdFx0fVxuXHR9XG5cblx0cmV0dXJuIHRvO1xufTtcblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL29iamVjdC1hc3NpZ24vaW5kZXguanNcbi8vIG1vZHVsZSBpZCA9IDNcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTQtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgZW1wdHlGdW5jdGlvbiA9IHJlcXVpcmUoJy4vZW1wdHlGdW5jdGlvbicpO1xuXG4vKipcbiAqIFNpbWlsYXIgdG8gaW52YXJpYW50IGJ1dCBvbmx5IGxvZ3MgYSB3YXJuaW5nIGlmIHRoZSBjb25kaXRpb24gaXMgbm90IG1ldC5cbiAqIFRoaXMgY2FuIGJlIHVzZWQgdG8gbG9nIGlzc3VlcyBpbiBkZXZlbG9wbWVudCBlbnZpcm9ubWVudHMgaW4gY3JpdGljYWxcbiAqIHBhdGhzLiBSZW1vdmluZyB0aGUgbG9nZ2luZyBjb2RlIGZvciBwcm9kdWN0aW9uIGVudmlyb25tZW50cyB3aWxsIGtlZXAgdGhlXG4gKiBzYW1lIGxvZ2ljIGFuZCBmb2xsb3cgdGhlIHNhbWUgY29kZSBwYXRocy5cbiAqL1xuXG52YXIgd2FybmluZyA9IGVtcHR5RnVuY3Rpb247XG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gJ3Byb2R1Y3Rpb24nKSB7XG4gIHZhciBwcmludFdhcm5pbmcgPSBmdW5jdGlvbiBwcmludFdhcm5pbmcoZm9ybWF0KSB7XG4gICAgZm9yICh2YXIgX2xlbiA9IGFyZ3VtZW50cy5sZW5ndGgsIGFyZ3MgPSBBcnJheShfbGVuID4gMSA/IF9sZW4gLSAxIDogMCksIF9rZXkgPSAxOyBfa2V5IDwgX2xlbjsgX2tleSsrKSB7XG4gICAgICBhcmdzW19rZXkgLSAxXSA9IGFyZ3VtZW50c1tfa2V5XTtcbiAgICB9XG5cbiAgICB2YXIgYXJnSW5kZXggPSAwO1xuICAgIHZhciBtZXNzYWdlID0gJ1dhcm5pbmc6ICcgKyBmb3JtYXQucmVwbGFjZSgvJXMvZywgZnVuY3Rpb24gKCkge1xuICAgICAgcmV0dXJuIGFyZ3NbYXJnSW5kZXgrK107XG4gICAgfSk7XG4gICAgaWYgKHR5cGVvZiBjb25zb2xlICE9PSAndW5kZWZpbmVkJykge1xuICAgICAgY29uc29sZS5lcnJvcihtZXNzYWdlKTtcbiAgICB9XG4gICAgdHJ5IHtcbiAgICAgIC8vIC0tLSBXZWxjb21lIHRvIGRlYnVnZ2luZyBSZWFjdCAtLS1cbiAgICAgIC8vIFRoaXMgZXJyb3Igd2FzIHRocm93biBhcyBhIGNvbnZlbmllbmNlIHNvIHRoYXQgeW91IGNhbiB1c2UgdGhpcyBzdGFja1xuICAgICAgLy8gdG8gZmluZCB0aGUgY2FsbHNpdGUgdGhhdCBjYXVzZWQgdGhpcyB3YXJuaW5nIHRvIGZpcmUuXG4gICAgICB0aHJvdyBuZXcgRXJyb3IobWVzc2FnZSk7XG4gICAgfSBjYXRjaCAoeCkge31cbiAgfTtcblxuICB3YXJuaW5nID0gZnVuY3Rpb24gd2FybmluZyhjb25kaXRpb24sIGZvcm1hdCkge1xuICAgIGlmIChmb3JtYXQgPT09IHVuZGVmaW5lZCkge1xuICAgICAgdGhyb3cgbmV3IEVycm9yKCdgd2FybmluZyhjb25kaXRpb24sIGZvcm1hdCwgLi4uYXJncylgIHJlcXVpcmVzIGEgd2FybmluZyAnICsgJ21lc3NhZ2UgYXJndW1lbnQnKTtcbiAgICB9XG5cbiAgICBpZiAoZm9ybWF0LmluZGV4T2YoJ0ZhaWxlZCBDb21wb3NpdGUgcHJvcFR5cGU6ICcpID09PSAwKSB7XG4gICAgICByZXR1cm47IC8vIElnbm9yZSBDb21wb3NpdGVDb21wb25lbnQgcHJvcHR5cGUgY2hlY2suXG4gICAgfVxuXG4gICAgaWYgKCFjb25kaXRpb24pIHtcbiAgICAgIGZvciAodmFyIF9sZW4yID0gYXJndW1lbnRzLmxlbmd0aCwgYXJncyA9IEFycmF5KF9sZW4yID4gMiA/IF9sZW4yIC0gMiA6IDApLCBfa2V5MiA9IDI7IF9rZXkyIDwgX2xlbjI7IF9rZXkyKyspIHtcbiAgICAgICAgYXJnc1tfa2V5MiAtIDJdID0gYXJndW1lbnRzW19rZXkyXTtcbiAgICAgIH1cblxuICAgICAgcHJpbnRXYXJuaW5nLmFwcGx5KHVuZGVmaW5lZCwgW2Zvcm1hdF0uY29uY2F0KGFyZ3MpKTtcbiAgICB9XG4gIH07XG59XG5cbm1vZHVsZS5leHBvcnRzID0gd2FybmluZztcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9mYmpzL2xpYi93YXJuaW5nLmpzXG4vLyBtb2R1bGUgaWQgPSA0XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKlxuICogQ29weXJpZ2h0IChjKSAyMDEzLXByZXNlbnQsIEZhY2Vib29rLCBJbmMuXG4gKlxuICogVGhpcyBzb3VyY2UgY29kZSBpcyBsaWNlbnNlZCB1bmRlciB0aGUgTUlUIGxpY2Vuc2UgZm91bmQgaW4gdGhlXG4gKiBMSUNFTlNFIGZpbGUgaW4gdGhlIHJvb3QgZGlyZWN0b3J5IG9mIHRoaXMgc291cmNlIHRyZWUuXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgUmVhY3RQcm9wVHlwZXNTZWNyZXQgPSAnU0VDUkVUX0RPX05PVF9QQVNTX1RISVNfT1JfWU9VX1dJTExfQkVfRklSRUQnO1xuXG5tb2R1bGUuZXhwb3J0cyA9IFJlYWN0UHJvcFR5cGVzU2VjcmV0O1xuXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvcHJvcC10eXBlcy9saWIvUmVhY3RQcm9wVHlwZXNTZWNyZXQuanNcbi8vIG1vZHVsZSBpZCA9IDVcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTMtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgZW1wdHlPYmplY3QgPSB7fTtcblxuaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgT2JqZWN0LmZyZWV6ZShlbXB0eU9iamVjdCk7XG59XG5cbm1vZHVsZS5leHBvcnRzID0gZW1wdHlPYmplY3Q7XG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvZmJqcy9saWIvZW1wdHlPYmplY3QuanNcbi8vIG1vZHVsZSBpZCA9IDZcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTMtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqL1xuXG4ndXNlIHN0cmljdCc7XG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gJ3Byb2R1Y3Rpb24nKSB7XG4gIHZhciBpbnZhcmlhbnQgPSByZXF1aXJlKCdmYmpzL2xpYi9pbnZhcmlhbnQnKTtcbiAgdmFyIHdhcm5pbmcgPSByZXF1aXJlKCdmYmpzL2xpYi93YXJuaW5nJyk7XG4gIHZhciBSZWFjdFByb3BUeXBlc1NlY3JldCA9IHJlcXVpcmUoJy4vbGliL1JlYWN0UHJvcFR5cGVzU2VjcmV0Jyk7XG4gIHZhciBsb2dnZWRUeXBlRmFpbHVyZXMgPSB7fTtcbn1cblxuLyoqXG4gKiBBc3NlcnQgdGhhdCB0aGUgdmFsdWVzIG1hdGNoIHdpdGggdGhlIHR5cGUgc3BlY3MuXG4gKiBFcnJvciBtZXNzYWdlcyBhcmUgbWVtb3JpemVkIGFuZCB3aWxsIG9ubHkgYmUgc2hvd24gb25jZS5cbiAqXG4gKiBAcGFyYW0ge29iamVjdH0gdHlwZVNwZWNzIE1hcCBvZiBuYW1lIHRvIGEgUmVhY3RQcm9wVHlwZVxuICogQHBhcmFtIHtvYmplY3R9IHZhbHVlcyBSdW50aW1lIHZhbHVlcyB0aGF0IG5lZWQgdG8gYmUgdHlwZS1jaGVja2VkXG4gKiBAcGFyYW0ge3N0cmluZ30gbG9jYXRpb24gZS5nLiBcInByb3BcIiwgXCJjb250ZXh0XCIsIFwiY2hpbGQgY29udGV4dFwiXG4gKiBAcGFyYW0ge3N0cmluZ30gY29tcG9uZW50TmFtZSBOYW1lIG9mIHRoZSBjb21wb25lbnQgZm9yIGVycm9yIG1lc3NhZ2VzLlxuICogQHBhcmFtIHs/RnVuY3Rpb259IGdldFN0YWNrIFJldHVybnMgdGhlIGNvbXBvbmVudCBzdGFjay5cbiAqIEBwcml2YXRlXG4gKi9cbmZ1bmN0aW9uIGNoZWNrUHJvcFR5cGVzKHR5cGVTcGVjcywgdmFsdWVzLCBsb2NhdGlvbiwgY29tcG9uZW50TmFtZSwgZ2V0U3RhY2spIHtcbiAgaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgICBmb3IgKHZhciB0eXBlU3BlY05hbWUgaW4gdHlwZVNwZWNzKSB7XG4gICAgICBpZiAodHlwZVNwZWNzLmhhc093blByb3BlcnR5KHR5cGVTcGVjTmFtZSkpIHtcbiAgICAgICAgdmFyIGVycm9yO1xuICAgICAgICAvLyBQcm9wIHR5cGUgdmFsaWRhdGlvbiBtYXkgdGhyb3cuIEluIGNhc2UgdGhleSBkbywgd2UgZG9uJ3Qgd2FudCB0b1xuICAgICAgICAvLyBmYWlsIHRoZSByZW5kZXIgcGhhc2Ugd2hlcmUgaXQgZGlkbid0IGZhaWwgYmVmb3JlLiBTbyB3ZSBsb2cgaXQuXG4gICAgICAgIC8vIEFmdGVyIHRoZXNlIGhhdmUgYmVlbiBjbGVhbmVkIHVwLCB3ZSdsbCBsZXQgdGhlbSB0aHJvdy5cbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICAvLyBUaGlzIGlzIGludGVudGlvbmFsbHkgYW4gaW52YXJpYW50IHRoYXQgZ2V0cyBjYXVnaHQuIEl0J3MgdGhlIHNhbWVcbiAgICAgICAgICAvLyBiZWhhdmlvciBhcyB3aXRob3V0IHRoaXMgc3RhdGVtZW50IGV4Y2VwdCB3aXRoIGEgYmV0dGVyIG1lc3NhZ2UuXG4gICAgICAgICAgaW52YXJpYW50KHR5cGVvZiB0eXBlU3BlY3NbdHlwZVNwZWNOYW1lXSA9PT0gJ2Z1bmN0aW9uJywgJyVzOiAlcyB0eXBlIGAlc2AgaXMgaW52YWxpZDsgaXQgbXVzdCBiZSBhIGZ1bmN0aW9uLCB1c3VhbGx5IGZyb20gJyArICd0aGUgYHByb3AtdHlwZXNgIHBhY2thZ2UsIGJ1dCByZWNlaXZlZCBgJXNgLicsIGNvbXBvbmVudE5hbWUgfHwgJ1JlYWN0IGNsYXNzJywgbG9jYXRpb24sIHR5cGVTcGVjTmFtZSwgdHlwZW9mIHR5cGVTcGVjc1t0eXBlU3BlY05hbWVdKTtcbiAgICAgICAgICBlcnJvciA9IHR5cGVTcGVjc1t0eXBlU3BlY05hbWVdKHZhbHVlcywgdHlwZVNwZWNOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgbnVsbCwgUmVhY3RQcm9wVHlwZXNTZWNyZXQpO1xuICAgICAgICB9IGNhdGNoIChleCkge1xuICAgICAgICAgIGVycm9yID0gZXg7XG4gICAgICAgIH1cbiAgICAgICAgd2FybmluZyghZXJyb3IgfHwgZXJyb3IgaW5zdGFuY2VvZiBFcnJvciwgJyVzOiB0eXBlIHNwZWNpZmljYXRpb24gb2YgJXMgYCVzYCBpcyBpbnZhbGlkOyB0aGUgdHlwZSBjaGVja2VyICcgKyAnZnVuY3Rpb24gbXVzdCByZXR1cm4gYG51bGxgIG9yIGFuIGBFcnJvcmAgYnV0IHJldHVybmVkIGEgJXMuICcgKyAnWW91IG1heSBoYXZlIGZvcmdvdHRlbiB0byBwYXNzIGFuIGFyZ3VtZW50IHRvIHRoZSB0eXBlIGNoZWNrZXIgJyArICdjcmVhdG9yIChhcnJheU9mLCBpbnN0YW5jZU9mLCBvYmplY3RPZiwgb25lT2YsIG9uZU9mVHlwZSwgYW5kICcgKyAnc2hhcGUgYWxsIHJlcXVpcmUgYW4gYXJndW1lbnQpLicsIGNvbXBvbmVudE5hbWUgfHwgJ1JlYWN0IGNsYXNzJywgbG9jYXRpb24sIHR5cGVTcGVjTmFtZSwgdHlwZW9mIGVycm9yKTtcbiAgICAgICAgaWYgKGVycm9yIGluc3RhbmNlb2YgRXJyb3IgJiYgIShlcnJvci5tZXNzYWdlIGluIGxvZ2dlZFR5cGVGYWlsdXJlcykpIHtcbiAgICAgICAgICAvLyBPbmx5IG1vbml0b3IgdGhpcyBmYWlsdXJlIG9uY2UgYmVjYXVzZSB0aGVyZSB0ZW5kcyB0byBiZSBhIGxvdCBvZiB0aGVcbiAgICAgICAgICAvLyBzYW1lIGVycm9yLlxuICAgICAgICAgIGxvZ2dlZFR5cGVGYWlsdXJlc1tlcnJvci5tZXNzYWdlXSA9IHRydWU7XG5cbiAgICAgICAgICB2YXIgc3RhY2sgPSBnZXRTdGFjayA/IGdldFN0YWNrKCkgOiAnJztcblxuICAgICAgICAgIHdhcm5pbmcoZmFsc2UsICdGYWlsZWQgJXMgdHlwZTogJXMlcycsIGxvY2F0aW9uLCBlcnJvci5tZXNzYWdlLCBzdGFjayAhPSBudWxsID8gc3RhY2sgOiAnJyk7XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICB9XG4gIH1cbn1cblxubW9kdWxlLmV4cG9ydHMgPSBjaGVja1Byb3BUeXBlcztcblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvY2hlY2tQcm9wVHlwZXMuanNcbi8vIG1vZHVsZSBpZCA9IDdcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiaW1wb3J0IFJlYWN0LCB7IENvbXBvbmVudCB9IGZyb20gJ3JlYWN0JztcbmltcG9ydCBQcm9wVHlwZXMgZnJvbSAncHJvcC10eXBlcyc7XG5cbmltcG9ydCAqIGFzIHN2Z1NvdXJjZXMgZnJvbSAnLi9zdmcnO1xuXG5leHBvcnQgZGVmYXVsdCBjbGFzcyBMb2FkaW5nIGV4dGVuZHMgQ29tcG9uZW50IHtcbiAgc3RhdGljIHByb3BUeXBlcyA9IHtcbiAgICBjb2xvcjogUHJvcFR5cGVzLnN0cmluZyxcbiAgICBkZWxheTogUHJvcFR5cGVzLm51bWJlcixcbiAgICB0eXBlOiBQcm9wVHlwZXMuc3RyaW5nLFxuICAgIGhlaWdodDogUHJvcFR5cGVzLm9uZU9mVHlwZShbXG4gICAgICBQcm9wVHlwZXMubnVtYmVyLFxuICAgICAgUHJvcFR5cGVzLnN0cmluZyxcbiAgICBdKSxcbiAgICB3aWR0aDogUHJvcFR5cGVzLm9uZU9mVHlwZShbXG4gICAgICBQcm9wVHlwZXMubnVtYmVyLFxuICAgICAgUHJvcFR5cGVzLnN0cmluZyxcbiAgICBdKSxcbiAgfTtcblxuICBzdGF0aWMgZGVmYXVsdFByb3BzID0ge1xuICAgIGNvbG9yOiAnI2ZmZicsXG4gICAgZGVsYXk6IDEwMDAsXG4gICAgdHlwZTogJ2JhbGxzJyxcbiAgICBoZWlnaHQ6IDY0LFxuICAgIHdpZHRoOiA2NCxcbiAgfTtcblxuICBzdGF0ZSA9IHtcbiAgICBkZWxheWVkOiB0aGlzLnByb3BzLmRlbGF5ID4gMCxcbiAgfTtcblxuICBjb21wb25lbnREaWRNb3VudCgpIHtcbiAgICBjb25zdCB7IGRlbGF5IH0gPSB0aGlzLnByb3BzO1xuICAgIGNvbnN0IHsgZGVsYXllZCB9ID0gdGhpcy5zdGF0ZTtcblxuICAgIGlmIChkZWxheWVkKSB7XG4gICAgICB0aGlzLnRpbWVvdXQgPSBzZXRUaW1lb3V0KCgpID0+IHtcbiAgICAgICAgdGhpcy5zZXRTdGF0ZSh7XG4gICAgICAgICAgZGVsYXllZDogZmFsc2UsXG4gICAgICAgIH0pO1xuICAgICAgfSwgZGVsYXkpO1xuICAgIH1cbiAgfVxuXG4gIGNvbXBvbmVudFdpbGxVbm1vdW50KCkge1xuICAgIGNvbnN0IHsgdGltZW91dCB9ID0gdGhpcztcblxuICAgIGlmICh0aW1lb3V0KSB7XG4gICAgICBjbGVhclRpbWVvdXQodGltZW91dCk7XG4gICAgfVxuICB9XG5cbiAgcmVuZGVyKCkge1xuICAgIGNvbnN0IHtcbiAgICAgIGNvbG9yLCBkZWxheSwgdHlwZSwgaGVpZ2h0LCB3aWR0aCwgLi4ucmVzdFByb3BzXG4gICAgfSA9IHRoaXMucHJvcHM7XG4gICAgY29uc3Qgc2VsZWN0ZWRUeXBlID0gdGhpcy5zdGF0ZS5kZWxheWVkID8gJ2JsYW5rJyA6IHR5cGU7XG4gICAgY29uc3Qgc3ZnID0gc3ZnU291cmNlc1tzZWxlY3RlZFR5cGVdO1xuICAgIGNvbnN0IHN0eWxlID0ge1xuICAgICAgZmlsbDogY29sb3IsXG4gICAgICBoZWlnaHQsXG4gICAgICB3aWR0aCxcbiAgICB9O1xuXG4gICAgcmV0dXJuIChcbiAgICAgIDxkaXZcbiAgICAgICAgc3R5bGU9e3N0eWxlfVxuICAgICAgICBkYW5nZXJvdXNseVNldElubmVySFRNTD17eyBfX2h0bWw6IHN2ZyB9fVxuICAgICAgICB7Li4ucmVzdFByb3BzfVxuICAgICAgLz5cbiAgICApO1xuICB9XG59XG5cblxuXG4vLyBXRUJQQUNLIEZPT1RFUiAvL1xuLy8gLi9saWIvcmVhY3QtbG9hZGluZy5qc3giLCIndXNlIHN0cmljdCc7XG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViA9PT0gJ3Byb2R1Y3Rpb24nKSB7XG4gIG1vZHVsZS5leHBvcnRzID0gcmVxdWlyZSgnLi9janMvcmVhY3QucHJvZHVjdGlvbi5taW4uanMnKTtcbn0gZWxzZSB7XG4gIG1vZHVsZS5leHBvcnRzID0gcmVxdWlyZSgnLi9janMvcmVhY3QuZGV2ZWxvcG1lbnQuanMnKTtcbn1cblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3JlYWN0L2luZGV4LmpzXG4vLyBtb2R1bGUgaWQgPSA5XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKiBAbGljZW5zZSBSZWFjdCB2MTYuMS4xXG4gKiByZWFjdC5wcm9kdWN0aW9uLm1pbi5qc1xuICpcbiAqIENvcHlyaWdodCAoYykgMjAxMy1wcmVzZW50LCBGYWNlYm9vaywgSW5jLlxuICpcbiAqIFRoaXMgc291cmNlIGNvZGUgaXMgbGljZW5zZWQgdW5kZXIgdGhlIE1JVCBsaWNlbnNlIGZvdW5kIGluIHRoZVxuICogTElDRU5TRSBmaWxlIGluIHRoZSByb290IGRpcmVjdG9yeSBvZiB0aGlzIHNvdXJjZSB0cmVlLlxuICovXG4ndXNlIHN0cmljdCc7dmFyIG09cmVxdWlyZShcIm9iamVjdC1hc3NpZ25cIiksbj1yZXF1aXJlKFwiZmJqcy9saWIvZW1wdHlPYmplY3RcIikscD1yZXF1aXJlKFwiZmJqcy9saWIvZW1wdHlGdW5jdGlvblwiKTtcbmZ1bmN0aW9uIHEoYSl7Zm9yKHZhciBiPWFyZ3VtZW50cy5sZW5ndGgtMSxlPVwiTWluaWZpZWQgUmVhY3QgZXJyb3IgI1wiK2ErXCI7IHZpc2l0IGh0dHA6Ly9mYWNlYm9vay5naXRodWIuaW8vcmVhY3QvZG9jcy9lcnJvci1kZWNvZGVyLmh0bWw/aW52YXJpYW50XFx4M2RcIithLGQ9MDtkPGI7ZCsrKWUrPVwiXFx4MjZhcmdzW11cXHgzZFwiK2VuY29kZVVSSUNvbXBvbmVudChhcmd1bWVudHNbZCsxXSk7Yj1FcnJvcihlK1wiIGZvciB0aGUgZnVsbCBtZXNzYWdlIG9yIHVzZSB0aGUgbm9uLW1pbmlmaWVkIGRldiBlbnZpcm9ubWVudCBmb3IgZnVsbCBlcnJvcnMgYW5kIGFkZGl0aW9uYWwgaGVscGZ1bCB3YXJuaW5ncy5cIik7Yi5uYW1lPVwiSW52YXJpYW50IFZpb2xhdGlvblwiO2IuZnJhbWVzVG9Qb3A9MTt0aHJvdyBiO31cbnZhciByPXtpc01vdW50ZWQ6ZnVuY3Rpb24oKXtyZXR1cm4hMX0sZW5xdWV1ZUZvcmNlVXBkYXRlOmZ1bmN0aW9uKCl7fSxlbnF1ZXVlUmVwbGFjZVN0YXRlOmZ1bmN0aW9uKCl7fSxlbnF1ZXVlU2V0U3RhdGU6ZnVuY3Rpb24oKXt9fTtmdW5jdGlvbiB0KGEsYixlKXt0aGlzLnByb3BzPWE7dGhpcy5jb250ZXh0PWI7dGhpcy5yZWZzPW47dGhpcy51cGRhdGVyPWV8fHJ9dC5wcm90b3R5cGUuaXNSZWFjdENvbXBvbmVudD17fTt0LnByb3RvdHlwZS5zZXRTdGF0ZT1mdW5jdGlvbihhLGIpe1wib2JqZWN0XCIhPT10eXBlb2YgYSYmXCJmdW5jdGlvblwiIT09dHlwZW9mIGEmJm51bGwhPWE/cShcIjg1XCIpOnZvaWQgMDt0aGlzLnVwZGF0ZXIuZW5xdWV1ZVNldFN0YXRlKHRoaXMsYSxiLFwic2V0U3RhdGVcIil9O3QucHJvdG90eXBlLmZvcmNlVXBkYXRlPWZ1bmN0aW9uKGEpe3RoaXMudXBkYXRlci5lbnF1ZXVlRm9yY2VVcGRhdGUodGhpcyxhLFwiZm9yY2VVcGRhdGVcIil9O1xuZnVuY3Rpb24gdShhLGIsZSl7dGhpcy5wcm9wcz1hO3RoaXMuY29udGV4dD1iO3RoaXMucmVmcz1uO3RoaXMudXBkYXRlcj1lfHxyfWZ1bmN0aW9uIHYoKXt9di5wcm90b3R5cGU9dC5wcm90b3R5cGU7dmFyIHc9dS5wcm90b3R5cGU9bmV3IHY7dy5jb25zdHJ1Y3Rvcj11O20odyx0LnByb3RvdHlwZSk7dy5pc1B1cmVSZWFjdENvbXBvbmVudD0hMDtmdW5jdGlvbiB4KGEsYixlKXt0aGlzLnByb3BzPWE7dGhpcy5jb250ZXh0PWI7dGhpcy5yZWZzPW47dGhpcy51cGRhdGVyPWV8fHJ9dmFyIHk9eC5wcm90b3R5cGU9bmV3IHY7eS5jb25zdHJ1Y3Rvcj14O20oeSx0LnByb3RvdHlwZSk7eS51bnN0YWJsZV9pc0FzeW5jUmVhY3RDb21wb25lbnQ9ITA7eS5yZW5kZXI9ZnVuY3Rpb24oKXtyZXR1cm4gdGhpcy5wcm9wcy5jaGlsZHJlbn07XG52YXIgej17Y3VycmVudDpudWxsfSxBPU9iamVjdC5wcm90b3R5cGUuaGFzT3duUHJvcGVydHksQj1cImZ1bmN0aW9uXCI9PT10eXBlb2YgU3ltYm9sJiZTeW1ib2xbXCJmb3JcIl0mJlN5bWJvbFtcImZvclwiXShcInJlYWN0LmVsZW1lbnRcIil8fDYwMTAzLEM9e2tleTohMCxyZWY6ITAsX19zZWxmOiEwLF9fc291cmNlOiEwfTtcbmZ1bmN0aW9uIEQoYSxiLGUpe3ZhciBkLGM9e30saD1udWxsLGs9bnVsbDtpZihudWxsIT1iKWZvcihkIGluIHZvaWQgMCE9PWIucmVmJiYoaz1iLnJlZiksdm9pZCAwIT09Yi5rZXkmJihoPVwiXCIrYi5rZXkpLGIpQS5jYWxsKGIsZCkmJiFDLmhhc093blByb3BlcnR5KGQpJiYoY1tkXT1iW2RdKTt2YXIgZj1hcmd1bWVudHMubGVuZ3RoLTI7aWYoMT09PWYpYy5jaGlsZHJlbj1lO2Vsc2UgaWYoMTxmKXtmb3IodmFyIGc9QXJyYXkoZiksbD0wO2w8ZjtsKyspZ1tsXT1hcmd1bWVudHNbbCsyXTtjLmNoaWxkcmVuPWd9aWYoYSYmYS5kZWZhdWx0UHJvcHMpZm9yKGQgaW4gZj1hLmRlZmF1bHRQcm9wcyxmKXZvaWQgMD09PWNbZF0mJihjW2RdPWZbZF0pO3JldHVybnskJHR5cGVvZjpCLHR5cGU6YSxrZXk6aCxyZWY6ayxwcm9wczpjLF9vd25lcjp6LmN1cnJlbnR9fWZ1bmN0aW9uIEUoYSl7cmV0dXJuXCJvYmplY3RcIj09PXR5cGVvZiBhJiZudWxsIT09YSYmYS4kJHR5cGVvZj09PUJ9XG52YXIgRj1cImZ1bmN0aW9uXCI9PT10eXBlb2YgU3ltYm9sJiZTeW1ib2wuaXRlcmF0b3IsRz1cImZ1bmN0aW9uXCI9PT10eXBlb2YgU3ltYm9sJiZTeW1ib2xbXCJmb3JcIl0mJlN5bWJvbFtcImZvclwiXShcInJlYWN0LmVsZW1lbnRcIil8fDYwMTAzLEg9XCJmdW5jdGlvblwiPT09dHlwZW9mIFN5bWJvbCYmU3ltYm9sW1wiZm9yXCJdJiZTeW1ib2xbXCJmb3JcIl0oXCJyZWFjdC5wb3J0YWxcIil8fDYwMTA2O2Z1bmN0aW9uIGVzY2FwZShhKXt2YXIgYj17XCJcXHgzZFwiOlwiXFx4M2QwXCIsXCI6XCI6XCJcXHgzZDJcIn07cmV0dXJuXCIkXCIrKFwiXCIrYSkucmVwbGFjZSgvWz06XS9nLGZ1bmN0aW9uKGEpe3JldHVybiBiW2FdfSl9dmFyIEk9L1xcLysvZyxKPVtdO1xuZnVuY3Rpb24gSyhhLGIsZSxkKXtpZihKLmxlbmd0aCl7dmFyIGM9Si5wb3AoKTtjLnJlc3VsdD1hO2Mua2V5UHJlZml4PWI7Yy5mdW5jPWU7Yy5jb250ZXh0PWQ7Yy5jb3VudD0wO3JldHVybiBjfXJldHVybntyZXN1bHQ6YSxrZXlQcmVmaXg6YixmdW5jOmUsY29udGV4dDpkLGNvdW50OjB9fWZ1bmN0aW9uIEwoYSl7YS5yZXN1bHQ9bnVsbDthLmtleVByZWZpeD1udWxsO2EuZnVuYz1udWxsO2EuY29udGV4dD1udWxsO2EuY291bnQ9MDsxMD5KLmxlbmd0aCYmSi5wdXNoKGEpfVxuZnVuY3Rpb24gTShhLGIsZSxkKXt2YXIgYz10eXBlb2YgYTtpZihcInVuZGVmaW5lZFwiPT09Y3x8XCJib29sZWFuXCI9PT1jKWE9bnVsbDtpZihudWxsPT09YXx8XCJzdHJpbmdcIj09PWN8fFwibnVtYmVyXCI9PT1jfHxcIm9iamVjdFwiPT09YyYmYS4kJHR5cGVvZj09PUd8fFwib2JqZWN0XCI9PT1jJiZhLiQkdHlwZW9mPT09SClyZXR1cm4gZShkLGEsXCJcIj09PWI/XCIuXCIrTihhLDApOmIpLDE7dmFyIGg9MDtiPVwiXCI9PT1iP1wiLlwiOmIrXCI6XCI7aWYoQXJyYXkuaXNBcnJheShhKSlmb3IodmFyIGs9MDtrPGEubGVuZ3RoO2srKyl7Yz1hW2tdO3ZhciBmPWIrTihjLGspO2grPU0oYyxmLGUsZCl9ZWxzZSBpZihmPUYmJmFbRl18fGFbXCJAQGl0ZXJhdG9yXCJdLFwiZnVuY3Rpb25cIj09PXR5cGVvZiBmKWZvcihhPWYuY2FsbChhKSxrPTA7IShjPWEubmV4dCgpKS5kb25lOyljPWMudmFsdWUsZj1iK04oYyxrKyspLGgrPU0oYyxmLGUsZCk7ZWxzZVwib2JqZWN0XCI9PT1jJiYoZT1cIlwiK2EscShcIjMxXCIsXCJbb2JqZWN0IE9iamVjdF1cIj09PVxuZT9cIm9iamVjdCB3aXRoIGtleXMge1wiK09iamVjdC5rZXlzKGEpLmpvaW4oXCIsIFwiKStcIn1cIjplLFwiXCIpKTtyZXR1cm4gaH1mdW5jdGlvbiBOKGEsYil7cmV0dXJuXCJvYmplY3RcIj09PXR5cGVvZiBhJiZudWxsIT09YSYmbnVsbCE9YS5rZXk/ZXNjYXBlKGEua2V5KTpiLnRvU3RyaW5nKDM2KX1mdW5jdGlvbiBPKGEsYil7YS5mdW5jLmNhbGwoYS5jb250ZXh0LGIsYS5jb3VudCsrKX1cbmZ1bmN0aW9uIFAoYSxiLGUpe3ZhciBkPWEucmVzdWx0LGM9YS5rZXlQcmVmaXg7YT1hLmZ1bmMuY2FsbChhLmNvbnRleHQsYixhLmNvdW50KyspO0FycmF5LmlzQXJyYXkoYSk/UShhLGQsZSxwLnRoYXRSZXR1cm5zQXJndW1lbnQpOm51bGwhPWEmJihFKGEpJiYoYj1jKyghYS5rZXl8fGImJmIua2V5PT09YS5rZXk/XCJcIjooXCJcIithLmtleSkucmVwbGFjZShJLFwiJFxceDI2L1wiKStcIi9cIikrZSxhPXskJHR5cGVvZjpCLHR5cGU6YS50eXBlLGtleTpiLHJlZjphLnJlZixwcm9wczphLnByb3BzLF9vd25lcjphLl9vd25lcn0pLGQucHVzaChhKSl9ZnVuY3Rpb24gUShhLGIsZSxkLGMpe3ZhciBoPVwiXCI7bnVsbCE9ZSYmKGg9KFwiXCIrZSkucmVwbGFjZShJLFwiJFxceDI2L1wiKStcIi9cIik7Yj1LKGIsaCxkLGMpO251bGw9PWF8fE0oYSxcIlwiLFAsYik7TChiKX1cImZ1bmN0aW9uXCI9PT10eXBlb2YgU3ltYm9sJiZTeW1ib2xbXCJmb3JcIl0mJlN5bWJvbFtcImZvclwiXShcInJlYWN0LmZyYWdtZW50XCIpO1xudmFyIFI9e0NoaWxkcmVuOnttYXA6ZnVuY3Rpb24oYSxiLGUpe2lmKG51bGw9PWEpcmV0dXJuIGE7dmFyIGQ9W107UShhLGQsbnVsbCxiLGUpO3JldHVybiBkfSxmb3JFYWNoOmZ1bmN0aW9uKGEsYixlKXtpZihudWxsPT1hKXJldHVybiBhO2I9SyhudWxsLG51bGwsYixlKTtudWxsPT1hfHxNKGEsXCJcIixPLGIpO0woYil9LGNvdW50OmZ1bmN0aW9uKGEpe3JldHVybiBudWxsPT1hPzA6TShhLFwiXCIscC50aGF0UmV0dXJuc051bGwsbnVsbCl9LHRvQXJyYXk6ZnVuY3Rpb24oYSl7dmFyIGI9W107UShhLGIsbnVsbCxwLnRoYXRSZXR1cm5zQXJndW1lbnQpO3JldHVybiBifSxvbmx5OmZ1bmN0aW9uKGEpe0UoYSk/dm9pZCAwOnEoXCIxNDNcIik7cmV0dXJuIGF9fSxDb21wb25lbnQ6dCxQdXJlQ29tcG9uZW50OnUsdW5zdGFibGVfQXN5bmNDb21wb25lbnQ6eCxjcmVhdGVFbGVtZW50OkQsY2xvbmVFbGVtZW50OmZ1bmN0aW9uKGEsYixlKXt2YXIgZD1tKHt9LGEucHJvcHMpLGM9YS5rZXksaD1hLnJlZixcbms9YS5fb3duZXI7aWYobnVsbCE9Yil7dm9pZCAwIT09Yi5yZWYmJihoPWIucmVmLGs9ei5jdXJyZW50KTt2b2lkIDAhPT1iLmtleSYmKGM9XCJcIitiLmtleSk7aWYoYS50eXBlJiZhLnR5cGUuZGVmYXVsdFByb3BzKXZhciBmPWEudHlwZS5kZWZhdWx0UHJvcHM7Zm9yKGcgaW4gYilBLmNhbGwoYixnKSYmIUMuaGFzT3duUHJvcGVydHkoZykmJihkW2ddPXZvaWQgMD09PWJbZ10mJnZvaWQgMCE9PWY/ZltnXTpiW2ddKX12YXIgZz1hcmd1bWVudHMubGVuZ3RoLTI7aWYoMT09PWcpZC5jaGlsZHJlbj1lO2Vsc2UgaWYoMTxnKXtmPUFycmF5KGcpO2Zvcih2YXIgbD0wO2w8ZztsKyspZltsXT1hcmd1bWVudHNbbCsyXTtkLmNoaWxkcmVuPWZ9cmV0dXJueyQkdHlwZW9mOkIsdHlwZTphLnR5cGUsa2V5OmMscmVmOmgscHJvcHM6ZCxfb3duZXI6a319LGNyZWF0ZUZhY3Rvcnk6ZnVuY3Rpb24oYSl7dmFyIGI9RC5iaW5kKG51bGwsYSk7Yi50eXBlPWE7cmV0dXJuIGJ9LGlzVmFsaWRFbGVtZW50OkUsXG52ZXJzaW9uOlwiMTYuMS4xXCIsX19TRUNSRVRfSU5URVJOQUxTX0RPX05PVF9VU0VfT1JfWU9VX1dJTExfQkVfRklSRUQ6e1JlYWN0Q3VycmVudE93bmVyOnosYXNzaWduOm19fSxTPU9iamVjdC5mcmVlemUoe2RlZmF1bHQ6Un0pLFQ9UyYmUnx8Uzttb2R1bGUuZXhwb3J0cz1UW1wiZGVmYXVsdFwiXT9UW1wiZGVmYXVsdFwiXTpUO1xuXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvcmVhY3QvY2pzL3JlYWN0LnByb2R1Y3Rpb24ubWluLmpzXG4vLyBtb2R1bGUgaWQgPSAxMFxuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCIvKiogQGxpY2Vuc2UgUmVhY3QgdjE2LjEuMVxuICogcmVhY3QuZGV2ZWxvcG1lbnQuanNcbiAqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTMtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqL1xuXG4ndXNlIHN0cmljdCc7XG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gXCJwcm9kdWN0aW9uXCIpIHtcbiAgKGZ1bmN0aW9uKCkge1xuJ3VzZSBzdHJpY3QnO1xuXG52YXIgX2Fzc2lnbiA9IHJlcXVpcmUoJ29iamVjdC1hc3NpZ24nKTtcbnZhciBpbnZhcmlhbnQgPSByZXF1aXJlKCdmYmpzL2xpYi9pbnZhcmlhbnQnKTtcbnZhciBlbXB0eU9iamVjdCA9IHJlcXVpcmUoJ2ZianMvbGliL2VtcHR5T2JqZWN0Jyk7XG52YXIgd2FybmluZyA9IHJlcXVpcmUoJ2ZianMvbGliL3dhcm5pbmcnKTtcbnZhciBlbXB0eUZ1bmN0aW9uID0gcmVxdWlyZSgnZmJqcy9saWIvZW1wdHlGdW5jdGlvbicpO1xudmFyIGNoZWNrUHJvcFR5cGVzID0gcmVxdWlyZSgncHJvcC10eXBlcy9jaGVja1Byb3BUeXBlcycpO1xuXG4vLyBUT0RPOiB0aGlzIGlzIHNwZWNpYWwgYmVjYXVzZSBpdCBnZXRzIGltcG9ydGVkIGR1cmluZyBidWlsZC5cblxudmFyIFJlYWN0VmVyc2lvbiA9ICcxNi4xLjEnO1xuXG4vKipcbiAqIFdBUk5JTkc6IERPIE5PVCBtYW51YWxseSByZXF1aXJlIHRoaXMgbW9kdWxlLlxuICogVGhpcyBpcyBhIHJlcGxhY2VtZW50IGZvciBgaW52YXJpYW50KC4uLilgIHVzZWQgYnkgdGhlIGVycm9yIGNvZGUgc3lzdGVtXG4gKiBhbmQgd2lsbCBfb25seV8gYmUgcmVxdWlyZWQgYnkgdGhlIGNvcnJlc3BvbmRpbmcgYmFiZWwgcGFzcy5cbiAqIEl0IGFsd2F5cyB0aHJvd3MuXG4gKi9cblxuLy8gRXhwb3J0cyBSZWFjdC5GcmFnbWVudFxudmFyIGVuYWJsZVJlYWN0RnJhZ21lbnQgPSBmYWxzZTtcbi8vIEV4cG9ydHMgUmVhY3RET00uY3JlYXRlUm9vdFxuXG5cblxuLy8gTXV0YXRpbmcgbW9kZSAoUmVhY3QgRE9NLCBSZWFjdCBBUlQsIFJlYWN0IE5hdGl2ZSk6XG5cbi8vIEV4cGVyaW1lbnRhbCBub29wIG1vZGUgKGN1cnJlbnRseSB1bnVzZWQpOlxuXG4vLyBFeHBlcmltZW50YWwgcGVyc2lzdGVudCBtb2RlIChDUyk6XG5cblxuLy8gT25seSB1c2VkIGluIHd3dyBidWlsZHMuXG5cbi8qKlxuICogRm9ya2VkIGZyb20gZmJqcy93YXJuaW5nOlxuICogaHR0cHM6Ly9naXRodWIuY29tL2ZhY2Vib29rL2ZianMvYmxvYi9lNjZiYTIwYWQ1YmU0MzNlYjU0NDIzZjJiMDk3ZDgyOTMyNGQ5ZGU2L3BhY2thZ2VzL2ZianMvc3JjL19fZm9ya3NfXy93YXJuaW5nLmpzXG4gKlxuICogT25seSBjaGFuZ2UgaXMgd2UgdXNlIGNvbnNvbGUud2FybiBpbnN0ZWFkIG9mIGNvbnNvbGUuZXJyb3IsXG4gKiBhbmQgZG8gbm90aGluZyB3aGVuICdjb25zb2xlJyBpcyBub3Qgc3VwcG9ydGVkLlxuICogVGhpcyByZWFsbHkgc2ltcGxpZmllcyB0aGUgY29kZS5cbiAqIC0tLVxuICogU2ltaWxhciB0byBpbnZhcmlhbnQgYnV0IG9ubHkgbG9ncyBhIHdhcm5pbmcgaWYgdGhlIGNvbmRpdGlvbiBpcyBub3QgbWV0LlxuICogVGhpcyBjYW4gYmUgdXNlZCB0byBsb2cgaXNzdWVzIGluIGRldmVsb3BtZW50IGVudmlyb25tZW50cyBpbiBjcml0aWNhbFxuICogcGF0aHMuIFJlbW92aW5nIHRoZSBsb2dnaW5nIGNvZGUgZm9yIHByb2R1Y3Rpb24gZW52aXJvbm1lbnRzIHdpbGwga2VlcCB0aGVcbiAqIHNhbWUgbG9naWMgYW5kIGZvbGxvdyB0aGUgc2FtZSBjb2RlIHBhdGhzLlxuICovXG5cbnZhciBsb3dQcmlvcml0eVdhcm5pbmcgPSBmdW5jdGlvbiAoKSB7fTtcblxue1xuICB2YXIgcHJpbnRXYXJuaW5nID0gZnVuY3Rpb24gKGZvcm1hdCkge1xuICAgIGZvciAodmFyIF9sZW4gPSBhcmd1bWVudHMubGVuZ3RoLCBhcmdzID0gQXJyYXkoX2xlbiA+IDEgPyBfbGVuIC0gMSA6IDApLCBfa2V5ID0gMTsgX2tleSA8IF9sZW47IF9rZXkrKykge1xuICAgICAgYXJnc1tfa2V5IC0gMV0gPSBhcmd1bWVudHNbX2tleV07XG4gICAgfVxuXG4gICAgdmFyIGFyZ0luZGV4ID0gMDtcbiAgICB2YXIgbWVzc2FnZSA9ICdXYXJuaW5nOiAnICsgZm9ybWF0LnJlcGxhY2UoLyVzL2csIGZ1bmN0aW9uICgpIHtcbiAgICAgIHJldHVybiBhcmdzW2FyZ0luZGV4KytdO1xuICAgIH0pO1xuICAgIGlmICh0eXBlb2YgY29uc29sZSAhPT0gJ3VuZGVmaW5lZCcpIHtcbiAgICAgIGNvbnNvbGUud2FybihtZXNzYWdlKTtcbiAgICB9XG4gICAgdHJ5IHtcbiAgICAgIC8vIC0tLSBXZWxjb21lIHRvIGRlYnVnZ2luZyBSZWFjdCAtLS1cbiAgICAgIC8vIFRoaXMgZXJyb3Igd2FzIHRocm93biBhcyBhIGNvbnZlbmllbmNlIHNvIHRoYXQgeW91IGNhbiB1c2UgdGhpcyBzdGFja1xuICAgICAgLy8gdG8gZmluZCB0aGUgY2FsbHNpdGUgdGhhdCBjYXVzZWQgdGhpcyB3YXJuaW5nIHRvIGZpcmUuXG4gICAgICB0aHJvdyBuZXcgRXJyb3IobWVzc2FnZSk7XG4gICAgfSBjYXRjaCAoeCkge31cbiAgfTtcblxuICBsb3dQcmlvcml0eVdhcm5pbmcgPSBmdW5jdGlvbiAoY29uZGl0aW9uLCBmb3JtYXQpIHtcbiAgICBpZiAoZm9ybWF0ID09PSB1bmRlZmluZWQpIHtcbiAgICAgIHRocm93IG5ldyBFcnJvcignYHdhcm5pbmcoY29uZGl0aW9uLCBmb3JtYXQsIC4uLmFyZ3MpYCByZXF1aXJlcyBhIHdhcm5pbmcgJyArICdtZXNzYWdlIGFyZ3VtZW50Jyk7XG4gICAgfVxuICAgIGlmICghY29uZGl0aW9uKSB7XG4gICAgICBmb3IgKHZhciBfbGVuMiA9IGFyZ3VtZW50cy5sZW5ndGgsIGFyZ3MgPSBBcnJheShfbGVuMiA+IDIgPyBfbGVuMiAtIDIgOiAwKSwgX2tleTIgPSAyOyBfa2V5MiA8IF9sZW4yOyBfa2V5MisrKSB7XG4gICAgICAgIGFyZ3NbX2tleTIgLSAyXSA9IGFyZ3VtZW50c1tfa2V5Ml07XG4gICAgICB9XG5cbiAgICAgIHByaW50V2FybmluZy5hcHBseSh1bmRlZmluZWQsIFtmb3JtYXRdLmNvbmNhdChhcmdzKSk7XG4gICAgfVxuICB9O1xufVxuXG52YXIgbG93UHJpb3JpdHlXYXJuaW5nJDEgPSBsb3dQcmlvcml0eVdhcm5pbmc7XG5cbnZhciBkaWRXYXJuU3RhdGVVcGRhdGVGb3JVbm1vdW50ZWRDb21wb25lbnQgPSB7fTtcblxuZnVuY3Rpb24gd2Fybk5vb3AocHVibGljSW5zdGFuY2UsIGNhbGxlck5hbWUpIHtcbiAge1xuICAgIHZhciBjb25zdHJ1Y3RvciA9IHB1YmxpY0luc3RhbmNlLmNvbnN0cnVjdG9yO1xuICAgIHZhciBjb21wb25lbnROYW1lID0gY29uc3RydWN0b3IgJiYgKGNvbnN0cnVjdG9yLmRpc3BsYXlOYW1lIHx8IGNvbnN0cnVjdG9yLm5hbWUpIHx8ICdSZWFjdENsYXNzJztcbiAgICB2YXIgd2FybmluZ0tleSA9IGNvbXBvbmVudE5hbWUgKyAnLicgKyBjYWxsZXJOYW1lO1xuICAgIGlmIChkaWRXYXJuU3RhdGVVcGRhdGVGb3JVbm1vdW50ZWRDb21wb25lbnRbd2FybmluZ0tleV0pIHtcbiAgICAgIHJldHVybjtcbiAgICB9XG4gICAgd2FybmluZyhmYWxzZSwgJyVzKC4uLik6IENhbiBvbmx5IHVwZGF0ZSBhIG1vdW50ZWQgb3IgbW91bnRpbmcgY29tcG9uZW50LiAnICsgJ1RoaXMgdXN1YWxseSBtZWFucyB5b3UgY2FsbGVkICVzKCkgb24gYW4gdW5tb3VudGVkIGNvbXBvbmVudC4gJyArICdUaGlzIGlzIGEgbm8tb3AuXFxuXFxuUGxlYXNlIGNoZWNrIHRoZSBjb2RlIGZvciB0aGUgJXMgY29tcG9uZW50LicsIGNhbGxlck5hbWUsIGNhbGxlck5hbWUsIGNvbXBvbmVudE5hbWUpO1xuICAgIGRpZFdhcm5TdGF0ZVVwZGF0ZUZvclVubW91bnRlZENvbXBvbmVudFt3YXJuaW5nS2V5XSA9IHRydWU7XG4gIH1cbn1cblxuLyoqXG4gKiBUaGlzIGlzIHRoZSBhYnN0cmFjdCBBUEkgZm9yIGFuIHVwZGF0ZSBxdWV1ZS5cbiAqL1xudmFyIFJlYWN0Tm9vcFVwZGF0ZVF1ZXVlID0ge1xuICAvKipcbiAgICogQ2hlY2tzIHdoZXRoZXIgb3Igbm90IHRoaXMgY29tcG9zaXRlIGNvbXBvbmVudCBpcyBtb3VudGVkLlxuICAgKiBAcGFyYW0ge1JlYWN0Q2xhc3N9IHB1YmxpY0luc3RhbmNlIFRoZSBpbnN0YW5jZSB3ZSB3YW50IHRvIHRlc3QuXG4gICAqIEByZXR1cm4ge2Jvb2xlYW59IFRydWUgaWYgbW91bnRlZCwgZmFsc2Ugb3RoZXJ3aXNlLlxuICAgKiBAcHJvdGVjdGVkXG4gICAqIEBmaW5hbFxuICAgKi9cbiAgaXNNb3VudGVkOiBmdW5jdGlvbiAocHVibGljSW5zdGFuY2UpIHtcbiAgICByZXR1cm4gZmFsc2U7XG4gIH0sXG5cbiAgLyoqXG4gICAqIEZvcmNlcyBhbiB1cGRhdGUuIFRoaXMgc2hvdWxkIG9ubHkgYmUgaW52b2tlZCB3aGVuIGl0IGlzIGtub3duIHdpdGhcbiAgICogY2VydGFpbnR5IHRoYXQgd2UgYXJlICoqbm90KiogaW4gYSBET00gdHJhbnNhY3Rpb24uXG4gICAqXG4gICAqIFlvdSBtYXkgd2FudCB0byBjYWxsIHRoaXMgd2hlbiB5b3Uga25vdyB0aGF0IHNvbWUgZGVlcGVyIGFzcGVjdCBvZiB0aGVcbiAgICogY29tcG9uZW50J3Mgc3RhdGUgaGFzIGNoYW5nZWQgYnV0IGBzZXRTdGF0ZWAgd2FzIG5vdCBjYWxsZWQuXG4gICAqXG4gICAqIFRoaXMgd2lsbCBub3QgaW52b2tlIGBzaG91bGRDb21wb25lbnRVcGRhdGVgLCBidXQgaXQgd2lsbCBpbnZva2VcbiAgICogYGNvbXBvbmVudFdpbGxVcGRhdGVgIGFuZCBgY29tcG9uZW50RGlkVXBkYXRlYC5cbiAgICpcbiAgICogQHBhcmFtIHtSZWFjdENsYXNzfSBwdWJsaWNJbnN0YW5jZSBUaGUgaW5zdGFuY2UgdGhhdCBzaG91bGQgcmVyZW5kZXIuXG4gICAqIEBwYXJhbSB7P2Z1bmN0aW9ufSBjYWxsYmFjayBDYWxsZWQgYWZ0ZXIgY29tcG9uZW50IGlzIHVwZGF0ZWQuXG4gICAqIEBwYXJhbSB7P3N0cmluZ30gY2FsbGVyTmFtZSBuYW1lIG9mIHRoZSBjYWxsaW5nIGZ1bmN0aW9uIGluIHRoZSBwdWJsaWMgQVBJLlxuICAgKiBAaW50ZXJuYWxcbiAgICovXG4gIGVucXVldWVGb3JjZVVwZGF0ZTogZnVuY3Rpb24gKHB1YmxpY0luc3RhbmNlLCBjYWxsYmFjaywgY2FsbGVyTmFtZSkge1xuICAgIHdhcm5Ob29wKHB1YmxpY0luc3RhbmNlLCAnZm9yY2VVcGRhdGUnKTtcbiAgfSxcblxuICAvKipcbiAgICogUmVwbGFjZXMgYWxsIG9mIHRoZSBzdGF0ZS4gQWx3YXlzIHVzZSB0aGlzIG9yIGBzZXRTdGF0ZWAgdG8gbXV0YXRlIHN0YXRlLlxuICAgKiBZb3Ugc2hvdWxkIHRyZWF0IGB0aGlzLnN0YXRlYCBhcyBpbW11dGFibGUuXG4gICAqXG4gICAqIFRoZXJlIGlzIG5vIGd1YXJhbnRlZSB0aGF0IGB0aGlzLnN0YXRlYCB3aWxsIGJlIGltbWVkaWF0ZWx5IHVwZGF0ZWQsIHNvXG4gICAqIGFjY2Vzc2luZyBgdGhpcy5zdGF0ZWAgYWZ0ZXIgY2FsbGluZyB0aGlzIG1ldGhvZCBtYXkgcmV0dXJuIHRoZSBvbGQgdmFsdWUuXG4gICAqXG4gICAqIEBwYXJhbSB7UmVhY3RDbGFzc30gcHVibGljSW5zdGFuY2UgVGhlIGluc3RhbmNlIHRoYXQgc2hvdWxkIHJlcmVuZGVyLlxuICAgKiBAcGFyYW0ge29iamVjdH0gY29tcGxldGVTdGF0ZSBOZXh0IHN0YXRlLlxuICAgKiBAcGFyYW0gez9mdW5jdGlvbn0gY2FsbGJhY2sgQ2FsbGVkIGFmdGVyIGNvbXBvbmVudCBpcyB1cGRhdGVkLlxuICAgKiBAcGFyYW0gez9zdHJpbmd9IGNhbGxlck5hbWUgbmFtZSBvZiB0aGUgY2FsbGluZyBmdW5jdGlvbiBpbiB0aGUgcHVibGljIEFQSS5cbiAgICogQGludGVybmFsXG4gICAqL1xuICBlbnF1ZXVlUmVwbGFjZVN0YXRlOiBmdW5jdGlvbiAocHVibGljSW5zdGFuY2UsIGNvbXBsZXRlU3RhdGUsIGNhbGxiYWNrLCBjYWxsZXJOYW1lKSB7XG4gICAgd2Fybk5vb3AocHVibGljSW5zdGFuY2UsICdyZXBsYWNlU3RhdGUnKTtcbiAgfSxcblxuICAvKipcbiAgICogU2V0cyBhIHN1YnNldCBvZiB0aGUgc3RhdGUuIFRoaXMgb25seSBleGlzdHMgYmVjYXVzZSBfcGVuZGluZ1N0YXRlIGlzXG4gICAqIGludGVybmFsLiBUaGlzIHByb3ZpZGVzIGEgbWVyZ2luZyBzdHJhdGVneSB0aGF0IGlzIG5vdCBhdmFpbGFibGUgdG8gZGVlcFxuICAgKiBwcm9wZXJ0aWVzIHdoaWNoIGlzIGNvbmZ1c2luZy4gVE9ETzogRXhwb3NlIHBlbmRpbmdTdGF0ZSBvciBkb24ndCB1c2UgaXRcbiAgICogZHVyaW5nIHRoZSBtZXJnZS5cbiAgICpcbiAgICogQHBhcmFtIHtSZWFjdENsYXNzfSBwdWJsaWNJbnN0YW5jZSBUaGUgaW5zdGFuY2UgdGhhdCBzaG91bGQgcmVyZW5kZXIuXG4gICAqIEBwYXJhbSB7b2JqZWN0fSBwYXJ0aWFsU3RhdGUgTmV4dCBwYXJ0aWFsIHN0YXRlIHRvIGJlIG1lcmdlZCB3aXRoIHN0YXRlLlxuICAgKiBAcGFyYW0gez9mdW5jdGlvbn0gY2FsbGJhY2sgQ2FsbGVkIGFmdGVyIGNvbXBvbmVudCBpcyB1cGRhdGVkLlxuICAgKiBAcGFyYW0gez9zdHJpbmd9IE5hbWUgb2YgdGhlIGNhbGxpbmcgZnVuY3Rpb24gaW4gdGhlIHB1YmxpYyBBUEkuXG4gICAqIEBpbnRlcm5hbFxuICAgKi9cbiAgZW5xdWV1ZVNldFN0YXRlOiBmdW5jdGlvbiAocHVibGljSW5zdGFuY2UsIHBhcnRpYWxTdGF0ZSwgY2FsbGJhY2ssIGNhbGxlck5hbWUpIHtcbiAgICB3YXJuTm9vcChwdWJsaWNJbnN0YW5jZSwgJ3NldFN0YXRlJyk7XG4gIH1cbn07XG5cbi8qKlxuICogQmFzZSBjbGFzcyBoZWxwZXJzIGZvciB0aGUgdXBkYXRpbmcgc3RhdGUgb2YgYSBjb21wb25lbnQuXG4gKi9cbmZ1bmN0aW9uIENvbXBvbmVudChwcm9wcywgY29udGV4dCwgdXBkYXRlcikge1xuICB0aGlzLnByb3BzID0gcHJvcHM7XG4gIHRoaXMuY29udGV4dCA9IGNvbnRleHQ7XG4gIHRoaXMucmVmcyA9IGVtcHR5T2JqZWN0O1xuICAvLyBXZSBpbml0aWFsaXplIHRoZSBkZWZhdWx0IHVwZGF0ZXIgYnV0IHRoZSByZWFsIG9uZSBnZXRzIGluamVjdGVkIGJ5IHRoZVxuICAvLyByZW5kZXJlci5cbiAgdGhpcy51cGRhdGVyID0gdXBkYXRlciB8fCBSZWFjdE5vb3BVcGRhdGVRdWV1ZTtcbn1cblxuQ29tcG9uZW50LnByb3RvdHlwZS5pc1JlYWN0Q29tcG9uZW50ID0ge307XG5cbi8qKlxuICogU2V0cyBhIHN1YnNldCBvZiB0aGUgc3RhdGUuIEFsd2F5cyB1c2UgdGhpcyB0byBtdXRhdGVcbiAqIHN0YXRlLiBZb3Ugc2hvdWxkIHRyZWF0IGB0aGlzLnN0YXRlYCBhcyBpbW11dGFibGUuXG4gKlxuICogVGhlcmUgaXMgbm8gZ3VhcmFudGVlIHRoYXQgYHRoaXMuc3RhdGVgIHdpbGwgYmUgaW1tZWRpYXRlbHkgdXBkYXRlZCwgc29cbiAqIGFjY2Vzc2luZyBgdGhpcy5zdGF0ZWAgYWZ0ZXIgY2FsbGluZyB0aGlzIG1ldGhvZCBtYXkgcmV0dXJuIHRoZSBvbGQgdmFsdWUuXG4gKlxuICogVGhlcmUgaXMgbm8gZ3VhcmFudGVlIHRoYXQgY2FsbHMgdG8gYHNldFN0YXRlYCB3aWxsIHJ1biBzeW5jaHJvbm91c2x5LFxuICogYXMgdGhleSBtYXkgZXZlbnR1YWxseSBiZSBiYXRjaGVkIHRvZ2V0aGVyLiAgWW91IGNhbiBwcm92aWRlIGFuIG9wdGlvbmFsXG4gKiBjYWxsYmFjayB0aGF0IHdpbGwgYmUgZXhlY3V0ZWQgd2hlbiB0aGUgY2FsbCB0byBzZXRTdGF0ZSBpcyBhY3R1YWxseVxuICogY29tcGxldGVkLlxuICpcbiAqIFdoZW4gYSBmdW5jdGlvbiBpcyBwcm92aWRlZCB0byBzZXRTdGF0ZSwgaXQgd2lsbCBiZSBjYWxsZWQgYXQgc29tZSBwb2ludCBpblxuICogdGhlIGZ1dHVyZSAobm90IHN5bmNocm9ub3VzbHkpLiBJdCB3aWxsIGJlIGNhbGxlZCB3aXRoIHRoZSB1cCB0byBkYXRlXG4gKiBjb21wb25lbnQgYXJndW1lbnRzIChzdGF0ZSwgcHJvcHMsIGNvbnRleHQpLiBUaGVzZSB2YWx1ZXMgY2FuIGJlIGRpZmZlcmVudFxuICogZnJvbSB0aGlzLiogYmVjYXVzZSB5b3VyIGZ1bmN0aW9uIG1heSBiZSBjYWxsZWQgYWZ0ZXIgcmVjZWl2ZVByb3BzIGJ1dCBiZWZvcmVcbiAqIHNob3VsZENvbXBvbmVudFVwZGF0ZSwgYW5kIHRoaXMgbmV3IHN0YXRlLCBwcm9wcywgYW5kIGNvbnRleHQgd2lsbCBub3QgeWV0IGJlXG4gKiBhc3NpZ25lZCB0byB0aGlzLlxuICpcbiAqIEBwYXJhbSB7b2JqZWN0fGZ1bmN0aW9ufSBwYXJ0aWFsU3RhdGUgTmV4dCBwYXJ0aWFsIHN0YXRlIG9yIGZ1bmN0aW9uIHRvXG4gKiAgICAgICAgcHJvZHVjZSBuZXh0IHBhcnRpYWwgc3RhdGUgdG8gYmUgbWVyZ2VkIHdpdGggY3VycmVudCBzdGF0ZS5cbiAqIEBwYXJhbSB7P2Z1bmN0aW9ufSBjYWxsYmFjayBDYWxsZWQgYWZ0ZXIgc3RhdGUgaXMgdXBkYXRlZC5cbiAqIEBmaW5hbFxuICogQHByb3RlY3RlZFxuICovXG5Db21wb25lbnQucHJvdG90eXBlLnNldFN0YXRlID0gZnVuY3Rpb24gKHBhcnRpYWxTdGF0ZSwgY2FsbGJhY2spIHtcbiAgISh0eXBlb2YgcGFydGlhbFN0YXRlID09PSAnb2JqZWN0JyB8fCB0eXBlb2YgcGFydGlhbFN0YXRlID09PSAnZnVuY3Rpb24nIHx8IHBhcnRpYWxTdGF0ZSA9PSBudWxsKSA/IGludmFyaWFudChmYWxzZSwgJ3NldFN0YXRlKC4uLik6IHRha2VzIGFuIG9iamVjdCBvZiBzdGF0ZSB2YXJpYWJsZXMgdG8gdXBkYXRlIG9yIGEgZnVuY3Rpb24gd2hpY2ggcmV0dXJucyBhbiBvYmplY3Qgb2Ygc3RhdGUgdmFyaWFibGVzLicpIDogdm9pZCAwO1xuICB0aGlzLnVwZGF0ZXIuZW5xdWV1ZVNldFN0YXRlKHRoaXMsIHBhcnRpYWxTdGF0ZSwgY2FsbGJhY2ssICdzZXRTdGF0ZScpO1xufTtcblxuLyoqXG4gKiBGb3JjZXMgYW4gdXBkYXRlLiBUaGlzIHNob3VsZCBvbmx5IGJlIGludm9rZWQgd2hlbiBpdCBpcyBrbm93biB3aXRoXG4gKiBjZXJ0YWludHkgdGhhdCB3ZSBhcmUgKipub3QqKiBpbiBhIERPTSB0cmFuc2FjdGlvbi5cbiAqXG4gKiBZb3UgbWF5IHdhbnQgdG8gY2FsbCB0aGlzIHdoZW4geW91IGtub3cgdGhhdCBzb21lIGRlZXBlciBhc3BlY3Qgb2YgdGhlXG4gKiBjb21wb25lbnQncyBzdGF0ZSBoYXMgY2hhbmdlZCBidXQgYHNldFN0YXRlYCB3YXMgbm90IGNhbGxlZC5cbiAqXG4gKiBUaGlzIHdpbGwgbm90IGludm9rZSBgc2hvdWxkQ29tcG9uZW50VXBkYXRlYCwgYnV0IGl0IHdpbGwgaW52b2tlXG4gKiBgY29tcG9uZW50V2lsbFVwZGF0ZWAgYW5kIGBjb21wb25lbnREaWRVcGRhdGVgLlxuICpcbiAqIEBwYXJhbSB7P2Z1bmN0aW9ufSBjYWxsYmFjayBDYWxsZWQgYWZ0ZXIgdXBkYXRlIGlzIGNvbXBsZXRlLlxuICogQGZpbmFsXG4gKiBAcHJvdGVjdGVkXG4gKi9cbkNvbXBvbmVudC5wcm90b3R5cGUuZm9yY2VVcGRhdGUgPSBmdW5jdGlvbiAoY2FsbGJhY2spIHtcbiAgdGhpcy51cGRhdGVyLmVucXVldWVGb3JjZVVwZGF0ZSh0aGlzLCBjYWxsYmFjaywgJ2ZvcmNlVXBkYXRlJyk7XG59O1xuXG4vKipcbiAqIERlcHJlY2F0ZWQgQVBJcy4gVGhlc2UgQVBJcyB1c2VkIHRvIGV4aXN0IG9uIGNsYXNzaWMgUmVhY3QgY2xhc3NlcyBidXQgc2luY2VcbiAqIHdlIHdvdWxkIGxpa2UgdG8gZGVwcmVjYXRlIHRoZW0sIHdlJ3JlIG5vdCBnb2luZyB0byBtb3ZlIHRoZW0gb3ZlciB0byB0aGlzXG4gKiBtb2Rlcm4gYmFzZSBjbGFzcy4gSW5zdGVhZCwgd2UgZGVmaW5lIGEgZ2V0dGVyIHRoYXQgd2FybnMgaWYgaXQncyBhY2Nlc3NlZC5cbiAqL1xue1xuICB2YXIgZGVwcmVjYXRlZEFQSXMgPSB7XG4gICAgaXNNb3VudGVkOiBbJ2lzTW91bnRlZCcsICdJbnN0ZWFkLCBtYWtlIHN1cmUgdG8gY2xlYW4gdXAgc3Vic2NyaXB0aW9ucyBhbmQgcGVuZGluZyByZXF1ZXN0cyBpbiAnICsgJ2NvbXBvbmVudFdpbGxVbm1vdW50IHRvIHByZXZlbnQgbWVtb3J5IGxlYWtzLiddLFxuICAgIHJlcGxhY2VTdGF0ZTogWydyZXBsYWNlU3RhdGUnLCAnUmVmYWN0b3IgeW91ciBjb2RlIHRvIHVzZSBzZXRTdGF0ZSBpbnN0ZWFkIChzZWUgJyArICdodHRwczovL2dpdGh1Yi5jb20vZmFjZWJvb2svcmVhY3QvaXNzdWVzLzMyMzYpLiddXG4gIH07XG4gIHZhciBkZWZpbmVEZXByZWNhdGlvbldhcm5pbmcgPSBmdW5jdGlvbiAobWV0aG9kTmFtZSwgaW5mbykge1xuICAgIE9iamVjdC5kZWZpbmVQcm9wZXJ0eShDb21wb25lbnQucHJvdG90eXBlLCBtZXRob2ROYW1lLCB7XG4gICAgICBnZXQ6IGZ1bmN0aW9uICgpIHtcbiAgICAgICAgbG93UHJpb3JpdHlXYXJuaW5nJDEoZmFsc2UsICclcyguLi4pIGlzIGRlcHJlY2F0ZWQgaW4gcGxhaW4gSmF2YVNjcmlwdCBSZWFjdCBjbGFzc2VzLiAlcycsIGluZm9bMF0sIGluZm9bMV0pO1xuICAgICAgICByZXR1cm4gdW5kZWZpbmVkO1xuICAgICAgfVxuICAgIH0pO1xuICB9O1xuICBmb3IgKHZhciBmbk5hbWUgaW4gZGVwcmVjYXRlZEFQSXMpIHtcbiAgICBpZiAoZGVwcmVjYXRlZEFQSXMuaGFzT3duUHJvcGVydHkoZm5OYW1lKSkge1xuICAgICAgZGVmaW5lRGVwcmVjYXRpb25XYXJuaW5nKGZuTmFtZSwgZGVwcmVjYXRlZEFQSXNbZm5OYW1lXSk7XG4gICAgfVxuICB9XG59XG5cbi8qKlxuICogQmFzZSBjbGFzcyBoZWxwZXJzIGZvciB0aGUgdXBkYXRpbmcgc3RhdGUgb2YgYSBjb21wb25lbnQuXG4gKi9cbmZ1bmN0aW9uIFB1cmVDb21wb25lbnQocHJvcHMsIGNvbnRleHQsIHVwZGF0ZXIpIHtcbiAgLy8gRHVwbGljYXRlZCBmcm9tIENvbXBvbmVudC5cbiAgdGhpcy5wcm9wcyA9IHByb3BzO1xuICB0aGlzLmNvbnRleHQgPSBjb250ZXh0O1xuICB0aGlzLnJlZnMgPSBlbXB0eU9iamVjdDtcbiAgLy8gV2UgaW5pdGlhbGl6ZSB0aGUgZGVmYXVsdCB1cGRhdGVyIGJ1dCB0aGUgcmVhbCBvbmUgZ2V0cyBpbmplY3RlZCBieSB0aGVcbiAgLy8gcmVuZGVyZXIuXG4gIHRoaXMudXBkYXRlciA9IHVwZGF0ZXIgfHwgUmVhY3ROb29wVXBkYXRlUXVldWU7XG59XG5cbmZ1bmN0aW9uIENvbXBvbmVudER1bW15KCkge31cbkNvbXBvbmVudER1bW15LnByb3RvdHlwZSA9IENvbXBvbmVudC5wcm90b3R5cGU7XG52YXIgcHVyZUNvbXBvbmVudFByb3RvdHlwZSA9IFB1cmVDb21wb25lbnQucHJvdG90eXBlID0gbmV3IENvbXBvbmVudER1bW15KCk7XG5wdXJlQ29tcG9uZW50UHJvdG90eXBlLmNvbnN0cnVjdG9yID0gUHVyZUNvbXBvbmVudDtcbi8vIEF2b2lkIGFuIGV4dHJhIHByb3RvdHlwZSBqdW1wIGZvciB0aGVzZSBtZXRob2RzLlxuX2Fzc2lnbihwdXJlQ29tcG9uZW50UHJvdG90eXBlLCBDb21wb25lbnQucHJvdG90eXBlKTtcbnB1cmVDb21wb25lbnRQcm90b3R5cGUuaXNQdXJlUmVhY3RDb21wb25lbnQgPSB0cnVlO1xuXG5mdW5jdGlvbiBBc3luY0NvbXBvbmVudChwcm9wcywgY29udGV4dCwgdXBkYXRlcikge1xuICAvLyBEdXBsaWNhdGVkIGZyb20gQ29tcG9uZW50LlxuICB0aGlzLnByb3BzID0gcHJvcHM7XG4gIHRoaXMuY29udGV4dCA9IGNvbnRleHQ7XG4gIHRoaXMucmVmcyA9IGVtcHR5T2JqZWN0O1xuICAvLyBXZSBpbml0aWFsaXplIHRoZSBkZWZhdWx0IHVwZGF0ZXIgYnV0IHRoZSByZWFsIG9uZSBnZXRzIGluamVjdGVkIGJ5IHRoZVxuICAvLyByZW5kZXJlci5cbiAgdGhpcy51cGRhdGVyID0gdXBkYXRlciB8fCBSZWFjdE5vb3BVcGRhdGVRdWV1ZTtcbn1cblxudmFyIGFzeW5jQ29tcG9uZW50UHJvdG90eXBlID0gQXN5bmNDb21wb25lbnQucHJvdG90eXBlID0gbmV3IENvbXBvbmVudER1bW15KCk7XG5hc3luY0NvbXBvbmVudFByb3RvdHlwZS5jb25zdHJ1Y3RvciA9IEFzeW5jQ29tcG9uZW50O1xuLy8gQXZvaWQgYW4gZXh0cmEgcHJvdG90eXBlIGp1bXAgZm9yIHRoZXNlIG1ldGhvZHMuXG5fYXNzaWduKGFzeW5jQ29tcG9uZW50UHJvdG90eXBlLCBDb21wb25lbnQucHJvdG90eXBlKTtcbmFzeW5jQ29tcG9uZW50UHJvdG90eXBlLnVuc3RhYmxlX2lzQXN5bmNSZWFjdENvbXBvbmVudCA9IHRydWU7XG5hc3luY0NvbXBvbmVudFByb3RvdHlwZS5yZW5kZXIgPSBmdW5jdGlvbiAoKSB7XG4gIHJldHVybiB0aGlzLnByb3BzLmNoaWxkcmVuO1xufTtcblxuLyoqXG4gKiBLZWVwcyB0cmFjayBvZiB0aGUgY3VycmVudCBvd25lci5cbiAqXG4gKiBUaGUgY3VycmVudCBvd25lciBpcyB0aGUgY29tcG9uZW50IHdobyBzaG91bGQgb3duIGFueSBjb21wb25lbnRzIHRoYXQgYXJlXG4gKiBjdXJyZW50bHkgYmVpbmcgY29uc3RydWN0ZWQuXG4gKi9cbnZhciBSZWFjdEN1cnJlbnRPd25lciA9IHtcbiAgLyoqXG4gICAqIEBpbnRlcm5hbFxuICAgKiBAdHlwZSB7UmVhY3RDb21wb25lbnR9XG4gICAqL1xuICBjdXJyZW50OiBudWxsXG59O1xuXG52YXIgaGFzT3duUHJvcGVydHkgPSBPYmplY3QucHJvdG90eXBlLmhhc093blByb3BlcnR5O1xuXG4vLyBUaGUgU3ltYm9sIHVzZWQgdG8gdGFnIHRoZSBSZWFjdEVsZW1lbnQgdHlwZS4gSWYgdGhlcmUgaXMgbm8gbmF0aXZlIFN5bWJvbFxuLy8gbm9yIHBvbHlmaWxsLCB0aGVuIGEgcGxhaW4gbnVtYmVyIGlzIHVzZWQgZm9yIHBlcmZvcm1hbmNlLlxudmFyIFJFQUNUX0VMRU1FTlRfVFlQRSQxID0gdHlwZW9mIFN5bWJvbCA9PT0gJ2Z1bmN0aW9uJyAmJiBTeW1ib2xbJ2ZvciddICYmIFN5bWJvbFsnZm9yJ10oJ3JlYWN0LmVsZW1lbnQnKSB8fCAweGVhYzc7XG5cbnZhciBSRVNFUlZFRF9QUk9QUyA9IHtcbiAga2V5OiB0cnVlLFxuICByZWY6IHRydWUsXG4gIF9fc2VsZjogdHJ1ZSxcbiAgX19zb3VyY2U6IHRydWVcbn07XG5cbnZhciBzcGVjaWFsUHJvcEtleVdhcm5pbmdTaG93bjtcbnZhciBzcGVjaWFsUHJvcFJlZldhcm5pbmdTaG93bjtcblxuZnVuY3Rpb24gaGFzVmFsaWRSZWYoY29uZmlnKSB7XG4gIHtcbiAgICBpZiAoaGFzT3duUHJvcGVydHkuY2FsbChjb25maWcsICdyZWYnKSkge1xuICAgICAgdmFyIGdldHRlciA9IE9iamVjdC5nZXRPd25Qcm9wZXJ0eURlc2NyaXB0b3IoY29uZmlnLCAncmVmJykuZ2V0O1xuICAgICAgaWYgKGdldHRlciAmJiBnZXR0ZXIuaXNSZWFjdFdhcm5pbmcpIHtcbiAgICAgICAgcmV0dXJuIGZhbHNlO1xuICAgICAgfVxuICAgIH1cbiAgfVxuICByZXR1cm4gY29uZmlnLnJlZiAhPT0gdW5kZWZpbmVkO1xufVxuXG5mdW5jdGlvbiBoYXNWYWxpZEtleShjb25maWcpIHtcbiAge1xuICAgIGlmIChoYXNPd25Qcm9wZXJ0eS5jYWxsKGNvbmZpZywgJ2tleScpKSB7XG4gICAgICB2YXIgZ2V0dGVyID0gT2JqZWN0LmdldE93blByb3BlcnR5RGVzY3JpcHRvcihjb25maWcsICdrZXknKS5nZXQ7XG4gICAgICBpZiAoZ2V0dGVyICYmIGdldHRlci5pc1JlYWN0V2FybmluZykge1xuICAgICAgICByZXR1cm4gZmFsc2U7XG4gICAgICB9XG4gICAgfVxuICB9XG4gIHJldHVybiBjb25maWcua2V5ICE9PSB1bmRlZmluZWQ7XG59XG5cbmZ1bmN0aW9uIGRlZmluZUtleVByb3BXYXJuaW5nR2V0dGVyKHByb3BzLCBkaXNwbGF5TmFtZSkge1xuICB2YXIgd2FybkFib3V0QWNjZXNzaW5nS2V5ID0gZnVuY3Rpb24gKCkge1xuICAgIGlmICghc3BlY2lhbFByb3BLZXlXYXJuaW5nU2hvd24pIHtcbiAgICAgIHNwZWNpYWxQcm9wS2V5V2FybmluZ1Nob3duID0gdHJ1ZTtcbiAgICAgIHdhcm5pbmcoZmFsc2UsICclczogYGtleWAgaXMgbm90IGEgcHJvcC4gVHJ5aW5nIHRvIGFjY2VzcyBpdCB3aWxsIHJlc3VsdCAnICsgJ2luIGB1bmRlZmluZWRgIGJlaW5nIHJldHVybmVkLiBJZiB5b3UgbmVlZCB0byBhY2Nlc3MgdGhlIHNhbWUgJyArICd2YWx1ZSB3aXRoaW4gdGhlIGNoaWxkIGNvbXBvbmVudCwgeW91IHNob3VsZCBwYXNzIGl0IGFzIGEgZGlmZmVyZW50ICcgKyAncHJvcC4gKGh0dHBzOi8vZmIubWUvcmVhY3Qtc3BlY2lhbC1wcm9wcyknLCBkaXNwbGF5TmFtZSk7XG4gICAgfVxuICB9O1xuICB3YXJuQWJvdXRBY2Nlc3NpbmdLZXkuaXNSZWFjdFdhcm5pbmcgPSB0cnVlO1xuICBPYmplY3QuZGVmaW5lUHJvcGVydHkocHJvcHMsICdrZXknLCB7XG4gICAgZ2V0OiB3YXJuQWJvdXRBY2Nlc3NpbmdLZXksXG4gICAgY29uZmlndXJhYmxlOiB0cnVlXG4gIH0pO1xufVxuXG5mdW5jdGlvbiBkZWZpbmVSZWZQcm9wV2FybmluZ0dldHRlcihwcm9wcywgZGlzcGxheU5hbWUpIHtcbiAgdmFyIHdhcm5BYm91dEFjY2Vzc2luZ1JlZiA9IGZ1bmN0aW9uICgpIHtcbiAgICBpZiAoIXNwZWNpYWxQcm9wUmVmV2FybmluZ1Nob3duKSB7XG4gICAgICBzcGVjaWFsUHJvcFJlZldhcm5pbmdTaG93biA9IHRydWU7XG4gICAgICB3YXJuaW5nKGZhbHNlLCAnJXM6IGByZWZgIGlzIG5vdCBhIHByb3AuIFRyeWluZyB0byBhY2Nlc3MgaXQgd2lsbCByZXN1bHQgJyArICdpbiBgdW5kZWZpbmVkYCBiZWluZyByZXR1cm5lZC4gSWYgeW91IG5lZWQgdG8gYWNjZXNzIHRoZSBzYW1lICcgKyAndmFsdWUgd2l0aGluIHRoZSBjaGlsZCBjb21wb25lbnQsIHlvdSBzaG91bGQgcGFzcyBpdCBhcyBhIGRpZmZlcmVudCAnICsgJ3Byb3AuIChodHRwczovL2ZiLm1lL3JlYWN0LXNwZWNpYWwtcHJvcHMpJywgZGlzcGxheU5hbWUpO1xuICAgIH1cbiAgfTtcbiAgd2FybkFib3V0QWNjZXNzaW5nUmVmLmlzUmVhY3RXYXJuaW5nID0gdHJ1ZTtcbiAgT2JqZWN0LmRlZmluZVByb3BlcnR5KHByb3BzLCAncmVmJywge1xuICAgIGdldDogd2FybkFib3V0QWNjZXNzaW5nUmVmLFxuICAgIGNvbmZpZ3VyYWJsZTogdHJ1ZVxuICB9KTtcbn1cblxuLyoqXG4gKiBGYWN0b3J5IG1ldGhvZCB0byBjcmVhdGUgYSBuZXcgUmVhY3QgZWxlbWVudC4gVGhpcyBubyBsb25nZXIgYWRoZXJlcyB0b1xuICogdGhlIGNsYXNzIHBhdHRlcm4sIHNvIGRvIG5vdCB1c2UgbmV3IHRvIGNhbGwgaXQuIEFsc28sIG5vIGluc3RhbmNlb2YgY2hlY2tcbiAqIHdpbGwgd29yay4gSW5zdGVhZCB0ZXN0ICQkdHlwZW9mIGZpZWxkIGFnYWluc3QgU3ltYm9sLmZvcigncmVhY3QuZWxlbWVudCcpIHRvIGNoZWNrXG4gKiBpZiBzb21ldGhpbmcgaXMgYSBSZWFjdCBFbGVtZW50LlxuICpcbiAqIEBwYXJhbSB7Kn0gdHlwZVxuICogQHBhcmFtIHsqfSBrZXlcbiAqIEBwYXJhbSB7c3RyaW5nfG9iamVjdH0gcmVmXG4gKiBAcGFyYW0geyp9IHNlbGYgQSAqdGVtcG9yYXJ5KiBoZWxwZXIgdG8gZGV0ZWN0IHBsYWNlcyB3aGVyZSBgdGhpc2AgaXNcbiAqIGRpZmZlcmVudCBmcm9tIHRoZSBgb3duZXJgIHdoZW4gUmVhY3QuY3JlYXRlRWxlbWVudCBpcyBjYWxsZWQsIHNvIHRoYXQgd2VcbiAqIGNhbiB3YXJuLiBXZSB3YW50IHRvIGdldCByaWQgb2Ygb3duZXIgYW5kIHJlcGxhY2Ugc3RyaW5nIGByZWZgcyB3aXRoIGFycm93XG4gKiBmdW5jdGlvbnMsIGFuZCBhcyBsb25nIGFzIGB0aGlzYCBhbmQgb3duZXIgYXJlIHRoZSBzYW1lLCB0aGVyZSB3aWxsIGJlIG5vXG4gKiBjaGFuZ2UgaW4gYmVoYXZpb3IuXG4gKiBAcGFyYW0geyp9IHNvdXJjZSBBbiBhbm5vdGF0aW9uIG9iamVjdCAoYWRkZWQgYnkgYSB0cmFuc3BpbGVyIG9yIG90aGVyd2lzZSlcbiAqIGluZGljYXRpbmcgZmlsZW5hbWUsIGxpbmUgbnVtYmVyLCBhbmQvb3Igb3RoZXIgaW5mb3JtYXRpb24uXG4gKiBAcGFyYW0geyp9IG93bmVyXG4gKiBAcGFyYW0geyp9IHByb3BzXG4gKiBAaW50ZXJuYWxcbiAqL1xudmFyIFJlYWN0RWxlbWVudCA9IGZ1bmN0aW9uICh0eXBlLCBrZXksIHJlZiwgc2VsZiwgc291cmNlLCBvd25lciwgcHJvcHMpIHtcbiAgdmFyIGVsZW1lbnQgPSB7XG4gICAgLy8gVGhpcyB0YWcgYWxsb3cgdXMgdG8gdW5pcXVlbHkgaWRlbnRpZnkgdGhpcyBhcyBhIFJlYWN0IEVsZW1lbnRcbiAgICAkJHR5cGVvZjogUkVBQ1RfRUxFTUVOVF9UWVBFJDEsXG5cbiAgICAvLyBCdWlsdC1pbiBwcm9wZXJ0aWVzIHRoYXQgYmVsb25nIG9uIHRoZSBlbGVtZW50XG4gICAgdHlwZTogdHlwZSxcbiAgICBrZXk6IGtleSxcbiAgICByZWY6IHJlZixcbiAgICBwcm9wczogcHJvcHMsXG5cbiAgICAvLyBSZWNvcmQgdGhlIGNvbXBvbmVudCByZXNwb25zaWJsZSBmb3IgY3JlYXRpbmcgdGhpcyBlbGVtZW50LlxuICAgIF9vd25lcjogb3duZXJcbiAgfTtcblxuICB7XG4gICAgLy8gVGhlIHZhbGlkYXRpb24gZmxhZyBpcyBjdXJyZW50bHkgbXV0YXRpdmUuIFdlIHB1dCBpdCBvblxuICAgIC8vIGFuIGV4dGVybmFsIGJhY2tpbmcgc3RvcmUgc28gdGhhdCB3ZSBjYW4gZnJlZXplIHRoZSB3aG9sZSBvYmplY3QuXG4gICAgLy8gVGhpcyBjYW4gYmUgcmVwbGFjZWQgd2l0aCBhIFdlYWtNYXAgb25jZSB0aGV5IGFyZSBpbXBsZW1lbnRlZCBpblxuICAgIC8vIGNvbW1vbmx5IHVzZWQgZGV2ZWxvcG1lbnQgZW52aXJvbm1lbnRzLlxuICAgIGVsZW1lbnQuX3N0b3JlID0ge307XG5cbiAgICAvLyBUbyBtYWtlIGNvbXBhcmluZyBSZWFjdEVsZW1lbnRzIGVhc2llciBmb3IgdGVzdGluZyBwdXJwb3Nlcywgd2UgbWFrZVxuICAgIC8vIHRoZSB2YWxpZGF0aW9uIGZsYWcgbm9uLWVudW1lcmFibGUgKHdoZXJlIHBvc3NpYmxlLCB3aGljaCBzaG91bGRcbiAgICAvLyBpbmNsdWRlIGV2ZXJ5IGVudmlyb25tZW50IHdlIHJ1biB0ZXN0cyBpbiksIHNvIHRoZSB0ZXN0IGZyYW1ld29ya1xuICAgIC8vIGlnbm9yZXMgaXQuXG4gICAgT2JqZWN0LmRlZmluZVByb3BlcnR5KGVsZW1lbnQuX3N0b3JlLCAndmFsaWRhdGVkJywge1xuICAgICAgY29uZmlndXJhYmxlOiBmYWxzZSxcbiAgICAgIGVudW1lcmFibGU6IGZhbHNlLFxuICAgICAgd3JpdGFibGU6IHRydWUsXG4gICAgICB2YWx1ZTogZmFsc2VcbiAgICB9KTtcbiAgICAvLyBzZWxmIGFuZCBzb3VyY2UgYXJlIERFViBvbmx5IHByb3BlcnRpZXMuXG4gICAgT2JqZWN0LmRlZmluZVByb3BlcnR5KGVsZW1lbnQsICdfc2VsZicsIHtcbiAgICAgIGNvbmZpZ3VyYWJsZTogZmFsc2UsXG4gICAgICBlbnVtZXJhYmxlOiBmYWxzZSxcbiAgICAgIHdyaXRhYmxlOiBmYWxzZSxcbiAgICAgIHZhbHVlOiBzZWxmXG4gICAgfSk7XG4gICAgLy8gVHdvIGVsZW1lbnRzIGNyZWF0ZWQgaW4gdHdvIGRpZmZlcmVudCBwbGFjZXMgc2hvdWxkIGJlIGNvbnNpZGVyZWRcbiAgICAvLyBlcXVhbCBmb3IgdGVzdGluZyBwdXJwb3NlcyBhbmQgdGhlcmVmb3JlIHdlIGhpZGUgaXQgZnJvbSBlbnVtZXJhdGlvbi5cbiAgICBPYmplY3QuZGVmaW5lUHJvcGVydHkoZWxlbWVudCwgJ19zb3VyY2UnLCB7XG4gICAgICBjb25maWd1cmFibGU6IGZhbHNlLFxuICAgICAgZW51bWVyYWJsZTogZmFsc2UsXG4gICAgICB3cml0YWJsZTogZmFsc2UsXG4gICAgICB2YWx1ZTogc291cmNlXG4gICAgfSk7XG4gICAgaWYgKE9iamVjdC5mcmVlemUpIHtcbiAgICAgIE9iamVjdC5mcmVlemUoZWxlbWVudC5wcm9wcyk7XG4gICAgICBPYmplY3QuZnJlZXplKGVsZW1lbnQpO1xuICAgIH1cbiAgfVxuXG4gIHJldHVybiBlbGVtZW50O1xufTtcblxuLyoqXG4gKiBDcmVhdGUgYW5kIHJldHVybiBhIG5ldyBSZWFjdEVsZW1lbnQgb2YgdGhlIGdpdmVuIHR5cGUuXG4gKiBTZWUgaHR0cHM6Ly9yZWFjdGpzLm9yZy9kb2NzL3JlYWN0LWFwaS5odG1sI2NyZWF0ZWVsZW1lbnRcbiAqL1xuZnVuY3Rpb24gY3JlYXRlRWxlbWVudCh0eXBlLCBjb25maWcsIGNoaWxkcmVuKSB7XG4gIHZhciBwcm9wTmFtZTtcblxuICAvLyBSZXNlcnZlZCBuYW1lcyBhcmUgZXh0cmFjdGVkXG4gIHZhciBwcm9wcyA9IHt9O1xuXG4gIHZhciBrZXkgPSBudWxsO1xuICB2YXIgcmVmID0gbnVsbDtcbiAgdmFyIHNlbGYgPSBudWxsO1xuICB2YXIgc291cmNlID0gbnVsbDtcblxuICBpZiAoY29uZmlnICE9IG51bGwpIHtcbiAgICBpZiAoaGFzVmFsaWRSZWYoY29uZmlnKSkge1xuICAgICAgcmVmID0gY29uZmlnLnJlZjtcbiAgICB9XG4gICAgaWYgKGhhc1ZhbGlkS2V5KGNvbmZpZykpIHtcbiAgICAgIGtleSA9ICcnICsgY29uZmlnLmtleTtcbiAgICB9XG5cbiAgICBzZWxmID0gY29uZmlnLl9fc2VsZiA9PT0gdW5kZWZpbmVkID8gbnVsbCA6IGNvbmZpZy5fX3NlbGY7XG4gICAgc291cmNlID0gY29uZmlnLl9fc291cmNlID09PSB1bmRlZmluZWQgPyBudWxsIDogY29uZmlnLl9fc291cmNlO1xuICAgIC8vIFJlbWFpbmluZyBwcm9wZXJ0aWVzIGFyZSBhZGRlZCB0byBhIG5ldyBwcm9wcyBvYmplY3RcbiAgICBmb3IgKHByb3BOYW1lIGluIGNvbmZpZykge1xuICAgICAgaWYgKGhhc093blByb3BlcnR5LmNhbGwoY29uZmlnLCBwcm9wTmFtZSkgJiYgIVJFU0VSVkVEX1BST1BTLmhhc093blByb3BlcnR5KHByb3BOYW1lKSkge1xuICAgICAgICBwcm9wc1twcm9wTmFtZV0gPSBjb25maWdbcHJvcE5hbWVdO1xuICAgICAgfVxuICAgIH1cbiAgfVxuXG4gIC8vIENoaWxkcmVuIGNhbiBiZSBtb3JlIHRoYW4gb25lIGFyZ3VtZW50LCBhbmQgdGhvc2UgYXJlIHRyYW5zZmVycmVkIG9udG9cbiAgLy8gdGhlIG5ld2x5IGFsbG9jYXRlZCBwcm9wcyBvYmplY3QuXG4gIHZhciBjaGlsZHJlbkxlbmd0aCA9IGFyZ3VtZW50cy5sZW5ndGggLSAyO1xuICBpZiAoY2hpbGRyZW5MZW5ndGggPT09IDEpIHtcbiAgICBwcm9wcy5jaGlsZHJlbiA9IGNoaWxkcmVuO1xuICB9IGVsc2UgaWYgKGNoaWxkcmVuTGVuZ3RoID4gMSkge1xuICAgIHZhciBjaGlsZEFycmF5ID0gQXJyYXkoY2hpbGRyZW5MZW5ndGgpO1xuICAgIGZvciAodmFyIGkgPSAwOyBpIDwgY2hpbGRyZW5MZW5ndGg7IGkrKykge1xuICAgICAgY2hpbGRBcnJheVtpXSA9IGFyZ3VtZW50c1tpICsgMl07XG4gICAgfVxuICAgIHtcbiAgICAgIGlmIChPYmplY3QuZnJlZXplKSB7XG4gICAgICAgIE9iamVjdC5mcmVlemUoY2hpbGRBcnJheSk7XG4gICAgICB9XG4gICAgfVxuICAgIHByb3BzLmNoaWxkcmVuID0gY2hpbGRBcnJheTtcbiAgfVxuXG4gIC8vIFJlc29sdmUgZGVmYXVsdCBwcm9wc1xuICBpZiAodHlwZSAmJiB0eXBlLmRlZmF1bHRQcm9wcykge1xuICAgIHZhciBkZWZhdWx0UHJvcHMgPSB0eXBlLmRlZmF1bHRQcm9wcztcbiAgICBmb3IgKHByb3BOYW1lIGluIGRlZmF1bHRQcm9wcykge1xuICAgICAgaWYgKHByb3BzW3Byb3BOYW1lXSA9PT0gdW5kZWZpbmVkKSB7XG4gICAgICAgIHByb3BzW3Byb3BOYW1lXSA9IGRlZmF1bHRQcm9wc1twcm9wTmFtZV07XG4gICAgICB9XG4gICAgfVxuICB9XG4gIHtcbiAgICBpZiAoa2V5IHx8IHJlZikge1xuICAgICAgaWYgKHR5cGVvZiBwcm9wcy4kJHR5cGVvZiA9PT0gJ3VuZGVmaW5lZCcgfHwgcHJvcHMuJCR0eXBlb2YgIT09IFJFQUNUX0VMRU1FTlRfVFlQRSQxKSB7XG4gICAgICAgIHZhciBkaXNwbGF5TmFtZSA9IHR5cGVvZiB0eXBlID09PSAnZnVuY3Rpb24nID8gdHlwZS5kaXNwbGF5TmFtZSB8fCB0eXBlLm5hbWUgfHwgJ1Vua25vd24nIDogdHlwZTtcbiAgICAgICAgaWYgKGtleSkge1xuICAgICAgICAgIGRlZmluZUtleVByb3BXYXJuaW5nR2V0dGVyKHByb3BzLCBkaXNwbGF5TmFtZSk7XG4gICAgICAgIH1cbiAgICAgICAgaWYgKHJlZikge1xuICAgICAgICAgIGRlZmluZVJlZlByb3BXYXJuaW5nR2V0dGVyKHByb3BzLCBkaXNwbGF5TmFtZSk7XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICB9XG4gIH1cbiAgcmV0dXJuIFJlYWN0RWxlbWVudCh0eXBlLCBrZXksIHJlZiwgc2VsZiwgc291cmNlLCBSZWFjdEN1cnJlbnRPd25lci5jdXJyZW50LCBwcm9wcyk7XG59XG5cbi8qKlxuICogUmV0dXJuIGEgZnVuY3Rpb24gdGhhdCBwcm9kdWNlcyBSZWFjdEVsZW1lbnRzIG9mIGEgZ2l2ZW4gdHlwZS5cbiAqIFNlZSBodHRwczovL3JlYWN0anMub3JnL2RvY3MvcmVhY3QtYXBpLmh0bWwjY3JlYXRlZmFjdG9yeVxuICovXG5cblxuZnVuY3Rpb24gY2xvbmVBbmRSZXBsYWNlS2V5KG9sZEVsZW1lbnQsIG5ld0tleSkge1xuICB2YXIgbmV3RWxlbWVudCA9IFJlYWN0RWxlbWVudChvbGRFbGVtZW50LnR5cGUsIG5ld0tleSwgb2xkRWxlbWVudC5yZWYsIG9sZEVsZW1lbnQuX3NlbGYsIG9sZEVsZW1lbnQuX3NvdXJjZSwgb2xkRWxlbWVudC5fb3duZXIsIG9sZEVsZW1lbnQucHJvcHMpO1xuXG4gIHJldHVybiBuZXdFbGVtZW50O1xufVxuXG4vKipcbiAqIENsb25lIGFuZCByZXR1cm4gYSBuZXcgUmVhY3RFbGVtZW50IHVzaW5nIGVsZW1lbnQgYXMgdGhlIHN0YXJ0aW5nIHBvaW50LlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNjbG9uZWVsZW1lbnRcbiAqL1xuZnVuY3Rpb24gY2xvbmVFbGVtZW50KGVsZW1lbnQsIGNvbmZpZywgY2hpbGRyZW4pIHtcbiAgdmFyIHByb3BOYW1lO1xuXG4gIC8vIE9yaWdpbmFsIHByb3BzIGFyZSBjb3BpZWRcbiAgdmFyIHByb3BzID0gX2Fzc2lnbih7fSwgZWxlbWVudC5wcm9wcyk7XG5cbiAgLy8gUmVzZXJ2ZWQgbmFtZXMgYXJlIGV4dHJhY3RlZFxuICB2YXIga2V5ID0gZWxlbWVudC5rZXk7XG4gIHZhciByZWYgPSBlbGVtZW50LnJlZjtcbiAgLy8gU2VsZiBpcyBwcmVzZXJ2ZWQgc2luY2UgdGhlIG93bmVyIGlzIHByZXNlcnZlZC5cbiAgdmFyIHNlbGYgPSBlbGVtZW50Ll9zZWxmO1xuICAvLyBTb3VyY2UgaXMgcHJlc2VydmVkIHNpbmNlIGNsb25lRWxlbWVudCBpcyB1bmxpa2VseSB0byBiZSB0YXJnZXRlZCBieSBhXG4gIC8vIHRyYW5zcGlsZXIsIGFuZCB0aGUgb3JpZ2luYWwgc291cmNlIGlzIHByb2JhYmx5IGEgYmV0dGVyIGluZGljYXRvciBvZiB0aGVcbiAgLy8gdHJ1ZSBvd25lci5cbiAgdmFyIHNvdXJjZSA9IGVsZW1lbnQuX3NvdXJjZTtcblxuICAvLyBPd25lciB3aWxsIGJlIHByZXNlcnZlZCwgdW5sZXNzIHJlZiBpcyBvdmVycmlkZGVuXG4gIHZhciBvd25lciA9IGVsZW1lbnQuX293bmVyO1xuXG4gIGlmIChjb25maWcgIT0gbnVsbCkge1xuICAgIGlmIChoYXNWYWxpZFJlZihjb25maWcpKSB7XG4gICAgICAvLyBTaWxlbnRseSBzdGVhbCB0aGUgcmVmIGZyb20gdGhlIHBhcmVudC5cbiAgICAgIHJlZiA9IGNvbmZpZy5yZWY7XG4gICAgICBvd25lciA9IFJlYWN0Q3VycmVudE93bmVyLmN1cnJlbnQ7XG4gICAgfVxuICAgIGlmIChoYXNWYWxpZEtleShjb25maWcpKSB7XG4gICAgICBrZXkgPSAnJyArIGNvbmZpZy5rZXk7XG4gICAgfVxuXG4gICAgLy8gUmVtYWluaW5nIHByb3BlcnRpZXMgb3ZlcnJpZGUgZXhpc3RpbmcgcHJvcHNcbiAgICB2YXIgZGVmYXVsdFByb3BzO1xuICAgIGlmIChlbGVtZW50LnR5cGUgJiYgZWxlbWVudC50eXBlLmRlZmF1bHRQcm9wcykge1xuICAgICAgZGVmYXVsdFByb3BzID0gZWxlbWVudC50eXBlLmRlZmF1bHRQcm9wcztcbiAgICB9XG4gICAgZm9yIChwcm9wTmFtZSBpbiBjb25maWcpIHtcbiAgICAgIGlmIChoYXNPd25Qcm9wZXJ0eS5jYWxsKGNvbmZpZywgcHJvcE5hbWUpICYmICFSRVNFUlZFRF9QUk9QUy5oYXNPd25Qcm9wZXJ0eShwcm9wTmFtZSkpIHtcbiAgICAgICAgaWYgKGNvbmZpZ1twcm9wTmFtZV0gPT09IHVuZGVmaW5lZCAmJiBkZWZhdWx0UHJvcHMgIT09IHVuZGVmaW5lZCkge1xuICAgICAgICAgIC8vIFJlc29sdmUgZGVmYXVsdCBwcm9wc1xuICAgICAgICAgIHByb3BzW3Byb3BOYW1lXSA9IGRlZmF1bHRQcm9wc1twcm9wTmFtZV07XG4gICAgICAgIH0gZWxzZSB7XG4gICAgICAgICAgcHJvcHNbcHJvcE5hbWVdID0gY29uZmlnW3Byb3BOYW1lXTtcbiAgICAgICAgfVxuICAgICAgfVxuICAgIH1cbiAgfVxuXG4gIC8vIENoaWxkcmVuIGNhbiBiZSBtb3JlIHRoYW4gb25lIGFyZ3VtZW50LCBhbmQgdGhvc2UgYXJlIHRyYW5zZmVycmVkIG9udG9cbiAgLy8gdGhlIG5ld2x5IGFsbG9jYXRlZCBwcm9wcyBvYmplY3QuXG4gIHZhciBjaGlsZHJlbkxlbmd0aCA9IGFyZ3VtZW50cy5sZW5ndGggLSAyO1xuICBpZiAoY2hpbGRyZW5MZW5ndGggPT09IDEpIHtcbiAgICBwcm9wcy5jaGlsZHJlbiA9IGNoaWxkcmVuO1xuICB9IGVsc2UgaWYgKGNoaWxkcmVuTGVuZ3RoID4gMSkge1xuICAgIHZhciBjaGlsZEFycmF5ID0gQXJyYXkoY2hpbGRyZW5MZW5ndGgpO1xuICAgIGZvciAodmFyIGkgPSAwOyBpIDwgY2hpbGRyZW5MZW5ndGg7IGkrKykge1xuICAgICAgY2hpbGRBcnJheVtpXSA9IGFyZ3VtZW50c1tpICsgMl07XG4gICAgfVxuICAgIHByb3BzLmNoaWxkcmVuID0gY2hpbGRBcnJheTtcbiAgfVxuXG4gIHJldHVybiBSZWFjdEVsZW1lbnQoZWxlbWVudC50eXBlLCBrZXksIHJlZiwgc2VsZiwgc291cmNlLCBvd25lciwgcHJvcHMpO1xufVxuXG4vKipcbiAqIFZlcmlmaWVzIHRoZSBvYmplY3QgaXMgYSBSZWFjdEVsZW1lbnQuXG4gKiBTZWUgaHR0cHM6Ly9yZWFjdGpzLm9yZy9kb2NzL3JlYWN0LWFwaS5odG1sI2lzdmFsaWRlbGVtZW50XG4gKiBAcGFyYW0gez9vYmplY3R9IG9iamVjdFxuICogQHJldHVybiB7Ym9vbGVhbn0gVHJ1ZSBpZiBgb2JqZWN0YCBpcyBhIHZhbGlkIGNvbXBvbmVudC5cbiAqIEBmaW5hbFxuICovXG5mdW5jdGlvbiBpc1ZhbGlkRWxlbWVudChvYmplY3QpIHtcbiAgcmV0dXJuIHR5cGVvZiBvYmplY3QgPT09ICdvYmplY3QnICYmIG9iamVjdCAhPT0gbnVsbCAmJiBvYmplY3QuJCR0eXBlb2YgPT09IFJFQUNUX0VMRU1FTlRfVFlQRSQxO1xufVxuXG52YXIgUmVhY3REZWJ1Z0N1cnJlbnRGcmFtZSA9IHt9O1xuXG57XG4gIC8vIENvbXBvbmVudCB0aGF0IGlzIGJlaW5nIHdvcmtlZCBvblxuICBSZWFjdERlYnVnQ3VycmVudEZyYW1lLmdldEN1cnJlbnRTdGFjayA9IG51bGw7XG5cbiAgUmVhY3REZWJ1Z0N1cnJlbnRGcmFtZS5nZXRTdGFja0FkZGVuZHVtID0gZnVuY3Rpb24gKCkge1xuICAgIHZhciBpbXBsID0gUmVhY3REZWJ1Z0N1cnJlbnRGcmFtZS5nZXRDdXJyZW50U3RhY2s7XG4gICAgaWYgKGltcGwpIHtcbiAgICAgIHJldHVybiBpbXBsKCk7XG4gICAgfVxuICAgIHJldHVybiBudWxsO1xuICB9O1xufVxuXG52YXIgSVRFUkFUT1JfU1lNQk9MID0gdHlwZW9mIFN5bWJvbCA9PT0gJ2Z1bmN0aW9uJyAmJiBTeW1ib2wuaXRlcmF0b3I7XG52YXIgRkFVWF9JVEVSQVRPUl9TWU1CT0wgPSAnQEBpdGVyYXRvcic7IC8vIEJlZm9yZSBTeW1ib2wgc3BlYy5cbi8vIFRoZSBTeW1ib2wgdXNlZCB0byB0YWcgdGhlIFJlYWN0RWxlbWVudCB0eXBlLiBJZiB0aGVyZSBpcyBubyBuYXRpdmUgU3ltYm9sXG4vLyBub3IgcG9seWZpbGwsIHRoZW4gYSBwbGFpbiBudW1iZXIgaXMgdXNlZCBmb3IgcGVyZm9ybWFuY2UuXG52YXIgUkVBQ1RfRUxFTUVOVF9UWVBFID0gdHlwZW9mIFN5bWJvbCA9PT0gJ2Z1bmN0aW9uJyAmJiBTeW1ib2xbJ2ZvciddICYmIFN5bWJvbFsnZm9yJ10oJ3JlYWN0LmVsZW1lbnQnKSB8fCAweGVhYzc7XG52YXIgUkVBQ1RfUE9SVEFMX1RZUEUgPSB0eXBlb2YgU3ltYm9sID09PSAnZnVuY3Rpb24nICYmIFN5bWJvbFsnZm9yJ10gJiYgU3ltYm9sWydmb3InXSgncmVhY3QucG9ydGFsJykgfHwgMHhlYWNhO1xudmFyIFNFUEFSQVRPUiA9ICcuJztcbnZhciBTVUJTRVBBUkFUT1IgPSAnOic7XG5cbi8qKlxuICogRXNjYXBlIGFuZCB3cmFwIGtleSBzbyBpdCBpcyBzYWZlIHRvIHVzZSBhcyBhIHJlYWN0aWRcbiAqXG4gKiBAcGFyYW0ge3N0cmluZ30ga2V5IHRvIGJlIGVzY2FwZWQuXG4gKiBAcmV0dXJuIHtzdHJpbmd9IHRoZSBlc2NhcGVkIGtleS5cbiAqL1xuZnVuY3Rpb24gZXNjYXBlKGtleSkge1xuICB2YXIgZXNjYXBlUmVnZXggPSAvWz06XS9nO1xuICB2YXIgZXNjYXBlckxvb2t1cCA9IHtcbiAgICAnPSc6ICc9MCcsXG4gICAgJzonOiAnPTInXG4gIH07XG4gIHZhciBlc2NhcGVkU3RyaW5nID0gKCcnICsga2V5KS5yZXBsYWNlKGVzY2FwZVJlZ2V4LCBmdW5jdGlvbiAobWF0Y2gpIHtcbiAgICByZXR1cm4gZXNjYXBlckxvb2t1cFttYXRjaF07XG4gIH0pO1xuXG4gIHJldHVybiAnJCcgKyBlc2NhcGVkU3RyaW5nO1xufVxuXG4vKipcbiAqIFRPRE86IFRlc3QgdGhhdCBhIHNpbmdsZSBjaGlsZCBhbmQgYW4gYXJyYXkgd2l0aCBvbmUgaXRlbSBoYXZlIHRoZSBzYW1lIGtleVxuICogcGF0dGVybi5cbiAqL1xuXG52YXIgZGlkV2FybkFib3V0TWFwcyA9IGZhbHNlO1xuXG52YXIgdXNlclByb3ZpZGVkS2V5RXNjYXBlUmVnZXggPSAvXFwvKy9nO1xuZnVuY3Rpb24gZXNjYXBlVXNlclByb3ZpZGVkS2V5KHRleHQpIHtcbiAgcmV0dXJuICgnJyArIHRleHQpLnJlcGxhY2UodXNlclByb3ZpZGVkS2V5RXNjYXBlUmVnZXgsICckJi8nKTtcbn1cblxudmFyIFBPT0xfU0laRSA9IDEwO1xudmFyIHRyYXZlcnNlQ29udGV4dFBvb2wgPSBbXTtcbmZ1bmN0aW9uIGdldFBvb2xlZFRyYXZlcnNlQ29udGV4dChtYXBSZXN1bHQsIGtleVByZWZpeCwgbWFwRnVuY3Rpb24sIG1hcENvbnRleHQpIHtcbiAgaWYgKHRyYXZlcnNlQ29udGV4dFBvb2wubGVuZ3RoKSB7XG4gICAgdmFyIHRyYXZlcnNlQ29udGV4dCA9IHRyYXZlcnNlQ29udGV4dFBvb2wucG9wKCk7XG4gICAgdHJhdmVyc2VDb250ZXh0LnJlc3VsdCA9IG1hcFJlc3VsdDtcbiAgICB0cmF2ZXJzZUNvbnRleHQua2V5UHJlZml4ID0ga2V5UHJlZml4O1xuICAgIHRyYXZlcnNlQ29udGV4dC5mdW5jID0gbWFwRnVuY3Rpb247XG4gICAgdHJhdmVyc2VDb250ZXh0LmNvbnRleHQgPSBtYXBDb250ZXh0O1xuICAgIHRyYXZlcnNlQ29udGV4dC5jb3VudCA9IDA7XG4gICAgcmV0dXJuIHRyYXZlcnNlQ29udGV4dDtcbiAgfSBlbHNlIHtcbiAgICByZXR1cm4ge1xuICAgICAgcmVzdWx0OiBtYXBSZXN1bHQsXG4gICAgICBrZXlQcmVmaXg6IGtleVByZWZpeCxcbiAgICAgIGZ1bmM6IG1hcEZ1bmN0aW9uLFxuICAgICAgY29udGV4dDogbWFwQ29udGV4dCxcbiAgICAgIGNvdW50OiAwXG4gICAgfTtcbiAgfVxufVxuXG5mdW5jdGlvbiByZWxlYXNlVHJhdmVyc2VDb250ZXh0KHRyYXZlcnNlQ29udGV4dCkge1xuICB0cmF2ZXJzZUNvbnRleHQucmVzdWx0ID0gbnVsbDtcbiAgdHJhdmVyc2VDb250ZXh0LmtleVByZWZpeCA9IG51bGw7XG4gIHRyYXZlcnNlQ29udGV4dC5mdW5jID0gbnVsbDtcbiAgdHJhdmVyc2VDb250ZXh0LmNvbnRleHQgPSBudWxsO1xuICB0cmF2ZXJzZUNvbnRleHQuY291bnQgPSAwO1xuICBpZiAodHJhdmVyc2VDb250ZXh0UG9vbC5sZW5ndGggPCBQT09MX1NJWkUpIHtcbiAgICB0cmF2ZXJzZUNvbnRleHRQb29sLnB1c2godHJhdmVyc2VDb250ZXh0KTtcbiAgfVxufVxuXG4vKipcbiAqIEBwYXJhbSB7Pyp9IGNoaWxkcmVuIENoaWxkcmVuIHRyZWUgY29udGFpbmVyLlxuICogQHBhcmFtIHshc3RyaW5nfSBuYW1lU29GYXIgTmFtZSBvZiB0aGUga2V5IHBhdGggc28gZmFyLlxuICogQHBhcmFtIHshZnVuY3Rpb259IGNhbGxiYWNrIENhbGxiYWNrIHRvIGludm9rZSB3aXRoIGVhY2ggY2hpbGQgZm91bmQuXG4gKiBAcGFyYW0gez8qfSB0cmF2ZXJzZUNvbnRleHQgVXNlZCB0byBwYXNzIGluZm9ybWF0aW9uIHRocm91Z2hvdXQgdGhlIHRyYXZlcnNhbFxuICogcHJvY2Vzcy5cbiAqIEByZXR1cm4geyFudW1iZXJ9IFRoZSBudW1iZXIgb2YgY2hpbGRyZW4gaW4gdGhpcyBzdWJ0cmVlLlxuICovXG5mdW5jdGlvbiB0cmF2ZXJzZUFsbENoaWxkcmVuSW1wbChjaGlsZHJlbiwgbmFtZVNvRmFyLCBjYWxsYmFjaywgdHJhdmVyc2VDb250ZXh0KSB7XG4gIHZhciB0eXBlID0gdHlwZW9mIGNoaWxkcmVuO1xuXG4gIGlmICh0eXBlID09PSAndW5kZWZpbmVkJyB8fCB0eXBlID09PSAnYm9vbGVhbicpIHtcbiAgICAvLyBBbGwgb2YgdGhlIGFib3ZlIGFyZSBwZXJjZWl2ZWQgYXMgbnVsbC5cbiAgICBjaGlsZHJlbiA9IG51bGw7XG4gIH1cblxuICBpZiAoY2hpbGRyZW4gPT09IG51bGwgfHwgdHlwZSA9PT0gJ3N0cmluZycgfHwgdHlwZSA9PT0gJ251bWJlcicgfHxcbiAgLy8gVGhlIGZvbGxvd2luZyBpcyBpbmxpbmVkIGZyb20gUmVhY3RFbGVtZW50LiBUaGlzIG1lYW5zIHdlIGNhbiBvcHRpbWl6ZVxuICAvLyBzb21lIGNoZWNrcy4gUmVhY3QgRmliZXIgYWxzbyBpbmxpbmVzIHRoaXMgbG9naWMgZm9yIHNpbWlsYXIgcHVycG9zZXMuXG4gIHR5cGUgPT09ICdvYmplY3QnICYmIGNoaWxkcmVuLiQkdHlwZW9mID09PSBSRUFDVF9FTEVNRU5UX1RZUEUgfHwgdHlwZSA9PT0gJ29iamVjdCcgJiYgY2hpbGRyZW4uJCR0eXBlb2YgPT09IFJFQUNUX1BPUlRBTF9UWVBFKSB7XG4gICAgY2FsbGJhY2sodHJhdmVyc2VDb250ZXh0LCBjaGlsZHJlbixcbiAgICAvLyBJZiBpdCdzIHRoZSBvbmx5IGNoaWxkLCB0cmVhdCB0aGUgbmFtZSBhcyBpZiBpdCB3YXMgd3JhcHBlZCBpbiBhbiBhcnJheVxuICAgIC8vIHNvIHRoYXQgaXQncyBjb25zaXN0ZW50IGlmIHRoZSBudW1iZXIgb2YgY2hpbGRyZW4gZ3Jvd3MuXG4gICAgbmFtZVNvRmFyID09PSAnJyA/IFNFUEFSQVRPUiArIGdldENvbXBvbmVudEtleShjaGlsZHJlbiwgMCkgOiBuYW1lU29GYXIpO1xuICAgIHJldHVybiAxO1xuICB9XG5cbiAgdmFyIGNoaWxkO1xuICB2YXIgbmV4dE5hbWU7XG4gIHZhciBzdWJ0cmVlQ291bnQgPSAwOyAvLyBDb3VudCBvZiBjaGlsZHJlbiBmb3VuZCBpbiB0aGUgY3VycmVudCBzdWJ0cmVlLlxuICB2YXIgbmV4dE5hbWVQcmVmaXggPSBuYW1lU29GYXIgPT09ICcnID8gU0VQQVJBVE9SIDogbmFtZVNvRmFyICsgU1VCU0VQQVJBVE9SO1xuXG4gIGlmIChBcnJheS5pc0FycmF5KGNoaWxkcmVuKSkge1xuICAgIGZvciAodmFyIGkgPSAwOyBpIDwgY2hpbGRyZW4ubGVuZ3RoOyBpKyspIHtcbiAgICAgIGNoaWxkID0gY2hpbGRyZW5baV07XG4gICAgICBuZXh0TmFtZSA9IG5leHROYW1lUHJlZml4ICsgZ2V0Q29tcG9uZW50S2V5KGNoaWxkLCBpKTtcbiAgICAgIHN1YnRyZWVDb3VudCArPSB0cmF2ZXJzZUFsbENoaWxkcmVuSW1wbChjaGlsZCwgbmV4dE5hbWUsIGNhbGxiYWNrLCB0cmF2ZXJzZUNvbnRleHQpO1xuICAgIH1cbiAgfSBlbHNlIHtcbiAgICB2YXIgaXRlcmF0b3JGbiA9IElURVJBVE9SX1NZTUJPTCAmJiBjaGlsZHJlbltJVEVSQVRPUl9TWU1CT0xdIHx8IGNoaWxkcmVuW0ZBVVhfSVRFUkFUT1JfU1lNQk9MXTtcbiAgICBpZiAodHlwZW9mIGl0ZXJhdG9yRm4gPT09ICdmdW5jdGlvbicpIHtcbiAgICAgIHtcbiAgICAgICAgLy8gV2FybiBhYm91dCB1c2luZyBNYXBzIGFzIGNoaWxkcmVuXG4gICAgICAgIGlmIChpdGVyYXRvckZuID09PSBjaGlsZHJlbi5lbnRyaWVzKSB7XG4gICAgICAgICAgd2FybmluZyhkaWRXYXJuQWJvdXRNYXBzLCAnVXNpbmcgTWFwcyBhcyBjaGlsZHJlbiBpcyB1bnN1cHBvcnRlZCBhbmQgd2lsbCBsaWtlbHkgeWllbGQgJyArICd1bmV4cGVjdGVkIHJlc3VsdHMuIENvbnZlcnQgaXQgdG8gYSBzZXF1ZW5jZS9pdGVyYWJsZSBvZiBrZXllZCAnICsgJ1JlYWN0RWxlbWVudHMgaW5zdGVhZC4lcycsIFJlYWN0RGVidWdDdXJyZW50RnJhbWUuZ2V0U3RhY2tBZGRlbmR1bSgpKTtcbiAgICAgICAgICBkaWRXYXJuQWJvdXRNYXBzID0gdHJ1ZTtcbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICB2YXIgaXRlcmF0b3IgPSBpdGVyYXRvckZuLmNhbGwoY2hpbGRyZW4pO1xuICAgICAgdmFyIHN0ZXA7XG4gICAgICB2YXIgaWkgPSAwO1xuICAgICAgd2hpbGUgKCEoc3RlcCA9IGl0ZXJhdG9yLm5leHQoKSkuZG9uZSkge1xuICAgICAgICBjaGlsZCA9IHN0ZXAudmFsdWU7XG4gICAgICAgIG5leHROYW1lID0gbmV4dE5hbWVQcmVmaXggKyBnZXRDb21wb25lbnRLZXkoY2hpbGQsIGlpKyspO1xuICAgICAgICBzdWJ0cmVlQ291bnQgKz0gdHJhdmVyc2VBbGxDaGlsZHJlbkltcGwoY2hpbGQsIG5leHROYW1lLCBjYWxsYmFjaywgdHJhdmVyc2VDb250ZXh0KTtcbiAgICAgIH1cbiAgICB9IGVsc2UgaWYgKHR5cGUgPT09ICdvYmplY3QnKSB7XG4gICAgICB2YXIgYWRkZW5kdW0gPSAnJztcbiAgICAgIHtcbiAgICAgICAgYWRkZW5kdW0gPSAnIElmIHlvdSBtZWFudCB0byByZW5kZXIgYSBjb2xsZWN0aW9uIG9mIGNoaWxkcmVuLCB1c2UgYW4gYXJyYXkgJyArICdpbnN0ZWFkLicgKyBSZWFjdERlYnVnQ3VycmVudEZyYW1lLmdldFN0YWNrQWRkZW5kdW0oKTtcbiAgICAgIH1cbiAgICAgIHZhciBjaGlsZHJlblN0cmluZyA9ICcnICsgY2hpbGRyZW47XG4gICAgICBpbnZhcmlhbnQoZmFsc2UsICdPYmplY3RzIGFyZSBub3QgdmFsaWQgYXMgYSBSZWFjdCBjaGlsZCAoZm91bmQ6ICVzKS4lcycsIGNoaWxkcmVuU3RyaW5nID09PSAnW29iamVjdCBPYmplY3RdJyA/ICdvYmplY3Qgd2l0aCBrZXlzIHsnICsgT2JqZWN0LmtleXMoY2hpbGRyZW4pLmpvaW4oJywgJykgKyAnfScgOiBjaGlsZHJlblN0cmluZywgYWRkZW5kdW0pO1xuICAgIH1cbiAgfVxuXG4gIHJldHVybiBzdWJ0cmVlQ291bnQ7XG59XG5cbi8qKlxuICogVHJhdmVyc2VzIGNoaWxkcmVuIHRoYXQgYXJlIHR5cGljYWxseSBzcGVjaWZpZWQgYXMgYHByb3BzLmNoaWxkcmVuYCwgYnV0XG4gKiBtaWdodCBhbHNvIGJlIHNwZWNpZmllZCB0aHJvdWdoIGF0dHJpYnV0ZXM6XG4gKlxuICogLSBgdHJhdmVyc2VBbGxDaGlsZHJlbih0aGlzLnByb3BzLmNoaWxkcmVuLCAuLi4pYFxuICogLSBgdHJhdmVyc2VBbGxDaGlsZHJlbih0aGlzLnByb3BzLmxlZnRQYW5lbENoaWxkcmVuLCAuLi4pYFxuICpcbiAqIFRoZSBgdHJhdmVyc2VDb250ZXh0YCBpcyBhbiBvcHRpb25hbCBhcmd1bWVudCB0aGF0IGlzIHBhc3NlZCB0aHJvdWdoIHRoZVxuICogZW50aXJlIHRyYXZlcnNhbC4gSXQgY2FuIGJlIHVzZWQgdG8gc3RvcmUgYWNjdW11bGF0aW9ucyBvciBhbnl0aGluZyBlbHNlIHRoYXRcbiAqIHRoZSBjYWxsYmFjayBtaWdodCBmaW5kIHJlbGV2YW50LlxuICpcbiAqIEBwYXJhbSB7Pyp9IGNoaWxkcmVuIENoaWxkcmVuIHRyZWUgb2JqZWN0LlxuICogQHBhcmFtIHshZnVuY3Rpb259IGNhbGxiYWNrIFRvIGludm9rZSB1cG9uIHRyYXZlcnNpbmcgZWFjaCBjaGlsZC5cbiAqIEBwYXJhbSB7Pyp9IHRyYXZlcnNlQ29udGV4dCBDb250ZXh0IGZvciB0cmF2ZXJzYWwuXG4gKiBAcmV0dXJuIHshbnVtYmVyfSBUaGUgbnVtYmVyIG9mIGNoaWxkcmVuIGluIHRoaXMgc3VidHJlZS5cbiAqL1xuZnVuY3Rpb24gdHJhdmVyc2VBbGxDaGlsZHJlbihjaGlsZHJlbiwgY2FsbGJhY2ssIHRyYXZlcnNlQ29udGV4dCkge1xuICBpZiAoY2hpbGRyZW4gPT0gbnVsbCkge1xuICAgIHJldHVybiAwO1xuICB9XG5cbiAgcmV0dXJuIHRyYXZlcnNlQWxsQ2hpbGRyZW5JbXBsKGNoaWxkcmVuLCAnJywgY2FsbGJhY2ssIHRyYXZlcnNlQ29udGV4dCk7XG59XG5cbi8qKlxuICogR2VuZXJhdGUgYSBrZXkgc3RyaW5nIHRoYXQgaWRlbnRpZmllcyBhIGNvbXBvbmVudCB3aXRoaW4gYSBzZXQuXG4gKlxuICogQHBhcmFtIHsqfSBjb21wb25lbnQgQSBjb21wb25lbnQgdGhhdCBjb3VsZCBjb250YWluIGEgbWFudWFsIGtleS5cbiAqIEBwYXJhbSB7bnVtYmVyfSBpbmRleCBJbmRleCB0aGF0IGlzIHVzZWQgaWYgYSBtYW51YWwga2V5IGlzIG5vdCBwcm92aWRlZC5cbiAqIEByZXR1cm4ge3N0cmluZ31cbiAqL1xuZnVuY3Rpb24gZ2V0Q29tcG9uZW50S2V5KGNvbXBvbmVudCwgaW5kZXgpIHtcbiAgLy8gRG8gc29tZSB0eXBlY2hlY2tpbmcgaGVyZSBzaW5jZSB3ZSBjYWxsIHRoaXMgYmxpbmRseS4gV2Ugd2FudCB0byBlbnN1cmVcbiAgLy8gdGhhdCB3ZSBkb24ndCBibG9jayBwb3RlbnRpYWwgZnV0dXJlIEVTIEFQSXMuXG4gIGlmICh0eXBlb2YgY29tcG9uZW50ID09PSAnb2JqZWN0JyAmJiBjb21wb25lbnQgIT09IG51bGwgJiYgY29tcG9uZW50LmtleSAhPSBudWxsKSB7XG4gICAgLy8gRXhwbGljaXQga2V5XG4gICAgcmV0dXJuIGVzY2FwZShjb21wb25lbnQua2V5KTtcbiAgfVxuICAvLyBJbXBsaWNpdCBrZXkgZGV0ZXJtaW5lZCBieSB0aGUgaW5kZXggaW4gdGhlIHNldFxuICByZXR1cm4gaW5kZXgudG9TdHJpbmcoMzYpO1xufVxuXG5mdW5jdGlvbiBmb3JFYWNoU2luZ2xlQ2hpbGQoYm9va0tlZXBpbmcsIGNoaWxkLCBuYW1lKSB7XG4gIHZhciBmdW5jID0gYm9va0tlZXBpbmcuZnVuYyxcbiAgICAgIGNvbnRleHQgPSBib29rS2VlcGluZy5jb250ZXh0O1xuXG4gIGZ1bmMuY2FsbChjb250ZXh0LCBjaGlsZCwgYm9va0tlZXBpbmcuY291bnQrKyk7XG59XG5cbi8qKlxuICogSXRlcmF0ZXMgdGhyb3VnaCBjaGlsZHJlbiB0aGF0IGFyZSB0eXBpY2FsbHkgc3BlY2lmaWVkIGFzIGBwcm9wcy5jaGlsZHJlbmAuXG4gKlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNyZWFjdC5jaGlsZHJlbi5mb3JlYWNoXG4gKlxuICogVGhlIHByb3ZpZGVkIGZvckVhY2hGdW5jKGNoaWxkLCBpbmRleCkgd2lsbCBiZSBjYWxsZWQgZm9yIGVhY2hcbiAqIGxlYWYgY2hpbGQuXG4gKlxuICogQHBhcmFtIHs/Kn0gY2hpbGRyZW4gQ2hpbGRyZW4gdHJlZSBjb250YWluZXIuXG4gKiBAcGFyYW0ge2Z1bmN0aW9uKCosIGludCl9IGZvckVhY2hGdW5jXG4gKiBAcGFyYW0geyp9IGZvckVhY2hDb250ZXh0IENvbnRleHQgZm9yIGZvckVhY2hDb250ZXh0LlxuICovXG5mdW5jdGlvbiBmb3JFYWNoQ2hpbGRyZW4oY2hpbGRyZW4sIGZvckVhY2hGdW5jLCBmb3JFYWNoQ29udGV4dCkge1xuICBpZiAoY2hpbGRyZW4gPT0gbnVsbCkge1xuICAgIHJldHVybiBjaGlsZHJlbjtcbiAgfVxuICB2YXIgdHJhdmVyc2VDb250ZXh0ID0gZ2V0UG9vbGVkVHJhdmVyc2VDb250ZXh0KG51bGwsIG51bGwsIGZvckVhY2hGdW5jLCBmb3JFYWNoQ29udGV4dCk7XG4gIHRyYXZlcnNlQWxsQ2hpbGRyZW4oY2hpbGRyZW4sIGZvckVhY2hTaW5nbGVDaGlsZCwgdHJhdmVyc2VDb250ZXh0KTtcbiAgcmVsZWFzZVRyYXZlcnNlQ29udGV4dCh0cmF2ZXJzZUNvbnRleHQpO1xufVxuXG5mdW5jdGlvbiBtYXBTaW5nbGVDaGlsZEludG9Db250ZXh0KGJvb2tLZWVwaW5nLCBjaGlsZCwgY2hpbGRLZXkpIHtcbiAgdmFyIHJlc3VsdCA9IGJvb2tLZWVwaW5nLnJlc3VsdCxcbiAgICAgIGtleVByZWZpeCA9IGJvb2tLZWVwaW5nLmtleVByZWZpeCxcbiAgICAgIGZ1bmMgPSBib29rS2VlcGluZy5mdW5jLFxuICAgICAgY29udGV4dCA9IGJvb2tLZWVwaW5nLmNvbnRleHQ7XG5cblxuICB2YXIgbWFwcGVkQ2hpbGQgPSBmdW5jLmNhbGwoY29udGV4dCwgY2hpbGQsIGJvb2tLZWVwaW5nLmNvdW50KyspO1xuICBpZiAoQXJyYXkuaXNBcnJheShtYXBwZWRDaGlsZCkpIHtcbiAgICBtYXBJbnRvV2l0aEtleVByZWZpeEludGVybmFsKG1hcHBlZENoaWxkLCByZXN1bHQsIGNoaWxkS2V5LCBlbXB0eUZ1bmN0aW9uLnRoYXRSZXR1cm5zQXJndW1lbnQpO1xuICB9IGVsc2UgaWYgKG1hcHBlZENoaWxkICE9IG51bGwpIHtcbiAgICBpZiAoaXNWYWxpZEVsZW1lbnQobWFwcGVkQ2hpbGQpKSB7XG4gICAgICBtYXBwZWRDaGlsZCA9IGNsb25lQW5kUmVwbGFjZUtleShtYXBwZWRDaGlsZCxcbiAgICAgIC8vIEtlZXAgYm90aCB0aGUgKG1hcHBlZCkgYW5kIG9sZCBrZXlzIGlmIHRoZXkgZGlmZmVyLCBqdXN0IGFzXG4gICAgICAvLyB0cmF2ZXJzZUFsbENoaWxkcmVuIHVzZWQgdG8gZG8gZm9yIG9iamVjdHMgYXMgY2hpbGRyZW5cbiAgICAgIGtleVByZWZpeCArIChtYXBwZWRDaGlsZC5rZXkgJiYgKCFjaGlsZCB8fCBjaGlsZC5rZXkgIT09IG1hcHBlZENoaWxkLmtleSkgPyBlc2NhcGVVc2VyUHJvdmlkZWRLZXkobWFwcGVkQ2hpbGQua2V5KSArICcvJyA6ICcnKSArIGNoaWxkS2V5KTtcbiAgICB9XG4gICAgcmVzdWx0LnB1c2gobWFwcGVkQ2hpbGQpO1xuICB9XG59XG5cbmZ1bmN0aW9uIG1hcEludG9XaXRoS2V5UHJlZml4SW50ZXJuYWwoY2hpbGRyZW4sIGFycmF5LCBwcmVmaXgsIGZ1bmMsIGNvbnRleHQpIHtcbiAgdmFyIGVzY2FwZWRQcmVmaXggPSAnJztcbiAgaWYgKHByZWZpeCAhPSBudWxsKSB7XG4gICAgZXNjYXBlZFByZWZpeCA9IGVzY2FwZVVzZXJQcm92aWRlZEtleShwcmVmaXgpICsgJy8nO1xuICB9XG4gIHZhciB0cmF2ZXJzZUNvbnRleHQgPSBnZXRQb29sZWRUcmF2ZXJzZUNvbnRleHQoYXJyYXksIGVzY2FwZWRQcmVmaXgsIGZ1bmMsIGNvbnRleHQpO1xuICB0cmF2ZXJzZUFsbENoaWxkcmVuKGNoaWxkcmVuLCBtYXBTaW5nbGVDaGlsZEludG9Db250ZXh0LCB0cmF2ZXJzZUNvbnRleHQpO1xuICByZWxlYXNlVHJhdmVyc2VDb250ZXh0KHRyYXZlcnNlQ29udGV4dCk7XG59XG5cbi8qKlxuICogTWFwcyBjaGlsZHJlbiB0aGF0IGFyZSB0eXBpY2FsbHkgc3BlY2lmaWVkIGFzIGBwcm9wcy5jaGlsZHJlbmAuXG4gKlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNyZWFjdC5jaGlsZHJlbi5tYXBcbiAqXG4gKiBUaGUgcHJvdmlkZWQgbWFwRnVuY3Rpb24oY2hpbGQsIGtleSwgaW5kZXgpIHdpbGwgYmUgY2FsbGVkIGZvciBlYWNoXG4gKiBsZWFmIGNoaWxkLlxuICpcbiAqIEBwYXJhbSB7Pyp9IGNoaWxkcmVuIENoaWxkcmVuIHRyZWUgY29udGFpbmVyLlxuICogQHBhcmFtIHtmdW5jdGlvbigqLCBpbnQpfSBmdW5jIFRoZSBtYXAgZnVuY3Rpb24uXG4gKiBAcGFyYW0geyp9IGNvbnRleHQgQ29udGV4dCBmb3IgbWFwRnVuY3Rpb24uXG4gKiBAcmV0dXJuIHtvYmplY3R9IE9iamVjdCBjb250YWluaW5nIHRoZSBvcmRlcmVkIG1hcCBvZiByZXN1bHRzLlxuICovXG5mdW5jdGlvbiBtYXBDaGlsZHJlbihjaGlsZHJlbiwgZnVuYywgY29udGV4dCkge1xuICBpZiAoY2hpbGRyZW4gPT0gbnVsbCkge1xuICAgIHJldHVybiBjaGlsZHJlbjtcbiAgfVxuICB2YXIgcmVzdWx0ID0gW107XG4gIG1hcEludG9XaXRoS2V5UHJlZml4SW50ZXJuYWwoY2hpbGRyZW4sIHJlc3VsdCwgbnVsbCwgZnVuYywgY29udGV4dCk7XG4gIHJldHVybiByZXN1bHQ7XG59XG5cbi8qKlxuICogQ291bnQgdGhlIG51bWJlciBvZiBjaGlsZHJlbiB0aGF0IGFyZSB0eXBpY2FsbHkgc3BlY2lmaWVkIGFzXG4gKiBgcHJvcHMuY2hpbGRyZW5gLlxuICpcbiAqIFNlZSBodHRwczovL3JlYWN0anMub3JnL2RvY3MvcmVhY3QtYXBpLmh0bWwjcmVhY3QuY2hpbGRyZW4uY291bnRcbiAqXG4gKiBAcGFyYW0gez8qfSBjaGlsZHJlbiBDaGlsZHJlbiB0cmVlIGNvbnRhaW5lci5cbiAqIEByZXR1cm4ge251bWJlcn0gVGhlIG51bWJlciBvZiBjaGlsZHJlbi5cbiAqL1xuZnVuY3Rpb24gY291bnRDaGlsZHJlbihjaGlsZHJlbiwgY29udGV4dCkge1xuICByZXR1cm4gdHJhdmVyc2VBbGxDaGlsZHJlbihjaGlsZHJlbiwgZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc051bGwsIG51bGwpO1xufVxuXG4vKipcbiAqIEZsYXR0ZW4gYSBjaGlsZHJlbiBvYmplY3QgKHR5cGljYWxseSBzcGVjaWZpZWQgYXMgYHByb3BzLmNoaWxkcmVuYCkgYW5kXG4gKiByZXR1cm4gYW4gYXJyYXkgd2l0aCBhcHByb3ByaWF0ZWx5IHJlLWtleWVkIGNoaWxkcmVuLlxuICpcbiAqIFNlZSBodHRwczovL3JlYWN0anMub3JnL2RvY3MvcmVhY3QtYXBpLmh0bWwjcmVhY3QuY2hpbGRyZW4udG9hcnJheVxuICovXG5mdW5jdGlvbiB0b0FycmF5KGNoaWxkcmVuKSB7XG4gIHZhciByZXN1bHQgPSBbXTtcbiAgbWFwSW50b1dpdGhLZXlQcmVmaXhJbnRlcm5hbChjaGlsZHJlbiwgcmVzdWx0LCBudWxsLCBlbXB0eUZ1bmN0aW9uLnRoYXRSZXR1cm5zQXJndW1lbnQpO1xuICByZXR1cm4gcmVzdWx0O1xufVxuXG4vKipcbiAqIFJldHVybnMgdGhlIGZpcnN0IGNoaWxkIGluIGEgY29sbGVjdGlvbiBvZiBjaGlsZHJlbiBhbmQgdmVyaWZpZXMgdGhhdCB0aGVyZVxuICogaXMgb25seSBvbmUgY2hpbGQgaW4gdGhlIGNvbGxlY3Rpb24uXG4gKlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNyZWFjdC5jaGlsZHJlbi5vbmx5XG4gKlxuICogVGhlIGN1cnJlbnQgaW1wbGVtZW50YXRpb24gb2YgdGhpcyBmdW5jdGlvbiBhc3N1bWVzIHRoYXQgYSBzaW5nbGUgY2hpbGQgZ2V0c1xuICogcGFzc2VkIHdpdGhvdXQgYSB3cmFwcGVyLCBidXQgdGhlIHB1cnBvc2Ugb2YgdGhpcyBoZWxwZXIgZnVuY3Rpb24gaXMgdG9cbiAqIGFic3RyYWN0IGF3YXkgdGhlIHBhcnRpY3VsYXIgc3RydWN0dXJlIG9mIGNoaWxkcmVuLlxuICpcbiAqIEBwYXJhbSB7P29iamVjdH0gY2hpbGRyZW4gQ2hpbGQgY29sbGVjdGlvbiBzdHJ1Y3R1cmUuXG4gKiBAcmV0dXJuIHtSZWFjdEVsZW1lbnR9IFRoZSBmaXJzdCBhbmQgb25seSBgUmVhY3RFbGVtZW50YCBjb250YWluZWQgaW4gdGhlXG4gKiBzdHJ1Y3R1cmUuXG4gKi9cbmZ1bmN0aW9uIG9ubHlDaGlsZChjaGlsZHJlbikge1xuICAhaXNWYWxpZEVsZW1lbnQoY2hpbGRyZW4pID8gaW52YXJpYW50KGZhbHNlLCAnUmVhY3QuQ2hpbGRyZW4ub25seSBleHBlY3RlZCB0byByZWNlaXZlIGEgc2luZ2xlIFJlYWN0IGVsZW1lbnQgY2hpbGQuJykgOiB2b2lkIDA7XG4gIHJldHVybiBjaGlsZHJlbjtcbn1cblxudmFyIGRlc2NyaWJlQ29tcG9uZW50RnJhbWUgPSBmdW5jdGlvbiAobmFtZSwgc291cmNlLCBvd25lck5hbWUpIHtcbiAgcmV0dXJuICdcXG4gICAgaW4gJyArIChuYW1lIHx8ICdVbmtub3duJykgKyAoc291cmNlID8gJyAoYXQgJyArIHNvdXJjZS5maWxlTmFtZS5yZXBsYWNlKC9eLipbXFxcXFxcL10vLCAnJykgKyAnOicgKyBzb3VyY2UubGluZU51bWJlciArICcpJyA6IG93bmVyTmFtZSA/ICcgKGNyZWF0ZWQgYnkgJyArIG93bmVyTmFtZSArICcpJyA6ICcnKTtcbn07XG5cbmZ1bmN0aW9uIGdldENvbXBvbmVudE5hbWUoZmliZXIpIHtcbiAgdmFyIHR5cGUgPSBmaWJlci50eXBlO1xuXG4gIGlmICh0eXBlb2YgdHlwZSA9PT0gJ3N0cmluZycpIHtcbiAgICByZXR1cm4gdHlwZTtcbiAgfVxuICBpZiAodHlwZW9mIHR5cGUgPT09ICdmdW5jdGlvbicpIHtcbiAgICByZXR1cm4gdHlwZS5kaXNwbGF5TmFtZSB8fCB0eXBlLm5hbWU7XG4gIH1cbiAgcmV0dXJuIG51bGw7XG59XG5cbi8qKlxuICogUmVhY3RFbGVtZW50VmFsaWRhdG9yIHByb3ZpZGVzIGEgd3JhcHBlciBhcm91bmQgYSBlbGVtZW50IGZhY3RvcnlcbiAqIHdoaWNoIHZhbGlkYXRlcyB0aGUgcHJvcHMgcGFzc2VkIHRvIHRoZSBlbGVtZW50LiBUaGlzIGlzIGludGVuZGVkIHRvIGJlXG4gKiB1c2VkIG9ubHkgaW4gREVWIGFuZCBjb3VsZCBiZSByZXBsYWNlZCBieSBhIHN0YXRpYyB0eXBlIGNoZWNrZXIgZm9yIGxhbmd1YWdlc1xuICogdGhhdCBzdXBwb3J0IGl0LlxuICovXG5cbntcbiAgdmFyIGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50ID0gbnVsbDtcblxuICB2YXIgZ2V0RGlzcGxheU5hbWUgPSBmdW5jdGlvbiAoZWxlbWVudCkge1xuICAgIGlmIChlbGVtZW50ID09IG51bGwpIHtcbiAgICAgIHJldHVybiAnI2VtcHR5JztcbiAgICB9IGVsc2UgaWYgKHR5cGVvZiBlbGVtZW50ID09PSAnc3RyaW5nJyB8fCB0eXBlb2YgZWxlbWVudCA9PT0gJ251bWJlcicpIHtcbiAgICAgIHJldHVybiAnI3RleHQnO1xuICAgIH0gZWxzZSBpZiAodHlwZW9mIGVsZW1lbnQudHlwZSA9PT0gJ3N0cmluZycpIHtcbiAgICAgIHJldHVybiBlbGVtZW50LnR5cGU7XG4gICAgfSBlbHNlIGlmIChlbGVtZW50LnR5cGUgPT09IFJFQUNUX0ZSQUdNRU5UX1RZUEUkMSkge1xuICAgICAgcmV0dXJuICdSZWFjdC5GcmFnbWVudCc7XG4gICAgfSBlbHNlIHtcbiAgICAgIHJldHVybiBlbGVtZW50LnR5cGUuZGlzcGxheU5hbWUgfHwgZWxlbWVudC50eXBlLm5hbWUgfHwgJ1Vua25vd24nO1xuICAgIH1cbiAgfTtcblxuICB2YXIgZ2V0U3RhY2tBZGRlbmR1bSA9IGZ1bmN0aW9uICgpIHtcbiAgICB2YXIgc3RhY2sgPSAnJztcbiAgICBpZiAoY3VycmVudGx5VmFsaWRhdGluZ0VsZW1lbnQpIHtcbiAgICAgIHZhciBuYW1lID0gZ2V0RGlzcGxheU5hbWUoY3VycmVudGx5VmFsaWRhdGluZ0VsZW1lbnQpO1xuICAgICAgdmFyIG93bmVyID0gY3VycmVudGx5VmFsaWRhdGluZ0VsZW1lbnQuX293bmVyO1xuICAgICAgc3RhY2sgKz0gZGVzY3JpYmVDb21wb25lbnRGcmFtZShuYW1lLCBjdXJyZW50bHlWYWxpZGF0aW5nRWxlbWVudC5fc291cmNlLCBvd25lciAmJiBnZXRDb21wb25lbnROYW1lKG93bmVyKSk7XG4gICAgfVxuICAgIHN0YWNrICs9IFJlYWN0RGVidWdDdXJyZW50RnJhbWUuZ2V0U3RhY2tBZGRlbmR1bSgpIHx8ICcnO1xuICAgIHJldHVybiBzdGFjaztcbiAgfTtcblxuICB2YXIgUkVBQ1RfRlJBR01FTlRfVFlQRSQxID0gdHlwZW9mIFN5bWJvbCA9PT0gJ2Z1bmN0aW9uJyAmJiBTeW1ib2xbJ2ZvciddICYmIFN5bWJvbFsnZm9yJ10oJ3JlYWN0LmZyYWdtZW50JykgfHwgMHhlYWNiO1xuXG4gIHZhciBWQUxJRF9GUkFHTUVOVF9QUk9QUyA9IG5ldyBNYXAoW1snY2hpbGRyZW4nLCB0cnVlXSwgWydrZXknLCB0cnVlXV0pO1xufVxuXG52YXIgSVRFUkFUT1JfU1lNQk9MJDEgPSB0eXBlb2YgU3ltYm9sID09PSAnZnVuY3Rpb24nICYmIFN5bWJvbC5pdGVyYXRvcjtcbnZhciBGQVVYX0lURVJBVE9SX1NZTUJPTCQxID0gJ0BAaXRlcmF0b3InOyAvLyBCZWZvcmUgU3ltYm9sIHNwZWMuXG5cbmZ1bmN0aW9uIGdldERlY2xhcmF0aW9uRXJyb3JBZGRlbmR1bSgpIHtcbiAgaWYgKFJlYWN0Q3VycmVudE93bmVyLmN1cnJlbnQpIHtcbiAgICB2YXIgbmFtZSA9IGdldENvbXBvbmVudE5hbWUoUmVhY3RDdXJyZW50T3duZXIuY3VycmVudCk7XG4gICAgaWYgKG5hbWUpIHtcbiAgICAgIHJldHVybiAnXFxuXFxuQ2hlY2sgdGhlIHJlbmRlciBtZXRob2Qgb2YgYCcgKyBuYW1lICsgJ2AuJztcbiAgICB9XG4gIH1cbiAgcmV0dXJuICcnO1xufVxuXG5mdW5jdGlvbiBnZXRTb3VyY2VJbmZvRXJyb3JBZGRlbmR1bShlbGVtZW50UHJvcHMpIHtcbiAgaWYgKGVsZW1lbnRQcm9wcyAhPT0gbnVsbCAmJiBlbGVtZW50UHJvcHMgIT09IHVuZGVmaW5lZCAmJiBlbGVtZW50UHJvcHMuX19zb3VyY2UgIT09IHVuZGVmaW5lZCkge1xuICAgIHZhciBzb3VyY2UgPSBlbGVtZW50UHJvcHMuX19zb3VyY2U7XG4gICAgdmFyIGZpbGVOYW1lID0gc291cmNlLmZpbGVOYW1lLnJlcGxhY2UoL14uKltcXFxcXFwvXS8sICcnKTtcbiAgICB2YXIgbGluZU51bWJlciA9IHNvdXJjZS5saW5lTnVtYmVyO1xuICAgIHJldHVybiAnXFxuXFxuQ2hlY2sgeW91ciBjb2RlIGF0ICcgKyBmaWxlTmFtZSArICc6JyArIGxpbmVOdW1iZXIgKyAnLic7XG4gIH1cbiAgcmV0dXJuICcnO1xufVxuXG4vKipcbiAqIFdhcm4gaWYgdGhlcmUncyBubyBrZXkgZXhwbGljaXRseSBzZXQgb24gZHluYW1pYyBhcnJheXMgb2YgY2hpbGRyZW4gb3JcbiAqIG9iamVjdCBrZXlzIGFyZSBub3QgdmFsaWQuIFRoaXMgYWxsb3dzIHVzIHRvIGtlZXAgdHJhY2sgb2YgY2hpbGRyZW4gYmV0d2VlblxuICogdXBkYXRlcy5cbiAqL1xudmFyIG93bmVySGFzS2V5VXNlV2FybmluZyA9IHt9O1xuXG5mdW5jdGlvbiBnZXRDdXJyZW50Q29tcG9uZW50RXJyb3JJbmZvKHBhcmVudFR5cGUpIHtcbiAgdmFyIGluZm8gPSBnZXREZWNsYXJhdGlvbkVycm9yQWRkZW5kdW0oKTtcblxuICBpZiAoIWluZm8pIHtcbiAgICB2YXIgcGFyZW50TmFtZSA9IHR5cGVvZiBwYXJlbnRUeXBlID09PSAnc3RyaW5nJyA/IHBhcmVudFR5cGUgOiBwYXJlbnRUeXBlLmRpc3BsYXlOYW1lIHx8IHBhcmVudFR5cGUubmFtZTtcbiAgICBpZiAocGFyZW50TmFtZSkge1xuICAgICAgaW5mbyA9ICdcXG5cXG5DaGVjayB0aGUgdG9wLWxldmVsIHJlbmRlciBjYWxsIHVzaW5nIDwnICsgcGFyZW50TmFtZSArICc+Lic7XG4gICAgfVxuICB9XG4gIHJldHVybiBpbmZvO1xufVxuXG4vKipcbiAqIFdhcm4gaWYgdGhlIGVsZW1lbnQgZG9lc24ndCBoYXZlIGFuIGV4cGxpY2l0IGtleSBhc3NpZ25lZCB0byBpdC5cbiAqIFRoaXMgZWxlbWVudCBpcyBpbiBhbiBhcnJheS4gVGhlIGFycmF5IGNvdWxkIGdyb3cgYW5kIHNocmluayBvciBiZVxuICogcmVvcmRlcmVkLiBBbGwgY2hpbGRyZW4gdGhhdCBoYXZlbid0IGFscmVhZHkgYmVlbiB2YWxpZGF0ZWQgYXJlIHJlcXVpcmVkIHRvXG4gKiBoYXZlIGEgXCJrZXlcIiBwcm9wZXJ0eSBhc3NpZ25lZCB0byBpdC4gRXJyb3Igc3RhdHVzZXMgYXJlIGNhY2hlZCBzbyBhIHdhcm5pbmdcbiAqIHdpbGwgb25seSBiZSBzaG93biBvbmNlLlxuICpcbiAqIEBpbnRlcm5hbFxuICogQHBhcmFtIHtSZWFjdEVsZW1lbnR9IGVsZW1lbnQgRWxlbWVudCB0aGF0IHJlcXVpcmVzIGEga2V5LlxuICogQHBhcmFtIHsqfSBwYXJlbnRUeXBlIGVsZW1lbnQncyBwYXJlbnQncyB0eXBlLlxuICovXG5mdW5jdGlvbiB2YWxpZGF0ZUV4cGxpY2l0S2V5KGVsZW1lbnQsIHBhcmVudFR5cGUpIHtcbiAgaWYgKCFlbGVtZW50Ll9zdG9yZSB8fCBlbGVtZW50Ll9zdG9yZS52YWxpZGF0ZWQgfHwgZWxlbWVudC5rZXkgIT0gbnVsbCkge1xuICAgIHJldHVybjtcbiAgfVxuICBlbGVtZW50Ll9zdG9yZS52YWxpZGF0ZWQgPSB0cnVlO1xuXG4gIHZhciBjdXJyZW50Q29tcG9uZW50RXJyb3JJbmZvID0gZ2V0Q3VycmVudENvbXBvbmVudEVycm9ySW5mbyhwYXJlbnRUeXBlKTtcbiAgaWYgKG93bmVySGFzS2V5VXNlV2FybmluZ1tjdXJyZW50Q29tcG9uZW50RXJyb3JJbmZvXSkge1xuICAgIHJldHVybjtcbiAgfVxuICBvd25lckhhc0tleVVzZVdhcm5pbmdbY3VycmVudENvbXBvbmVudEVycm9ySW5mb10gPSB0cnVlO1xuXG4gIC8vIFVzdWFsbHkgdGhlIGN1cnJlbnQgb3duZXIgaXMgdGhlIG9mZmVuZGVyLCBidXQgaWYgaXQgYWNjZXB0cyBjaGlsZHJlbiBhcyBhXG4gIC8vIHByb3BlcnR5LCBpdCBtYXkgYmUgdGhlIGNyZWF0b3Igb2YgdGhlIGNoaWxkIHRoYXQncyByZXNwb25zaWJsZSBmb3JcbiAgLy8gYXNzaWduaW5nIGl0IGEga2V5LlxuICB2YXIgY2hpbGRPd25lciA9ICcnO1xuICBpZiAoZWxlbWVudCAmJiBlbGVtZW50Ll9vd25lciAmJiBlbGVtZW50Ll9vd25lciAhPT0gUmVhY3RDdXJyZW50T3duZXIuY3VycmVudCkge1xuICAgIC8vIEdpdmUgdGhlIGNvbXBvbmVudCB0aGF0IG9yaWdpbmFsbHkgY3JlYXRlZCB0aGlzIGNoaWxkLlxuICAgIGNoaWxkT3duZXIgPSAnIEl0IHdhcyBwYXNzZWQgYSBjaGlsZCBmcm9tICcgKyBnZXRDb21wb25lbnROYW1lKGVsZW1lbnQuX293bmVyKSArICcuJztcbiAgfVxuXG4gIGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50ID0gZWxlbWVudDtcbiAge1xuICAgIHdhcm5pbmcoZmFsc2UsICdFYWNoIGNoaWxkIGluIGFuIGFycmF5IG9yIGl0ZXJhdG9yIHNob3VsZCBoYXZlIGEgdW5pcXVlIFwia2V5XCIgcHJvcC4nICsgJyVzJXMgU2VlIGh0dHBzOi8vZmIubWUvcmVhY3Qtd2FybmluZy1rZXlzIGZvciBtb3JlIGluZm9ybWF0aW9uLiVzJywgY3VycmVudENvbXBvbmVudEVycm9ySW5mbywgY2hpbGRPd25lciwgZ2V0U3RhY2tBZGRlbmR1bSgpKTtcbiAgfVxuICBjdXJyZW50bHlWYWxpZGF0aW5nRWxlbWVudCA9IG51bGw7XG59XG5cbi8qKlxuICogRW5zdXJlIHRoYXQgZXZlcnkgZWxlbWVudCBlaXRoZXIgaXMgcGFzc2VkIGluIGEgc3RhdGljIGxvY2F0aW9uLCBpbiBhblxuICogYXJyYXkgd2l0aCBhbiBleHBsaWNpdCBrZXlzIHByb3BlcnR5IGRlZmluZWQsIG9yIGluIGFuIG9iamVjdCBsaXRlcmFsXG4gKiB3aXRoIHZhbGlkIGtleSBwcm9wZXJ0eS5cbiAqXG4gKiBAaW50ZXJuYWxcbiAqIEBwYXJhbSB7UmVhY3ROb2RlfSBub2RlIFN0YXRpY2FsbHkgcGFzc2VkIGNoaWxkIG9mIGFueSB0eXBlLlxuICogQHBhcmFtIHsqfSBwYXJlbnRUeXBlIG5vZGUncyBwYXJlbnQncyB0eXBlLlxuICovXG5mdW5jdGlvbiB2YWxpZGF0ZUNoaWxkS2V5cyhub2RlLCBwYXJlbnRUeXBlKSB7XG4gIGlmICh0eXBlb2Ygbm9kZSAhPT0gJ29iamVjdCcpIHtcbiAgICByZXR1cm47XG4gIH1cbiAgaWYgKEFycmF5LmlzQXJyYXkobm9kZSkpIHtcbiAgICBmb3IgKHZhciBpID0gMDsgaSA8IG5vZGUubGVuZ3RoOyBpKyspIHtcbiAgICAgIHZhciBjaGlsZCA9IG5vZGVbaV07XG4gICAgICBpZiAoaXNWYWxpZEVsZW1lbnQoY2hpbGQpKSB7XG4gICAgICAgIHZhbGlkYXRlRXhwbGljaXRLZXkoY2hpbGQsIHBhcmVudFR5cGUpO1xuICAgICAgfVxuICAgIH1cbiAgfSBlbHNlIGlmIChpc1ZhbGlkRWxlbWVudChub2RlKSkge1xuICAgIC8vIFRoaXMgZWxlbWVudCB3YXMgcGFzc2VkIGluIGEgdmFsaWQgbG9jYXRpb24uXG4gICAgaWYgKG5vZGUuX3N0b3JlKSB7XG4gICAgICBub2RlLl9zdG9yZS52YWxpZGF0ZWQgPSB0cnVlO1xuICAgIH1cbiAgfSBlbHNlIGlmIChub2RlKSB7XG4gICAgdmFyIGl0ZXJhdG9yRm4gPSBJVEVSQVRPUl9TWU1CT0wkMSAmJiBub2RlW0lURVJBVE9SX1NZTUJPTCQxXSB8fCBub2RlW0ZBVVhfSVRFUkFUT1JfU1lNQk9MJDFdO1xuICAgIGlmICh0eXBlb2YgaXRlcmF0b3JGbiA9PT0gJ2Z1bmN0aW9uJykge1xuICAgICAgLy8gRW50cnkgaXRlcmF0b3JzIHVzZWQgdG8gcHJvdmlkZSBpbXBsaWNpdCBrZXlzLFxuICAgICAgLy8gYnV0IG5vdyB3ZSBwcmludCBhIHNlcGFyYXRlIHdhcm5pbmcgZm9yIHRoZW0gbGF0ZXIuXG4gICAgICBpZiAoaXRlcmF0b3JGbiAhPT0gbm9kZS5lbnRyaWVzKSB7XG4gICAgICAgIHZhciBpdGVyYXRvciA9IGl0ZXJhdG9yRm4uY2FsbChub2RlKTtcbiAgICAgICAgdmFyIHN0ZXA7XG4gICAgICAgIHdoaWxlICghKHN0ZXAgPSBpdGVyYXRvci5uZXh0KCkpLmRvbmUpIHtcbiAgICAgICAgICBpZiAoaXNWYWxpZEVsZW1lbnQoc3RlcC52YWx1ZSkpIHtcbiAgICAgICAgICAgIHZhbGlkYXRlRXhwbGljaXRLZXkoc3RlcC52YWx1ZSwgcGFyZW50VHlwZSk7XG4gICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG59XG5cbi8qKlxuICogR2l2ZW4gYW4gZWxlbWVudCwgdmFsaWRhdGUgdGhhdCBpdHMgcHJvcHMgZm9sbG93IHRoZSBwcm9wVHlwZXMgZGVmaW5pdGlvbixcbiAqIHByb3ZpZGVkIGJ5IHRoZSB0eXBlLlxuICpcbiAqIEBwYXJhbSB7UmVhY3RFbGVtZW50fSBlbGVtZW50XG4gKi9cbmZ1bmN0aW9uIHZhbGlkYXRlUHJvcFR5cGVzKGVsZW1lbnQpIHtcbiAgdmFyIGNvbXBvbmVudENsYXNzID0gZWxlbWVudC50eXBlO1xuICBpZiAodHlwZW9mIGNvbXBvbmVudENsYXNzICE9PSAnZnVuY3Rpb24nKSB7XG4gICAgcmV0dXJuO1xuICB9XG4gIHZhciBuYW1lID0gY29tcG9uZW50Q2xhc3MuZGlzcGxheU5hbWUgfHwgY29tcG9uZW50Q2xhc3MubmFtZTtcbiAgdmFyIHByb3BUeXBlcyA9IGNvbXBvbmVudENsYXNzLnByb3BUeXBlcztcblxuICBpZiAocHJvcFR5cGVzKSB7XG4gICAgY3VycmVudGx5VmFsaWRhdGluZ0VsZW1lbnQgPSBlbGVtZW50O1xuICAgIGNoZWNrUHJvcFR5cGVzKHByb3BUeXBlcywgZWxlbWVudC5wcm9wcywgJ3Byb3AnLCBuYW1lLCBnZXRTdGFja0FkZGVuZHVtKTtcbiAgICBjdXJyZW50bHlWYWxpZGF0aW5nRWxlbWVudCA9IG51bGw7XG4gIH1cbiAgaWYgKHR5cGVvZiBjb21wb25lbnRDbGFzcy5nZXREZWZhdWx0UHJvcHMgPT09ICdmdW5jdGlvbicpIHtcbiAgICB3YXJuaW5nKGNvbXBvbmVudENsYXNzLmdldERlZmF1bHRQcm9wcy5pc1JlYWN0Q2xhc3NBcHByb3ZlZCwgJ2dldERlZmF1bHRQcm9wcyBpcyBvbmx5IHVzZWQgb24gY2xhc3NpYyBSZWFjdC5jcmVhdGVDbGFzcyAnICsgJ2RlZmluaXRpb25zLiBVc2UgYSBzdGF0aWMgcHJvcGVydHkgbmFtZWQgYGRlZmF1bHRQcm9wc2AgaW5zdGVhZC4nKTtcbiAgfVxufVxuXG4vKipcbiAqIEdpdmVuIGEgZnJhZ21lbnQsIHZhbGlkYXRlIHRoYXQgaXQgY2FuIG9ubHkgYmUgcHJvdmlkZWQgd2l0aCBmcmFnbWVudCBwcm9wc1xuICogQHBhcmFtIHtSZWFjdEVsZW1lbnR9IGZyYWdtZW50XG4gKi9cbmZ1bmN0aW9uIHZhbGlkYXRlRnJhZ21lbnRQcm9wcyhmcmFnbWVudCkge1xuICBjdXJyZW50bHlWYWxpZGF0aW5nRWxlbWVudCA9IGZyYWdtZW50O1xuXG4gIHZhciBfaXRlcmF0b3JOb3JtYWxDb21wbGV0aW9uID0gdHJ1ZTtcbiAgdmFyIF9kaWRJdGVyYXRvckVycm9yID0gZmFsc2U7XG4gIHZhciBfaXRlcmF0b3JFcnJvciA9IHVuZGVmaW5lZDtcblxuICB0cnkge1xuICAgIGZvciAodmFyIF9pdGVyYXRvciA9IE9iamVjdC5rZXlzKGZyYWdtZW50LnByb3BzKVtTeW1ib2wuaXRlcmF0b3JdKCksIF9zdGVwOyAhKF9pdGVyYXRvck5vcm1hbENvbXBsZXRpb24gPSAoX3N0ZXAgPSBfaXRlcmF0b3IubmV4dCgpKS5kb25lKTsgX2l0ZXJhdG9yTm9ybWFsQ29tcGxldGlvbiA9IHRydWUpIHtcbiAgICAgIHZhciBrZXkgPSBfc3RlcC52YWx1ZTtcblxuICAgICAgaWYgKCFWQUxJRF9GUkFHTUVOVF9QUk9QUy5oYXMoa2V5KSkge1xuICAgICAgICB3YXJuaW5nKGZhbHNlLCAnSW52YWxpZCBwcm9wIGAlc2Agc3VwcGxpZWQgdG8gYFJlYWN0LkZyYWdtZW50YC4gJyArICdSZWFjdC5GcmFnbWVudCBjYW4gb25seSBoYXZlIGBrZXlgIGFuZCBgY2hpbGRyZW5gIHByb3BzLiVzJywga2V5LCBnZXRTdGFja0FkZGVuZHVtKCkpO1xuICAgICAgICBicmVhaztcbiAgICAgIH1cbiAgICB9XG4gIH0gY2F0Y2ggKGVycikge1xuICAgIF9kaWRJdGVyYXRvckVycm9yID0gdHJ1ZTtcbiAgICBfaXRlcmF0b3JFcnJvciA9IGVycjtcbiAgfSBmaW5hbGx5IHtcbiAgICB0cnkge1xuICAgICAgaWYgKCFfaXRlcmF0b3JOb3JtYWxDb21wbGV0aW9uICYmIF9pdGVyYXRvclsncmV0dXJuJ10pIHtcbiAgICAgICAgX2l0ZXJhdG9yWydyZXR1cm4nXSgpO1xuICAgICAgfVxuICAgIH0gZmluYWxseSB7XG4gICAgICBpZiAoX2RpZEl0ZXJhdG9yRXJyb3IpIHtcbiAgICAgICAgdGhyb3cgX2l0ZXJhdG9yRXJyb3I7XG4gICAgICB9XG4gICAgfVxuICB9XG5cbiAgaWYgKGZyYWdtZW50LnJlZiAhPT0gbnVsbCkge1xuICAgIHdhcm5pbmcoZmFsc2UsICdJbnZhbGlkIGF0dHJpYnV0ZSBgcmVmYCBzdXBwbGllZCB0byBgUmVhY3QuRnJhZ21lbnRgLiVzJywgZ2V0U3RhY2tBZGRlbmR1bSgpKTtcbiAgfVxuXG4gIGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50ID0gbnVsbDtcbn1cblxuZnVuY3Rpb24gY3JlYXRlRWxlbWVudFdpdGhWYWxpZGF0aW9uKHR5cGUsIHByb3BzLCBjaGlsZHJlbikge1xuICB2YXIgdmFsaWRUeXBlID0gdHlwZW9mIHR5cGUgPT09ICdzdHJpbmcnIHx8IHR5cGVvZiB0eXBlID09PSAnZnVuY3Rpb24nIHx8IHR5cGVvZiB0eXBlID09PSAnc3ltYm9sJyB8fCB0eXBlb2YgdHlwZSA9PT0gJ251bWJlcic7XG4gIC8vIFdlIHdhcm4gaW4gdGhpcyBjYXNlIGJ1dCBkb24ndCB0aHJvdy4gV2UgZXhwZWN0IHRoZSBlbGVtZW50IGNyZWF0aW9uIHRvXG4gIC8vIHN1Y2NlZWQgYW5kIHRoZXJlIHdpbGwgbGlrZWx5IGJlIGVycm9ycyBpbiByZW5kZXIuXG4gIGlmICghdmFsaWRUeXBlKSB7XG4gICAgdmFyIGluZm8gPSAnJztcbiAgICBpZiAodHlwZSA9PT0gdW5kZWZpbmVkIHx8IHR5cGVvZiB0eXBlID09PSAnb2JqZWN0JyAmJiB0eXBlICE9PSBudWxsICYmIE9iamVjdC5rZXlzKHR5cGUpLmxlbmd0aCA9PT0gMCkge1xuICAgICAgaW5mbyArPSAnIFlvdSBsaWtlbHkgZm9yZ290IHRvIGV4cG9ydCB5b3VyIGNvbXBvbmVudCBmcm9tIHRoZSBmaWxlICcgKyBcIml0J3MgZGVmaW5lZCBpbiwgb3IgeW91IG1pZ2h0IGhhdmUgbWl4ZWQgdXAgZGVmYXVsdCBhbmQgbmFtZWQgaW1wb3J0cy5cIjtcbiAgICB9XG5cbiAgICB2YXIgc291cmNlSW5mbyA9IGdldFNvdXJjZUluZm9FcnJvckFkZGVuZHVtKHByb3BzKTtcbiAgICBpZiAoc291cmNlSW5mbykge1xuICAgICAgaW5mbyArPSBzb3VyY2VJbmZvO1xuICAgIH0gZWxzZSB7XG4gICAgICBpbmZvICs9IGdldERlY2xhcmF0aW9uRXJyb3JBZGRlbmR1bSgpO1xuICAgIH1cblxuICAgIGluZm8gKz0gZ2V0U3RhY2tBZGRlbmR1bSgpIHx8ICcnO1xuXG4gICAgd2FybmluZyhmYWxzZSwgJ1JlYWN0LmNyZWF0ZUVsZW1lbnQ6IHR5cGUgaXMgaW52YWxpZCAtLSBleHBlY3RlZCBhIHN0cmluZyAoZm9yICcgKyAnYnVpbHQtaW4gY29tcG9uZW50cykgb3IgYSBjbGFzcy9mdW5jdGlvbiAoZm9yIGNvbXBvc2l0ZSAnICsgJ2NvbXBvbmVudHMpIGJ1dCBnb3Q6ICVzLiVzJywgdHlwZSA9PSBudWxsID8gdHlwZSA6IHR5cGVvZiB0eXBlLCBpbmZvKTtcbiAgfVxuXG4gIHZhciBlbGVtZW50ID0gY3JlYXRlRWxlbWVudC5hcHBseSh0aGlzLCBhcmd1bWVudHMpO1xuXG4gIC8vIFRoZSByZXN1bHQgY2FuIGJlIG51bGxpc2ggaWYgYSBtb2NrIG9yIGEgY3VzdG9tIGZ1bmN0aW9uIGlzIHVzZWQuXG4gIC8vIFRPRE86IERyb3AgdGhpcyB3aGVuIHRoZXNlIGFyZSBubyBsb25nZXIgYWxsb3dlZCBhcyB0aGUgdHlwZSBhcmd1bWVudC5cbiAgaWYgKGVsZW1lbnQgPT0gbnVsbCkge1xuICAgIHJldHVybiBlbGVtZW50O1xuICB9XG5cbiAgLy8gU2tpcCBrZXkgd2FybmluZyBpZiB0aGUgdHlwZSBpc24ndCB2YWxpZCBzaW5jZSBvdXIga2V5IHZhbGlkYXRpb24gbG9naWNcbiAgLy8gZG9lc24ndCBleHBlY3QgYSBub24tc3RyaW5nL2Z1bmN0aW9uIHR5cGUgYW5kIGNhbiB0aHJvdyBjb25mdXNpbmcgZXJyb3JzLlxuICAvLyBXZSBkb24ndCB3YW50IGV4Y2VwdGlvbiBiZWhhdmlvciB0byBkaWZmZXIgYmV0d2VlbiBkZXYgYW5kIHByb2QuXG4gIC8vIChSZW5kZXJpbmcgd2lsbCB0aHJvdyB3aXRoIGEgaGVscGZ1bCBtZXNzYWdlIGFuZCBhcyBzb29uIGFzIHRoZSB0eXBlIGlzXG4gIC8vIGZpeGVkLCB0aGUga2V5IHdhcm5pbmdzIHdpbGwgYXBwZWFyLilcbiAgaWYgKHZhbGlkVHlwZSkge1xuICAgIGZvciAodmFyIGkgPSAyOyBpIDwgYXJndW1lbnRzLmxlbmd0aDsgaSsrKSB7XG4gICAgICB2YWxpZGF0ZUNoaWxkS2V5cyhhcmd1bWVudHNbaV0sIHR5cGUpO1xuICAgIH1cbiAgfVxuXG4gIGlmICh0eXBlb2YgdHlwZSA9PT0gJ3N5bWJvbCcgJiYgdHlwZSA9PT0gUkVBQ1RfRlJBR01FTlRfVFlQRSQxKSB7XG4gICAgdmFsaWRhdGVGcmFnbWVudFByb3BzKGVsZW1lbnQpO1xuICB9IGVsc2Uge1xuICAgIHZhbGlkYXRlUHJvcFR5cGVzKGVsZW1lbnQpO1xuICB9XG5cbiAgcmV0dXJuIGVsZW1lbnQ7XG59XG5cbmZ1bmN0aW9uIGNyZWF0ZUZhY3RvcnlXaXRoVmFsaWRhdGlvbih0eXBlKSB7XG4gIHZhciB2YWxpZGF0ZWRGYWN0b3J5ID0gY3JlYXRlRWxlbWVudFdpdGhWYWxpZGF0aW9uLmJpbmQobnVsbCwgdHlwZSk7XG4gIC8vIExlZ2FjeSBob29rIFRPRE86IFdhcm4gaWYgdGhpcyBpcyBhY2Nlc3NlZFxuICB2YWxpZGF0ZWRGYWN0b3J5LnR5cGUgPSB0eXBlO1xuXG4gIHtcbiAgICBPYmplY3QuZGVmaW5lUHJvcGVydHkodmFsaWRhdGVkRmFjdG9yeSwgJ3R5cGUnLCB7XG4gICAgICBlbnVtZXJhYmxlOiBmYWxzZSxcbiAgICAgIGdldDogZnVuY3Rpb24gKCkge1xuICAgICAgICBsb3dQcmlvcml0eVdhcm5pbmckMShmYWxzZSwgJ0ZhY3RvcnkudHlwZSBpcyBkZXByZWNhdGVkLiBBY2Nlc3MgdGhlIGNsYXNzIGRpcmVjdGx5ICcgKyAnYmVmb3JlIHBhc3NpbmcgaXQgdG8gY3JlYXRlRmFjdG9yeS4nKTtcbiAgICAgICAgT2JqZWN0LmRlZmluZVByb3BlcnR5KHRoaXMsICd0eXBlJywge1xuICAgICAgICAgIHZhbHVlOiB0eXBlXG4gICAgICAgIH0pO1xuICAgICAgICByZXR1cm4gdHlwZTtcbiAgICAgIH1cbiAgICB9KTtcbiAgfVxuXG4gIHJldHVybiB2YWxpZGF0ZWRGYWN0b3J5O1xufVxuXG5mdW5jdGlvbiBjbG9uZUVsZW1lbnRXaXRoVmFsaWRhdGlvbihlbGVtZW50LCBwcm9wcywgY2hpbGRyZW4pIHtcbiAgdmFyIG5ld0VsZW1lbnQgPSBjbG9uZUVsZW1lbnQuYXBwbHkodGhpcywgYXJndW1lbnRzKTtcbiAgZm9yICh2YXIgaSA9IDI7IGkgPCBhcmd1bWVudHMubGVuZ3RoOyBpKyspIHtcbiAgICB2YWxpZGF0ZUNoaWxkS2V5cyhhcmd1bWVudHNbaV0sIG5ld0VsZW1lbnQudHlwZSk7XG4gIH1cbiAgdmFsaWRhdGVQcm9wVHlwZXMobmV3RWxlbWVudCk7XG4gIHJldHVybiBuZXdFbGVtZW50O1xufVxuXG52YXIgUkVBQ1RfRlJBR01FTlRfVFlQRSA9IHR5cGVvZiBTeW1ib2wgPT09ICdmdW5jdGlvbicgJiYgU3ltYm9sWydmb3InXSAmJiBTeW1ib2xbJ2ZvciddKCdyZWFjdC5mcmFnbWVudCcpIHx8IDB4ZWFjYjtcblxudmFyIFJlYWN0ID0ge1xuICBDaGlsZHJlbjoge1xuICAgIG1hcDogbWFwQ2hpbGRyZW4sXG4gICAgZm9yRWFjaDogZm9yRWFjaENoaWxkcmVuLFxuICAgIGNvdW50OiBjb3VudENoaWxkcmVuLFxuICAgIHRvQXJyYXk6IHRvQXJyYXksXG4gICAgb25seTogb25seUNoaWxkXG4gIH0sXG5cbiAgQ29tcG9uZW50OiBDb21wb25lbnQsXG4gIFB1cmVDb21wb25lbnQ6IFB1cmVDb21wb25lbnQsXG4gIHVuc3RhYmxlX0FzeW5jQ29tcG9uZW50OiBBc3luY0NvbXBvbmVudCxcblxuICBjcmVhdGVFbGVtZW50OiBjcmVhdGVFbGVtZW50V2l0aFZhbGlkYXRpb24sXG4gIGNsb25lRWxlbWVudDogY2xvbmVFbGVtZW50V2l0aFZhbGlkYXRpb24sXG4gIGNyZWF0ZUZhY3Rvcnk6IGNyZWF0ZUZhY3RvcnlXaXRoVmFsaWRhdGlvbixcbiAgaXNWYWxpZEVsZW1lbnQ6IGlzVmFsaWRFbGVtZW50LFxuXG4gIHZlcnNpb246IFJlYWN0VmVyc2lvbixcblxuICBfX1NFQ1JFVF9JTlRFUk5BTFNfRE9fTk9UX1VTRV9PUl9ZT1VfV0lMTF9CRV9GSVJFRDoge1xuICAgIFJlYWN0Q3VycmVudE93bmVyOiBSZWFjdEN1cnJlbnRPd25lcixcbiAgICAvLyBVc2VkIGJ5IHJlbmRlcmVycyB0byBhdm9pZCBidW5kbGluZyBvYmplY3QtYXNzaWduIHR3aWNlIGluIFVNRCBidW5kbGVzOlxuICAgIGFzc2lnbjogX2Fzc2lnblxuICB9XG59O1xuXG5pZiAoZW5hYmxlUmVhY3RGcmFnbWVudCkge1xuICBSZWFjdC5GcmFnbWVudCA9IFJFQUNUX0ZSQUdNRU5UX1RZUEU7XG59XG5cbntcbiAgX2Fzc2lnbihSZWFjdC5fX1NFQ1JFVF9JTlRFUk5BTFNfRE9fTk9UX1VTRV9PUl9ZT1VfV0lMTF9CRV9GSVJFRCwge1xuICAgIC8vIFRoZXNlIHNob3VsZCBub3QgYmUgaW5jbHVkZWQgaW4gcHJvZHVjdGlvbi5cbiAgICBSZWFjdERlYnVnQ3VycmVudEZyYW1lOiBSZWFjdERlYnVnQ3VycmVudEZyYW1lLFxuICAgIC8vIFNoaW0gZm9yIFJlYWN0IERPTSAxNi4wLjAgd2hpY2ggc3RpbGwgZGVzdHJ1Y3R1cmVkIChidXQgbm90IHVzZWQpIHRoaXMuXG4gICAgLy8gVE9ETzogcmVtb3ZlIGluIFJlYWN0IDE3LjAuXG4gICAgUmVhY3RDb21wb25lbnRUcmVlSG9vazoge31cbiAgfSk7XG59XG5cblxuXG52YXIgUmVhY3QkMiA9IE9iamVjdC5mcmVlemUoe1xuXHRkZWZhdWx0OiBSZWFjdFxufSk7XG5cbnZhciBSZWFjdCQzID0gKCBSZWFjdCQyICYmIFJlYWN0ICkgfHwgUmVhY3QkMjtcblxuLy8gVE9ETzogZGVjaWRlIG9uIHRoZSB0b3AtbGV2ZWwgZXhwb3J0IGZvcm0uXG4vLyBUaGlzIGlzIGhhY2t5IGJ1dCBtYWtlcyBpdCB3b3JrIHdpdGggYm90aCBSb2xsdXAgYW5kIEplc3QuXG52YXIgcmVhY3QgPSBSZWFjdCQzWydkZWZhdWx0J10gPyBSZWFjdCQzWydkZWZhdWx0J10gOiBSZWFjdCQzO1xuXG5tb2R1bGUuZXhwb3J0cyA9IHJlYWN0O1xuICB9KSgpO1xufVxuXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvcmVhY3QvY2pzL3JlYWN0LmRldmVsb3BtZW50LmpzXG4vLyBtb2R1bGUgaWQgPSAxMVxuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCIvKipcbiAqIENvcHlyaWdodCAoYykgMjAxMy1wcmVzZW50LCBGYWNlYm9vaywgSW5jLlxuICpcbiAqIFRoaXMgc291cmNlIGNvZGUgaXMgbGljZW5zZWQgdW5kZXIgdGhlIE1JVCBsaWNlbnNlIGZvdW5kIGluIHRoZVxuICogTElDRU5TRSBmaWxlIGluIHRoZSByb290IGRpcmVjdG9yeSBvZiB0aGlzIHNvdXJjZSB0cmVlLlxuICovXG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gJ3Byb2R1Y3Rpb24nKSB7XG4gIHZhciBSRUFDVF9FTEVNRU5UX1RZUEUgPSAodHlwZW9mIFN5bWJvbCA9PT0gJ2Z1bmN0aW9uJyAmJlxuICAgIFN5bWJvbC5mb3IgJiZcbiAgICBTeW1ib2wuZm9yKCdyZWFjdC5lbGVtZW50JykpIHx8XG4gICAgMHhlYWM3O1xuXG4gIHZhciBpc1ZhbGlkRWxlbWVudCA9IGZ1bmN0aW9uKG9iamVjdCkge1xuICAgIHJldHVybiB0eXBlb2Ygb2JqZWN0ID09PSAnb2JqZWN0JyAmJlxuICAgICAgb2JqZWN0ICE9PSBudWxsICYmXG4gICAgICBvYmplY3QuJCR0eXBlb2YgPT09IFJFQUNUX0VMRU1FTlRfVFlQRTtcbiAgfTtcblxuICAvLyBCeSBleHBsaWNpdGx5IHVzaW5nIGBwcm9wLXR5cGVzYCB5b3UgYXJlIG9wdGluZyBpbnRvIG5ldyBkZXZlbG9wbWVudCBiZWhhdmlvci5cbiAgLy8gaHR0cDovL2ZiLm1lL3Byb3AtdHlwZXMtaW4tcHJvZFxuICB2YXIgdGhyb3dPbkRpcmVjdEFjY2VzcyA9IHRydWU7XG4gIG1vZHVsZS5leHBvcnRzID0gcmVxdWlyZSgnLi9mYWN0b3J5V2l0aFR5cGVDaGVja2VycycpKGlzVmFsaWRFbGVtZW50LCB0aHJvd09uRGlyZWN0QWNjZXNzKTtcbn0gZWxzZSB7XG4gIC8vIEJ5IGV4cGxpY2l0bHkgdXNpbmcgYHByb3AtdHlwZXNgIHlvdSBhcmUgb3B0aW5nIGludG8gbmV3IHByb2R1Y3Rpb24gYmVoYXZpb3IuXG4gIC8vIGh0dHA6Ly9mYi5tZS9wcm9wLXR5cGVzLWluLXByb2RcbiAgbW9kdWxlLmV4cG9ydHMgPSByZXF1aXJlKCcuL2ZhY3RvcnlXaXRoVGhyb3dpbmdTaGltcycpKCk7XG59XG5cblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9wcm9wLXR5cGVzL2luZGV4LmpzXG4vLyBtb2R1bGUgaWQgPSAxMlxuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCIvKipcbiAqIENvcHlyaWdodCAoYykgMjAxMy1wcmVzZW50LCBGYWNlYm9vaywgSW5jLlxuICpcbiAqIFRoaXMgc291cmNlIGNvZGUgaXMgbGljZW5zZWQgdW5kZXIgdGhlIE1JVCBsaWNlbnNlIGZvdW5kIGluIHRoZVxuICogTElDRU5TRSBmaWxlIGluIHRoZSByb290IGRpcmVjdG9yeSBvZiB0aGlzIHNvdXJjZSB0cmVlLlxuICovXG5cbid1c2Ugc3RyaWN0JztcblxudmFyIGVtcHR5RnVuY3Rpb24gPSByZXF1aXJlKCdmYmpzL2xpYi9lbXB0eUZ1bmN0aW9uJyk7XG52YXIgaW52YXJpYW50ID0gcmVxdWlyZSgnZmJqcy9saWIvaW52YXJpYW50Jyk7XG52YXIgd2FybmluZyA9IHJlcXVpcmUoJ2ZianMvbGliL3dhcm5pbmcnKTtcbnZhciBhc3NpZ24gPSByZXF1aXJlKCdvYmplY3QtYXNzaWduJyk7XG5cbnZhciBSZWFjdFByb3BUeXBlc1NlY3JldCA9IHJlcXVpcmUoJy4vbGliL1JlYWN0UHJvcFR5cGVzU2VjcmV0Jyk7XG52YXIgY2hlY2tQcm9wVHlwZXMgPSByZXF1aXJlKCcuL2NoZWNrUHJvcFR5cGVzJyk7XG5cbm1vZHVsZS5leHBvcnRzID0gZnVuY3Rpb24oaXNWYWxpZEVsZW1lbnQsIHRocm93T25EaXJlY3RBY2Nlc3MpIHtcbiAgLyogZ2xvYmFsIFN5bWJvbCAqL1xuICB2YXIgSVRFUkFUT1JfU1lNQk9MID0gdHlwZW9mIFN5bWJvbCA9PT0gJ2Z1bmN0aW9uJyAmJiBTeW1ib2wuaXRlcmF0b3I7XG4gIHZhciBGQVVYX0lURVJBVE9SX1NZTUJPTCA9ICdAQGl0ZXJhdG9yJzsgLy8gQmVmb3JlIFN5bWJvbCBzcGVjLlxuXG4gIC8qKlxuICAgKiBSZXR1cm5zIHRoZSBpdGVyYXRvciBtZXRob2QgZnVuY3Rpb24gY29udGFpbmVkIG9uIHRoZSBpdGVyYWJsZSBvYmplY3QuXG4gICAqXG4gICAqIEJlIHN1cmUgdG8gaW52b2tlIHRoZSBmdW5jdGlvbiB3aXRoIHRoZSBpdGVyYWJsZSBhcyBjb250ZXh0OlxuICAgKlxuICAgKiAgICAgdmFyIGl0ZXJhdG9yRm4gPSBnZXRJdGVyYXRvckZuKG15SXRlcmFibGUpO1xuICAgKiAgICAgaWYgKGl0ZXJhdG9yRm4pIHtcbiAgICogICAgICAgdmFyIGl0ZXJhdG9yID0gaXRlcmF0b3JGbi5jYWxsKG15SXRlcmFibGUpO1xuICAgKiAgICAgICAuLi5cbiAgICogICAgIH1cbiAgICpcbiAgICogQHBhcmFtIHs/b2JqZWN0fSBtYXliZUl0ZXJhYmxlXG4gICAqIEByZXR1cm4gez9mdW5jdGlvbn1cbiAgICovXG4gIGZ1bmN0aW9uIGdldEl0ZXJhdG9yRm4obWF5YmVJdGVyYWJsZSkge1xuICAgIHZhciBpdGVyYXRvckZuID0gbWF5YmVJdGVyYWJsZSAmJiAoSVRFUkFUT1JfU1lNQk9MICYmIG1heWJlSXRlcmFibGVbSVRFUkFUT1JfU1lNQk9MXSB8fCBtYXliZUl0ZXJhYmxlW0ZBVVhfSVRFUkFUT1JfU1lNQk9MXSk7XG4gICAgaWYgKHR5cGVvZiBpdGVyYXRvckZuID09PSAnZnVuY3Rpb24nKSB7XG4gICAgICByZXR1cm4gaXRlcmF0b3JGbjtcbiAgICB9XG4gIH1cblxuICAvKipcbiAgICogQ29sbGVjdGlvbiBvZiBtZXRob2RzIHRoYXQgYWxsb3cgZGVjbGFyYXRpb24gYW5kIHZhbGlkYXRpb24gb2YgcHJvcHMgdGhhdCBhcmVcbiAgICogc3VwcGxpZWQgdG8gUmVhY3QgY29tcG9uZW50cy4gRXhhbXBsZSB1c2FnZTpcbiAgICpcbiAgICogICB2YXIgUHJvcHMgPSByZXF1aXJlKCdSZWFjdFByb3BUeXBlcycpO1xuICAgKiAgIHZhciBNeUFydGljbGUgPSBSZWFjdC5jcmVhdGVDbGFzcyh7XG4gICAqICAgICBwcm9wVHlwZXM6IHtcbiAgICogICAgICAgLy8gQW4gb3B0aW9uYWwgc3RyaW5nIHByb3AgbmFtZWQgXCJkZXNjcmlwdGlvblwiLlxuICAgKiAgICAgICBkZXNjcmlwdGlvbjogUHJvcHMuc3RyaW5nLFxuICAgKlxuICAgKiAgICAgICAvLyBBIHJlcXVpcmVkIGVudW0gcHJvcCBuYW1lZCBcImNhdGVnb3J5XCIuXG4gICAqICAgICAgIGNhdGVnb3J5OiBQcm9wcy5vbmVPZihbJ05ld3MnLCdQaG90b3MnXSkuaXNSZXF1aXJlZCxcbiAgICpcbiAgICogICAgICAgLy8gQSBwcm9wIG5hbWVkIFwiZGlhbG9nXCIgdGhhdCByZXF1aXJlcyBhbiBpbnN0YW5jZSBvZiBEaWFsb2cuXG4gICAqICAgICAgIGRpYWxvZzogUHJvcHMuaW5zdGFuY2VPZihEaWFsb2cpLmlzUmVxdWlyZWRcbiAgICogICAgIH0sXG4gICAqICAgICByZW5kZXI6IGZ1bmN0aW9uKCkgeyAuLi4gfVxuICAgKiAgIH0pO1xuICAgKlxuICAgKiBBIG1vcmUgZm9ybWFsIHNwZWNpZmljYXRpb24gb2YgaG93IHRoZXNlIG1ldGhvZHMgYXJlIHVzZWQ6XG4gICAqXG4gICAqICAgdHlwZSA6PSBhcnJheXxib29sfGZ1bmN8b2JqZWN0fG51bWJlcnxzdHJpbmd8b25lT2YoWy4uLl0pfGluc3RhbmNlT2YoLi4uKVxuICAgKiAgIGRlY2wgOj0gUmVhY3RQcm9wVHlwZXMue3R5cGV9KC5pc1JlcXVpcmVkKT9cbiAgICpcbiAgICogRWFjaCBhbmQgZXZlcnkgZGVjbGFyYXRpb24gcHJvZHVjZXMgYSBmdW5jdGlvbiB3aXRoIHRoZSBzYW1lIHNpZ25hdHVyZS4gVGhpc1xuICAgKiBhbGxvd3MgdGhlIGNyZWF0aW9uIG9mIGN1c3RvbSB2YWxpZGF0aW9uIGZ1bmN0aW9ucy4gRm9yIGV4YW1wbGU6XG4gICAqXG4gICAqICB2YXIgTXlMaW5rID0gUmVhY3QuY3JlYXRlQ2xhc3Moe1xuICAgKiAgICBwcm9wVHlwZXM6IHtcbiAgICogICAgICAvLyBBbiBvcHRpb25hbCBzdHJpbmcgb3IgVVJJIHByb3AgbmFtZWQgXCJocmVmXCIuXG4gICAqICAgICAgaHJlZjogZnVuY3Rpb24ocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lKSB7XG4gICAqICAgICAgICB2YXIgcHJvcFZhbHVlID0gcHJvcHNbcHJvcE5hbWVdO1xuICAgKiAgICAgICAgaWYgKHByb3BWYWx1ZSAhPSBudWxsICYmIHR5cGVvZiBwcm9wVmFsdWUgIT09ICdzdHJpbmcnICYmXG4gICAqICAgICAgICAgICAgIShwcm9wVmFsdWUgaW5zdGFuY2VvZiBVUkkpKSB7XG4gICAqICAgICAgICAgIHJldHVybiBuZXcgRXJyb3IoXG4gICAqICAgICAgICAgICAgJ0V4cGVjdGVkIGEgc3RyaW5nIG9yIGFuIFVSSSBmb3IgJyArIHByb3BOYW1lICsgJyBpbiAnICtcbiAgICogICAgICAgICAgICBjb21wb25lbnROYW1lXG4gICAqICAgICAgICAgICk7XG4gICAqICAgICAgICB9XG4gICAqICAgICAgfVxuICAgKiAgICB9LFxuICAgKiAgICByZW5kZXI6IGZ1bmN0aW9uKCkgey4uLn1cbiAgICogIH0pO1xuICAgKlxuICAgKiBAaW50ZXJuYWxcbiAgICovXG5cbiAgdmFyIEFOT05ZTU9VUyA9ICc8PGFub255bW91cz4+JztcblxuICAvLyBJbXBvcnRhbnQhXG4gIC8vIEtlZXAgdGhpcyBsaXN0IGluIHN5bmMgd2l0aCBwcm9kdWN0aW9uIHZlcnNpb24gaW4gYC4vZmFjdG9yeVdpdGhUaHJvd2luZ1NoaW1zLmpzYC5cbiAgdmFyIFJlYWN0UHJvcFR5cGVzID0ge1xuICAgIGFycmF5OiBjcmVhdGVQcmltaXRpdmVUeXBlQ2hlY2tlcignYXJyYXknKSxcbiAgICBib29sOiBjcmVhdGVQcmltaXRpdmVUeXBlQ2hlY2tlcignYm9vbGVhbicpLFxuICAgIGZ1bmM6IGNyZWF0ZVByaW1pdGl2ZVR5cGVDaGVja2VyKCdmdW5jdGlvbicpLFxuICAgIG51bWJlcjogY3JlYXRlUHJpbWl0aXZlVHlwZUNoZWNrZXIoJ251bWJlcicpLFxuICAgIG9iamVjdDogY3JlYXRlUHJpbWl0aXZlVHlwZUNoZWNrZXIoJ29iamVjdCcpLFxuICAgIHN0cmluZzogY3JlYXRlUHJpbWl0aXZlVHlwZUNoZWNrZXIoJ3N0cmluZycpLFxuICAgIHN5bWJvbDogY3JlYXRlUHJpbWl0aXZlVHlwZUNoZWNrZXIoJ3N5bWJvbCcpLFxuXG4gICAgYW55OiBjcmVhdGVBbnlUeXBlQ2hlY2tlcigpLFxuICAgIGFycmF5T2Y6IGNyZWF0ZUFycmF5T2ZUeXBlQ2hlY2tlcixcbiAgICBlbGVtZW50OiBjcmVhdGVFbGVtZW50VHlwZUNoZWNrZXIoKSxcbiAgICBpbnN0YW5jZU9mOiBjcmVhdGVJbnN0YW5jZVR5cGVDaGVja2VyLFxuICAgIG5vZGU6IGNyZWF0ZU5vZGVDaGVja2VyKCksXG4gICAgb2JqZWN0T2Y6IGNyZWF0ZU9iamVjdE9mVHlwZUNoZWNrZXIsXG4gICAgb25lT2Y6IGNyZWF0ZUVudW1UeXBlQ2hlY2tlcixcbiAgICBvbmVPZlR5cGU6IGNyZWF0ZVVuaW9uVHlwZUNoZWNrZXIsXG4gICAgc2hhcGU6IGNyZWF0ZVNoYXBlVHlwZUNoZWNrZXIsXG4gICAgZXhhY3Q6IGNyZWF0ZVN0cmljdFNoYXBlVHlwZUNoZWNrZXIsXG4gIH07XG5cbiAgLyoqXG4gICAqIGlubGluZWQgT2JqZWN0LmlzIHBvbHlmaWxsIHRvIGF2b2lkIHJlcXVpcmluZyBjb25zdW1lcnMgc2hpcCB0aGVpciBvd25cbiAgICogaHR0cHM6Ly9kZXZlbG9wZXIubW96aWxsYS5vcmcvZW4tVVMvZG9jcy9XZWIvSmF2YVNjcmlwdC9SZWZlcmVuY2UvR2xvYmFsX09iamVjdHMvT2JqZWN0L2lzXG4gICAqL1xuICAvKmVzbGludC1kaXNhYmxlIG5vLXNlbGYtY29tcGFyZSovXG4gIGZ1bmN0aW9uIGlzKHgsIHkpIHtcbiAgICAvLyBTYW1lVmFsdWUgYWxnb3JpdGhtXG4gICAgaWYgKHggPT09IHkpIHtcbiAgICAgIC8vIFN0ZXBzIDEtNSwgNy0xMFxuICAgICAgLy8gU3RlcHMgNi5iLTYuZTogKzAgIT0gLTBcbiAgICAgIHJldHVybiB4ICE9PSAwIHx8IDEgLyB4ID09PSAxIC8geTtcbiAgICB9IGVsc2Uge1xuICAgICAgLy8gU3RlcCA2LmE6IE5hTiA9PSBOYU5cbiAgICAgIHJldHVybiB4ICE9PSB4ICYmIHkgIT09IHk7XG4gICAgfVxuICB9XG4gIC8qZXNsaW50LWVuYWJsZSBuby1zZWxmLWNvbXBhcmUqL1xuXG4gIC8qKlxuICAgKiBXZSB1c2UgYW4gRXJyb3ItbGlrZSBvYmplY3QgZm9yIGJhY2t3YXJkIGNvbXBhdGliaWxpdHkgYXMgcGVvcGxlIG1heSBjYWxsXG4gICAqIFByb3BUeXBlcyBkaXJlY3RseSBhbmQgaW5zcGVjdCB0aGVpciBvdXRwdXQuIEhvd2V2ZXIsIHdlIGRvbid0IHVzZSByZWFsXG4gICAqIEVycm9ycyBhbnltb3JlLiBXZSBkb24ndCBpbnNwZWN0IHRoZWlyIHN0YWNrIGFueXdheSwgYW5kIGNyZWF0aW5nIHRoZW1cbiAgICogaXMgcHJvaGliaXRpdmVseSBleHBlbnNpdmUgaWYgdGhleSBhcmUgY3JlYXRlZCB0b28gb2Z0ZW4sIHN1Y2ggYXMgd2hhdFxuICAgKiBoYXBwZW5zIGluIG9uZU9mVHlwZSgpIGZvciBhbnkgdHlwZSBiZWZvcmUgdGhlIG9uZSB0aGF0IG1hdGNoZWQuXG4gICAqL1xuICBmdW5jdGlvbiBQcm9wVHlwZUVycm9yKG1lc3NhZ2UpIHtcbiAgICB0aGlzLm1lc3NhZ2UgPSBtZXNzYWdlO1xuICAgIHRoaXMuc3RhY2sgPSAnJztcbiAgfVxuICAvLyBNYWtlIGBpbnN0YW5jZW9mIEVycm9yYCBzdGlsbCB3b3JrIGZvciByZXR1cm5lZCBlcnJvcnMuXG4gIFByb3BUeXBlRXJyb3IucHJvdG90eXBlID0gRXJyb3IucHJvdG90eXBlO1xuXG4gIGZ1bmN0aW9uIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKSB7XG4gICAgaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgICAgIHZhciBtYW51YWxQcm9wVHlwZUNhbGxDYWNoZSA9IHt9O1xuICAgICAgdmFyIG1hbnVhbFByb3BUeXBlV2FybmluZ0NvdW50ID0gMDtcbiAgICB9XG4gICAgZnVuY3Rpb24gY2hlY2tUeXBlKGlzUmVxdWlyZWQsIHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSwgc2VjcmV0KSB7XG4gICAgICBjb21wb25lbnROYW1lID0gY29tcG9uZW50TmFtZSB8fCBBTk9OWU1PVVM7XG4gICAgICBwcm9wRnVsbE5hbWUgPSBwcm9wRnVsbE5hbWUgfHwgcHJvcE5hbWU7XG5cbiAgICAgIGlmIChzZWNyZXQgIT09IFJlYWN0UHJvcFR5cGVzU2VjcmV0KSB7XG4gICAgICAgIGlmICh0aHJvd09uRGlyZWN0QWNjZXNzKSB7XG4gICAgICAgICAgLy8gTmV3IGJlaGF2aW9yIG9ubHkgZm9yIHVzZXJzIG9mIGBwcm9wLXR5cGVzYCBwYWNrYWdlXG4gICAgICAgICAgaW52YXJpYW50KFxuICAgICAgICAgICAgZmFsc2UsXG4gICAgICAgICAgICAnQ2FsbGluZyBQcm9wVHlwZXMgdmFsaWRhdG9ycyBkaXJlY3RseSBpcyBub3Qgc3VwcG9ydGVkIGJ5IHRoZSBgcHJvcC10eXBlc2AgcGFja2FnZS4gJyArXG4gICAgICAgICAgICAnVXNlIGBQcm9wVHlwZXMuY2hlY2tQcm9wVHlwZXMoKWAgdG8gY2FsbCB0aGVtLiAnICtcbiAgICAgICAgICAgICdSZWFkIG1vcmUgYXQgaHR0cDovL2ZiLm1lL3VzZS1jaGVjay1wcm9wLXR5cGVzJ1xuICAgICAgICAgICk7XG4gICAgICAgIH0gZWxzZSBpZiAocHJvY2Vzcy5lbnYuTk9ERV9FTlYgIT09ICdwcm9kdWN0aW9uJyAmJiB0eXBlb2YgY29uc29sZSAhPT0gJ3VuZGVmaW5lZCcpIHtcbiAgICAgICAgICAvLyBPbGQgYmVoYXZpb3IgZm9yIHBlb3BsZSB1c2luZyBSZWFjdC5Qcm9wVHlwZXNcbiAgICAgICAgICB2YXIgY2FjaGVLZXkgPSBjb21wb25lbnROYW1lICsgJzonICsgcHJvcE5hbWU7XG4gICAgICAgICAgaWYgKFxuICAgICAgICAgICAgIW1hbnVhbFByb3BUeXBlQ2FsbENhY2hlW2NhY2hlS2V5XSAmJlxuICAgICAgICAgICAgLy8gQXZvaWQgc3BhbW1pbmcgdGhlIGNvbnNvbGUgYmVjYXVzZSB0aGV5IGFyZSBvZnRlbiBub3QgYWN0aW9uYWJsZSBleGNlcHQgZm9yIGxpYiBhdXRob3JzXG4gICAgICAgICAgICBtYW51YWxQcm9wVHlwZVdhcm5pbmdDb3VudCA8IDNcbiAgICAgICAgICApIHtcbiAgICAgICAgICAgIHdhcm5pbmcoXG4gICAgICAgICAgICAgIGZhbHNlLFxuICAgICAgICAgICAgICAnWW91IGFyZSBtYW51YWxseSBjYWxsaW5nIGEgUmVhY3QuUHJvcFR5cGVzIHZhbGlkYXRpb24gJyArXG4gICAgICAgICAgICAgICdmdW5jdGlvbiBmb3IgdGhlIGAlc2AgcHJvcCBvbiBgJXNgLiBUaGlzIGlzIGRlcHJlY2F0ZWQgJyArXG4gICAgICAgICAgICAgICdhbmQgd2lsbCB0aHJvdyBpbiB0aGUgc3RhbmRhbG9uZSBgcHJvcC10eXBlc2AgcGFja2FnZS4gJyArXG4gICAgICAgICAgICAgICdZb3UgbWF5IGJlIHNlZWluZyB0aGlzIHdhcm5pbmcgZHVlIHRvIGEgdGhpcmQtcGFydHkgUHJvcFR5cGVzICcgK1xuICAgICAgICAgICAgICAnbGlicmFyeS4gU2VlIGh0dHBzOi8vZmIubWUvcmVhY3Qtd2FybmluZy1kb250LWNhbGwtcHJvcHR5cGVzICcgKyAnZm9yIGRldGFpbHMuJyxcbiAgICAgICAgICAgICAgcHJvcEZ1bGxOYW1lLFxuICAgICAgICAgICAgICBjb21wb25lbnROYW1lXG4gICAgICAgICAgICApO1xuICAgICAgICAgICAgbWFudWFsUHJvcFR5cGVDYWxsQ2FjaGVbY2FjaGVLZXldID0gdHJ1ZTtcbiAgICAgICAgICAgIG1hbnVhbFByb3BUeXBlV2FybmluZ0NvdW50Kys7XG4gICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICB9XG4gICAgICBpZiAocHJvcHNbcHJvcE5hbWVdID09IG51bGwpIHtcbiAgICAgICAgaWYgKGlzUmVxdWlyZWQpIHtcbiAgICAgICAgICBpZiAocHJvcHNbcHJvcE5hbWVdID09PSBudWxsKSB7XG4gICAgICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ1RoZSAnICsgbG9jYXRpb24gKyAnIGAnICsgcHJvcEZ1bGxOYW1lICsgJ2AgaXMgbWFya2VkIGFzIHJlcXVpcmVkICcgKyAoJ2luIGAnICsgY29tcG9uZW50TmFtZSArICdgLCBidXQgaXRzIHZhbHVlIGlzIGBudWxsYC4nKSk7XG4gICAgICAgICAgfVxuICAgICAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignVGhlICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBpcyBtYXJrZWQgYXMgcmVxdWlyZWQgaW4gJyArICgnYCcgKyBjb21wb25lbnROYW1lICsgJ2AsIGJ1dCBpdHMgdmFsdWUgaXMgYHVuZGVmaW5lZGAuJykpO1xuICAgICAgICB9XG4gICAgICAgIHJldHVybiBudWxsO1xuICAgICAgfSBlbHNlIHtcbiAgICAgICAgcmV0dXJuIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSk7XG4gICAgICB9XG4gICAgfVxuXG4gICAgdmFyIGNoYWluZWRDaGVja1R5cGUgPSBjaGVja1R5cGUuYmluZChudWxsLCBmYWxzZSk7XG4gICAgY2hhaW5lZENoZWNrVHlwZS5pc1JlcXVpcmVkID0gY2hlY2tUeXBlLmJpbmQobnVsbCwgdHJ1ZSk7XG5cbiAgICByZXR1cm4gY2hhaW5lZENoZWNrVHlwZTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZVByaW1pdGl2ZVR5cGVDaGVja2VyKGV4cGVjdGVkVHlwZSkge1xuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSwgc2VjcmV0KSB7XG4gICAgICB2YXIgcHJvcFZhbHVlID0gcHJvcHNbcHJvcE5hbWVdO1xuICAgICAgdmFyIHByb3BUeXBlID0gZ2V0UHJvcFR5cGUocHJvcFZhbHVlKTtcbiAgICAgIGlmIChwcm9wVHlwZSAhPT0gZXhwZWN0ZWRUeXBlKSB7XG4gICAgICAgIC8vIGBwcm9wVmFsdWVgIGJlaW5nIGluc3RhbmNlIG9mLCBzYXksIGRhdGUvcmVnZXhwLCBwYXNzIHRoZSAnb2JqZWN0J1xuICAgICAgICAvLyBjaGVjaywgYnV0IHdlIGNhbiBvZmZlciBhIG1vcmUgcHJlY2lzZSBlcnJvciBtZXNzYWdlIGhlcmUgcmF0aGVyIHRoYW5cbiAgICAgICAgLy8gJ29mIHR5cGUgYG9iamVjdGAnLlxuICAgICAgICB2YXIgcHJlY2lzZVR5cGUgPSBnZXRQcmVjaXNlVHlwZShwcm9wVmFsdWUpO1xuXG4gICAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignSW52YWxpZCAnICsgbG9jYXRpb24gKyAnIGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Agb2YgdHlwZSAnICsgKCdgJyArIHByZWNpc2VUeXBlICsgJ2Agc3VwcGxpZWQgdG8gYCcgKyBjb21wb25lbnROYW1lICsgJ2AsIGV4cGVjdGVkICcpICsgKCdgJyArIGV4cGVjdGVkVHlwZSArICdgLicpKTtcbiAgICAgIH1cbiAgICAgIHJldHVybiBudWxsO1xuICAgIH1cbiAgICByZXR1cm4gY3JlYXRlQ2hhaW5hYmxlVHlwZUNoZWNrZXIodmFsaWRhdGUpO1xuICB9XG5cbiAgZnVuY3Rpb24gY3JlYXRlQW55VHlwZUNoZWNrZXIoKSB7XG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKGVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNOdWxsKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZUFycmF5T2ZUeXBlQ2hlY2tlcih0eXBlQ2hlY2tlcikge1xuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSkge1xuICAgICAgaWYgKHR5cGVvZiB0eXBlQ2hlY2tlciAhPT0gJ2Z1bmN0aW9uJykge1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ1Byb3BlcnR5IGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Agb2YgY29tcG9uZW50IGAnICsgY29tcG9uZW50TmFtZSArICdgIGhhcyBpbnZhbGlkIFByb3BUeXBlIG5vdGF0aW9uIGluc2lkZSBhcnJheU9mLicpO1xuICAgICAgfVxuICAgICAgdmFyIHByb3BWYWx1ZSA9IHByb3BzW3Byb3BOYW1lXTtcbiAgICAgIGlmICghQXJyYXkuaXNBcnJheShwcm9wVmFsdWUpKSB7XG4gICAgICAgIHZhciBwcm9wVHlwZSA9IGdldFByb3BUeXBlKHByb3BWYWx1ZSk7XG4gICAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignSW52YWxpZCAnICsgbG9jYXRpb24gKyAnIGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Agb2YgdHlwZSAnICsgKCdgJyArIHByb3BUeXBlICsgJ2Agc3VwcGxpZWQgdG8gYCcgKyBjb21wb25lbnROYW1lICsgJ2AsIGV4cGVjdGVkIGFuIGFycmF5LicpKTtcbiAgICAgIH1cbiAgICAgIGZvciAodmFyIGkgPSAwOyBpIDwgcHJvcFZhbHVlLmxlbmd0aDsgaSsrKSB7XG4gICAgICAgIHZhciBlcnJvciA9IHR5cGVDaGVja2VyKHByb3BWYWx1ZSwgaSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSArICdbJyArIGkgKyAnXScsIFJlYWN0UHJvcFR5cGVzU2VjcmV0KTtcbiAgICAgICAgaWYgKGVycm9yIGluc3RhbmNlb2YgRXJyb3IpIHtcbiAgICAgICAgICByZXR1cm4gZXJyb3I7XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICAgIHJldHVybiBudWxsO1xuICAgIH1cbiAgICByZXR1cm4gY3JlYXRlQ2hhaW5hYmxlVHlwZUNoZWNrZXIodmFsaWRhdGUpO1xuICB9XG5cbiAgZnVuY3Rpb24gY3JlYXRlRWxlbWVudFR5cGVDaGVja2VyKCkge1xuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSkge1xuICAgICAgdmFyIHByb3BWYWx1ZSA9IHByb3BzW3Byb3BOYW1lXTtcbiAgICAgIGlmICghaXNWYWxpZEVsZW1lbnQocHJvcFZhbHVlKSkge1xuICAgICAgICB2YXIgcHJvcFR5cGUgPSBnZXRQcm9wVHlwZShwcm9wVmFsdWUpO1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIG9mIHR5cGUgJyArICgnYCcgKyBwcm9wVHlwZSArICdgIHN1cHBsaWVkIHRvIGAnICsgY29tcG9uZW50TmFtZSArICdgLCBleHBlY3RlZCBhIHNpbmdsZSBSZWFjdEVsZW1lbnQuJykpO1xuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVJbnN0YW5jZVR5cGVDaGVja2VyKGV4cGVjdGVkQ2xhc3MpIHtcbiAgICBmdW5jdGlvbiB2YWxpZGF0ZShwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUpIHtcbiAgICAgIGlmICghKHByb3BzW3Byb3BOYW1lXSBpbnN0YW5jZW9mIGV4cGVjdGVkQ2xhc3MpKSB7XG4gICAgICAgIHZhciBleHBlY3RlZENsYXNzTmFtZSA9IGV4cGVjdGVkQ2xhc3MubmFtZSB8fCBBTk9OWU1PVVM7XG4gICAgICAgIHZhciBhY3R1YWxDbGFzc05hbWUgPSBnZXRDbGFzc05hbWUocHJvcHNbcHJvcE5hbWVdKTtcbiAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBvZiB0eXBlICcgKyAoJ2AnICsgYWN0dWFsQ2xhc3NOYW1lICsgJ2Agc3VwcGxpZWQgdG8gYCcgKyBjb21wb25lbnROYW1lICsgJ2AsIGV4cGVjdGVkICcpICsgKCdpbnN0YW5jZSBvZiBgJyArIGV4cGVjdGVkQ2xhc3NOYW1lICsgJ2AuJykpO1xuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVFbnVtVHlwZUNoZWNrZXIoZXhwZWN0ZWRWYWx1ZXMpIHtcbiAgICBpZiAoIUFycmF5LmlzQXJyYXkoZXhwZWN0ZWRWYWx1ZXMpKSB7XG4gICAgICBwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gJ3Byb2R1Y3Rpb24nID8gd2FybmluZyhmYWxzZSwgJ0ludmFsaWQgYXJndW1lbnQgc3VwcGxpZWQgdG8gb25lT2YsIGV4cGVjdGVkIGFuIGluc3RhbmNlIG9mIGFycmF5LicpIDogdm9pZCAwO1xuICAgICAgcmV0dXJuIGVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNOdWxsO1xuICAgIH1cblxuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSkge1xuICAgICAgdmFyIHByb3BWYWx1ZSA9IHByb3BzW3Byb3BOYW1lXTtcbiAgICAgIGZvciAodmFyIGkgPSAwOyBpIDwgZXhwZWN0ZWRWYWx1ZXMubGVuZ3RoOyBpKyspIHtcbiAgICAgICAgaWYgKGlzKHByb3BWYWx1ZSwgZXhwZWN0ZWRWYWx1ZXNbaV0pKSB7XG4gICAgICAgICAgcmV0dXJuIG51bGw7XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgdmFyIHZhbHVlc1N0cmluZyA9IEpTT04uc3RyaW5naWZ5KGV4cGVjdGVkVmFsdWVzKTtcbiAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignSW52YWxpZCAnICsgbG9jYXRpb24gKyAnIGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Agb2YgdmFsdWUgYCcgKyBwcm9wVmFsdWUgKyAnYCAnICsgKCdzdXBwbGllZCB0byBgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgZXhwZWN0ZWQgb25lIG9mICcgKyB2YWx1ZXNTdHJpbmcgKyAnLicpKTtcbiAgICB9XG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZU9iamVjdE9mVHlwZUNoZWNrZXIodHlwZUNoZWNrZXIpIHtcbiAgICBmdW5jdGlvbiB2YWxpZGF0ZShwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUpIHtcbiAgICAgIGlmICh0eXBlb2YgdHlwZUNoZWNrZXIgIT09ICdmdW5jdGlvbicpIHtcbiAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdQcm9wZXJ0eSBgJyArIHByb3BGdWxsTmFtZSArICdgIG9mIGNvbXBvbmVudCBgJyArIGNvbXBvbmVudE5hbWUgKyAnYCBoYXMgaW52YWxpZCBQcm9wVHlwZSBub3RhdGlvbiBpbnNpZGUgb2JqZWN0T2YuJyk7XG4gICAgICB9XG4gICAgICB2YXIgcHJvcFZhbHVlID0gcHJvcHNbcHJvcE5hbWVdO1xuICAgICAgdmFyIHByb3BUeXBlID0gZ2V0UHJvcFR5cGUocHJvcFZhbHVlKTtcbiAgICAgIGlmIChwcm9wVHlwZSAhPT0gJ29iamVjdCcpIHtcbiAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBvZiB0eXBlICcgKyAoJ2AnICsgcHJvcFR5cGUgKyAnYCBzdXBwbGllZCB0byBgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgZXhwZWN0ZWQgYW4gb2JqZWN0LicpKTtcbiAgICAgIH1cbiAgICAgIGZvciAodmFyIGtleSBpbiBwcm9wVmFsdWUpIHtcbiAgICAgICAgaWYgKHByb3BWYWx1ZS5oYXNPd25Qcm9wZXJ0eShrZXkpKSB7XG4gICAgICAgICAgdmFyIGVycm9yID0gdHlwZUNoZWNrZXIocHJvcFZhbHVlLCBrZXksIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUgKyAnLicgKyBrZXksIFJlYWN0UHJvcFR5cGVzU2VjcmV0KTtcbiAgICAgICAgICBpZiAoZXJyb3IgaW5zdGFuY2VvZiBFcnJvcikge1xuICAgICAgICAgICAgcmV0dXJuIGVycm9yO1xuICAgICAgICAgIH1cbiAgICAgICAgfVxuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVVbmlvblR5cGVDaGVja2VyKGFycmF5T2ZUeXBlQ2hlY2tlcnMpIHtcbiAgICBpZiAoIUFycmF5LmlzQXJyYXkoYXJyYXlPZlR5cGVDaGVja2VycykpIHtcbiAgICAgIHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicgPyB3YXJuaW5nKGZhbHNlLCAnSW52YWxpZCBhcmd1bWVudCBzdXBwbGllZCB0byBvbmVPZlR5cGUsIGV4cGVjdGVkIGFuIGluc3RhbmNlIG9mIGFycmF5LicpIDogdm9pZCAwO1xuICAgICAgcmV0dXJuIGVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNOdWxsO1xuICAgIH1cblxuICAgIGZvciAodmFyIGkgPSAwOyBpIDwgYXJyYXlPZlR5cGVDaGVja2Vycy5sZW5ndGg7IGkrKykge1xuICAgICAgdmFyIGNoZWNrZXIgPSBhcnJheU9mVHlwZUNoZWNrZXJzW2ldO1xuICAgICAgaWYgKHR5cGVvZiBjaGVja2VyICE9PSAnZnVuY3Rpb24nKSB7XG4gICAgICAgIHdhcm5pbmcoXG4gICAgICAgICAgZmFsc2UsXG4gICAgICAgICAgJ0ludmFsaWQgYXJndW1lbnQgc3VwcGxpZWQgdG8gb25lT2ZUeXBlLiBFeHBlY3RlZCBhbiBhcnJheSBvZiBjaGVjayBmdW5jdGlvbnMsIGJ1dCAnICtcbiAgICAgICAgICAncmVjZWl2ZWQgJXMgYXQgaW5kZXggJXMuJyxcbiAgICAgICAgICBnZXRQb3N0Zml4Rm9yVHlwZVdhcm5pbmcoY2hlY2tlciksXG4gICAgICAgICAgaVxuICAgICAgICApO1xuICAgICAgICByZXR1cm4gZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc051bGw7XG4gICAgICB9XG4gICAgfVxuXG4gICAgZnVuY3Rpb24gdmFsaWRhdGUocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lKSB7XG4gICAgICBmb3IgKHZhciBpID0gMDsgaSA8IGFycmF5T2ZUeXBlQ2hlY2tlcnMubGVuZ3RoOyBpKyspIHtcbiAgICAgICAgdmFyIGNoZWNrZXIgPSBhcnJheU9mVHlwZUNoZWNrZXJzW2ldO1xuICAgICAgICBpZiAoY2hlY2tlcihwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUsIFJlYWN0UHJvcFR5cGVzU2VjcmV0KSA9PSBudWxsKSB7XG4gICAgICAgICAgcmV0dXJuIG51bGw7XG4gICAgICAgIH1cbiAgICAgIH1cblxuICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBzdXBwbGllZCB0byAnICsgKCdgJyArIGNvbXBvbmVudE5hbWUgKyAnYC4nKSk7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVOb2RlQ2hlY2tlcigpIHtcbiAgICBmdW5jdGlvbiB2YWxpZGF0ZShwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUpIHtcbiAgICAgIGlmICghaXNOb2RlKHByb3BzW3Byb3BOYW1lXSkpIHtcbiAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBzdXBwbGllZCB0byAnICsgKCdgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgZXhwZWN0ZWQgYSBSZWFjdE5vZGUuJykpO1xuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVTaGFwZVR5cGVDaGVja2VyKHNoYXBlVHlwZXMpIHtcbiAgICBmdW5jdGlvbiB2YWxpZGF0ZShwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUpIHtcbiAgICAgIHZhciBwcm9wVmFsdWUgPSBwcm9wc1twcm9wTmFtZV07XG4gICAgICB2YXIgcHJvcFR5cGUgPSBnZXRQcm9wVHlwZShwcm9wVmFsdWUpO1xuICAgICAgaWYgKHByb3BUeXBlICE9PSAnb2JqZWN0Jykge1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIG9mIHR5cGUgYCcgKyBwcm9wVHlwZSArICdgICcgKyAoJ3N1cHBsaWVkIHRvIGAnICsgY29tcG9uZW50TmFtZSArICdgLCBleHBlY3RlZCBgb2JqZWN0YC4nKSk7XG4gICAgICB9XG4gICAgICBmb3IgKHZhciBrZXkgaW4gc2hhcGVUeXBlcykge1xuICAgICAgICB2YXIgY2hlY2tlciA9IHNoYXBlVHlwZXNba2V5XTtcbiAgICAgICAgaWYgKCFjaGVja2VyKSB7XG4gICAgICAgICAgY29udGludWU7XG4gICAgICAgIH1cbiAgICAgICAgdmFyIGVycm9yID0gY2hlY2tlcihwcm9wVmFsdWUsIGtleSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSArICcuJyArIGtleSwgUmVhY3RQcm9wVHlwZXNTZWNyZXQpO1xuICAgICAgICBpZiAoZXJyb3IpIHtcbiAgICAgICAgICByZXR1cm4gZXJyb3I7XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICAgIHJldHVybiBudWxsO1xuICAgIH1cbiAgICByZXR1cm4gY3JlYXRlQ2hhaW5hYmxlVHlwZUNoZWNrZXIodmFsaWRhdGUpO1xuICB9XG5cbiAgZnVuY3Rpb24gY3JlYXRlU3RyaWN0U2hhcGVUeXBlQ2hlY2tlcihzaGFwZVR5cGVzKSB7XG4gICAgZnVuY3Rpb24gdmFsaWRhdGUocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lKSB7XG4gICAgICB2YXIgcHJvcFZhbHVlID0gcHJvcHNbcHJvcE5hbWVdO1xuICAgICAgdmFyIHByb3BUeXBlID0gZ2V0UHJvcFR5cGUocHJvcFZhbHVlKTtcbiAgICAgIGlmIChwcm9wVHlwZSAhPT0gJ29iamVjdCcpIHtcbiAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBvZiB0eXBlIGAnICsgcHJvcFR5cGUgKyAnYCAnICsgKCdzdXBwbGllZCB0byBgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgZXhwZWN0ZWQgYG9iamVjdGAuJykpO1xuICAgICAgfVxuICAgICAgLy8gV2UgbmVlZCB0byBjaGVjayBhbGwga2V5cyBpbiBjYXNlIHNvbWUgYXJlIHJlcXVpcmVkIGJ1dCBtaXNzaW5nIGZyb21cbiAgICAgIC8vIHByb3BzLlxuICAgICAgdmFyIGFsbEtleXMgPSBhc3NpZ24oe30sIHByb3BzW3Byb3BOYW1lXSwgc2hhcGVUeXBlcyk7XG4gICAgICBmb3IgKHZhciBrZXkgaW4gYWxsS2V5cykge1xuICAgICAgICB2YXIgY2hlY2tlciA9IHNoYXBlVHlwZXNba2V5XTtcbiAgICAgICAgaWYgKCFjaGVja2VyKSB7XG4gICAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKFxuICAgICAgICAgICAgJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIGtleSBgJyArIGtleSArICdgIHN1cHBsaWVkIHRvIGAnICsgY29tcG9uZW50TmFtZSArICdgLicgK1xuICAgICAgICAgICAgJ1xcbkJhZCBvYmplY3Q6ICcgKyBKU09OLnN0cmluZ2lmeShwcm9wc1twcm9wTmFtZV0sIG51bGwsICcgICcpICtcbiAgICAgICAgICAgICdcXG5WYWxpZCBrZXlzOiAnICsgIEpTT04uc3RyaW5naWZ5KE9iamVjdC5rZXlzKHNoYXBlVHlwZXMpLCBudWxsLCAnICAnKVxuICAgICAgICAgICk7XG4gICAgICAgIH1cbiAgICAgICAgdmFyIGVycm9yID0gY2hlY2tlcihwcm9wVmFsdWUsIGtleSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSArICcuJyArIGtleSwgUmVhY3RQcm9wVHlwZXNTZWNyZXQpO1xuICAgICAgICBpZiAoZXJyb3IpIHtcbiAgICAgICAgICByZXR1cm4gZXJyb3I7XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICAgIHJldHVybiBudWxsO1xuICAgIH1cblxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBpc05vZGUocHJvcFZhbHVlKSB7XG4gICAgc3dpdGNoICh0eXBlb2YgcHJvcFZhbHVlKSB7XG4gICAgICBjYXNlICdudW1iZXInOlxuICAgICAgY2FzZSAnc3RyaW5nJzpcbiAgICAgIGNhc2UgJ3VuZGVmaW5lZCc6XG4gICAgICAgIHJldHVybiB0cnVlO1xuICAgICAgY2FzZSAnYm9vbGVhbic6XG4gICAgICAgIHJldHVybiAhcHJvcFZhbHVlO1xuICAgICAgY2FzZSAnb2JqZWN0JzpcbiAgICAgICAgaWYgKEFycmF5LmlzQXJyYXkocHJvcFZhbHVlKSkge1xuICAgICAgICAgIHJldHVybiBwcm9wVmFsdWUuZXZlcnkoaXNOb2RlKTtcbiAgICAgICAgfVxuICAgICAgICBpZiAocHJvcFZhbHVlID09PSBudWxsIHx8IGlzVmFsaWRFbGVtZW50KHByb3BWYWx1ZSkpIHtcbiAgICAgICAgICByZXR1cm4gdHJ1ZTtcbiAgICAgICAgfVxuXG4gICAgICAgIHZhciBpdGVyYXRvckZuID0gZ2V0SXRlcmF0b3JGbihwcm9wVmFsdWUpO1xuICAgICAgICBpZiAoaXRlcmF0b3JGbikge1xuICAgICAgICAgIHZhciBpdGVyYXRvciA9IGl0ZXJhdG9yRm4uY2FsbChwcm9wVmFsdWUpO1xuICAgICAgICAgIHZhciBzdGVwO1xuICAgICAgICAgIGlmIChpdGVyYXRvckZuICE9PSBwcm9wVmFsdWUuZW50cmllcykge1xuICAgICAgICAgICAgd2hpbGUgKCEoc3RlcCA9IGl0ZXJhdG9yLm5leHQoKSkuZG9uZSkge1xuICAgICAgICAgICAgICBpZiAoIWlzTm9kZShzdGVwLnZhbHVlKSkge1xuICAgICAgICAgICAgICAgIHJldHVybiBmYWxzZTtcbiAgICAgICAgICAgICAgfVxuICAgICAgICAgICAgfVxuICAgICAgICAgIH0gZWxzZSB7XG4gICAgICAgICAgICAvLyBJdGVyYXRvciB3aWxsIHByb3ZpZGUgZW50cnkgW2ssdl0gdHVwbGVzIHJhdGhlciB0aGFuIHZhbHVlcy5cbiAgICAgICAgICAgIHdoaWxlICghKHN0ZXAgPSBpdGVyYXRvci5uZXh0KCkpLmRvbmUpIHtcbiAgICAgICAgICAgICAgdmFyIGVudHJ5ID0gc3RlcC52YWx1ZTtcbiAgICAgICAgICAgICAgaWYgKGVudHJ5KSB7XG4gICAgICAgICAgICAgICAgaWYgKCFpc05vZGUoZW50cnlbMV0pKSB7XG4gICAgICAgICAgICAgICAgICByZXR1cm4gZmFsc2U7XG4gICAgICAgICAgICAgICAgfVxuICAgICAgICAgICAgICB9XG4gICAgICAgICAgICB9XG4gICAgICAgICAgfVxuICAgICAgICB9IGVsc2Uge1xuICAgICAgICAgIHJldHVybiBmYWxzZTtcbiAgICAgICAgfVxuXG4gICAgICAgIHJldHVybiB0cnVlO1xuICAgICAgZGVmYXVsdDpcbiAgICAgICAgcmV0dXJuIGZhbHNlO1xuICAgIH1cbiAgfVxuXG4gIGZ1bmN0aW9uIGlzU3ltYm9sKHByb3BUeXBlLCBwcm9wVmFsdWUpIHtcbiAgICAvLyBOYXRpdmUgU3ltYm9sLlxuICAgIGlmIChwcm9wVHlwZSA9PT0gJ3N5bWJvbCcpIHtcbiAgICAgIHJldHVybiB0cnVlO1xuICAgIH1cblxuICAgIC8vIDE5LjQuMy41IFN5bWJvbC5wcm90b3R5cGVbQEB0b1N0cmluZ1RhZ10gPT09ICdTeW1ib2wnXG4gICAgaWYgKHByb3BWYWx1ZVsnQEB0b1N0cmluZ1RhZyddID09PSAnU3ltYm9sJykge1xuICAgICAgcmV0dXJuIHRydWU7XG4gICAgfVxuXG4gICAgLy8gRmFsbGJhY2sgZm9yIG5vbi1zcGVjIGNvbXBsaWFudCBTeW1ib2xzIHdoaWNoIGFyZSBwb2x5ZmlsbGVkLlxuICAgIGlmICh0eXBlb2YgU3ltYm9sID09PSAnZnVuY3Rpb24nICYmIHByb3BWYWx1ZSBpbnN0YW5jZW9mIFN5bWJvbCkge1xuICAgICAgcmV0dXJuIHRydWU7XG4gICAgfVxuXG4gICAgcmV0dXJuIGZhbHNlO1xuICB9XG5cbiAgLy8gRXF1aXZhbGVudCBvZiBgdHlwZW9mYCBidXQgd2l0aCBzcGVjaWFsIGhhbmRsaW5nIGZvciBhcnJheSBhbmQgcmVnZXhwLlxuICBmdW5jdGlvbiBnZXRQcm9wVHlwZShwcm9wVmFsdWUpIHtcbiAgICB2YXIgcHJvcFR5cGUgPSB0eXBlb2YgcHJvcFZhbHVlO1xuICAgIGlmIChBcnJheS5pc0FycmF5KHByb3BWYWx1ZSkpIHtcbiAgICAgIHJldHVybiAnYXJyYXknO1xuICAgIH1cbiAgICBpZiAocHJvcFZhbHVlIGluc3RhbmNlb2YgUmVnRXhwKSB7XG4gICAgICAvLyBPbGQgd2Via2l0cyAoYXQgbGVhc3QgdW50aWwgQW5kcm9pZCA0LjApIHJldHVybiAnZnVuY3Rpb24nIHJhdGhlciB0aGFuXG4gICAgICAvLyAnb2JqZWN0JyBmb3IgdHlwZW9mIGEgUmVnRXhwLiBXZSdsbCBub3JtYWxpemUgdGhpcyBoZXJlIHNvIHRoYXQgL2JsYS9cbiAgICAgIC8vIHBhc3NlcyBQcm9wVHlwZXMub2JqZWN0LlxuICAgICAgcmV0dXJuICdvYmplY3QnO1xuICAgIH1cbiAgICBpZiAoaXNTeW1ib2wocHJvcFR5cGUsIHByb3BWYWx1ZSkpIHtcbiAgICAgIHJldHVybiAnc3ltYm9sJztcbiAgICB9XG4gICAgcmV0dXJuIHByb3BUeXBlO1xuICB9XG5cbiAgLy8gVGhpcyBoYW5kbGVzIG1vcmUgdHlwZXMgdGhhbiBgZ2V0UHJvcFR5cGVgLiBPbmx5IHVzZWQgZm9yIGVycm9yIG1lc3NhZ2VzLlxuICAvLyBTZWUgYGNyZWF0ZVByaW1pdGl2ZVR5cGVDaGVja2VyYC5cbiAgZnVuY3Rpb24gZ2V0UHJlY2lzZVR5cGUocHJvcFZhbHVlKSB7XG4gICAgaWYgKHR5cGVvZiBwcm9wVmFsdWUgPT09ICd1bmRlZmluZWQnIHx8IHByb3BWYWx1ZSA9PT0gbnVsbCkge1xuICAgICAgcmV0dXJuICcnICsgcHJvcFZhbHVlO1xuICAgIH1cbiAgICB2YXIgcHJvcFR5cGUgPSBnZXRQcm9wVHlwZShwcm9wVmFsdWUpO1xuICAgIGlmIChwcm9wVHlwZSA9PT0gJ29iamVjdCcpIHtcbiAgICAgIGlmIChwcm9wVmFsdWUgaW5zdGFuY2VvZiBEYXRlKSB7XG4gICAgICAgIHJldHVybiAnZGF0ZSc7XG4gICAgICB9IGVsc2UgaWYgKHByb3BWYWx1ZSBpbnN0YW5jZW9mIFJlZ0V4cCkge1xuICAgICAgICByZXR1cm4gJ3JlZ2V4cCc7XG4gICAgICB9XG4gICAgfVxuICAgIHJldHVybiBwcm9wVHlwZTtcbiAgfVxuXG4gIC8vIFJldHVybnMgYSBzdHJpbmcgdGhhdCBpcyBwb3N0Zml4ZWQgdG8gYSB3YXJuaW5nIGFib3V0IGFuIGludmFsaWQgdHlwZS5cbiAgLy8gRm9yIGV4YW1wbGUsIFwidW5kZWZpbmVkXCIgb3IgXCJvZiB0eXBlIGFycmF5XCJcbiAgZnVuY3Rpb24gZ2V0UG9zdGZpeEZvclR5cGVXYXJuaW5nKHZhbHVlKSB7XG4gICAgdmFyIHR5cGUgPSBnZXRQcmVjaXNlVHlwZSh2YWx1ZSk7XG4gICAgc3dpdGNoICh0eXBlKSB7XG4gICAgICBjYXNlICdhcnJheSc6XG4gICAgICBjYXNlICdvYmplY3QnOlxuICAgICAgICByZXR1cm4gJ2FuICcgKyB0eXBlO1xuICAgICAgY2FzZSAnYm9vbGVhbic6XG4gICAgICBjYXNlICdkYXRlJzpcbiAgICAgIGNhc2UgJ3JlZ2V4cCc6XG4gICAgICAgIHJldHVybiAnYSAnICsgdHlwZTtcbiAgICAgIGRlZmF1bHQ6XG4gICAgICAgIHJldHVybiB0eXBlO1xuICAgIH1cbiAgfVxuXG4gIC8vIFJldHVybnMgY2xhc3MgbmFtZSBvZiB0aGUgb2JqZWN0LCBpZiBhbnkuXG4gIGZ1bmN0aW9uIGdldENsYXNzTmFtZShwcm9wVmFsdWUpIHtcbiAgICBpZiAoIXByb3BWYWx1ZS5jb25zdHJ1Y3RvciB8fCAhcHJvcFZhbHVlLmNvbnN0cnVjdG9yLm5hbWUpIHtcbiAgICAgIHJldHVybiBBTk9OWU1PVVM7XG4gICAgfVxuICAgIHJldHVybiBwcm9wVmFsdWUuY29uc3RydWN0b3IubmFtZTtcbiAgfVxuXG4gIFJlYWN0UHJvcFR5cGVzLmNoZWNrUHJvcFR5cGVzID0gY2hlY2tQcm9wVHlwZXM7XG4gIFJlYWN0UHJvcFR5cGVzLlByb3BUeXBlcyA9IFJlYWN0UHJvcFR5cGVzO1xuXG4gIHJldHVybiBSZWFjdFByb3BUeXBlcztcbn07XG5cblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9wcm9wLXR5cGVzL2ZhY3RvcnlXaXRoVHlwZUNoZWNrZXJzLmpzXG4vLyBtb2R1bGUgaWQgPSAxM1xuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCIvKipcbiAqIENvcHlyaWdodCAoYykgMjAxMy1wcmVzZW50LCBGYWNlYm9vaywgSW5jLlxuICpcbiAqIFRoaXMgc291cmNlIGNvZGUgaXMgbGljZW5zZWQgdW5kZXIgdGhlIE1JVCBsaWNlbnNlIGZvdW5kIGluIHRoZVxuICogTElDRU5TRSBmaWxlIGluIHRoZSByb290IGRpcmVjdG9yeSBvZiB0aGlzIHNvdXJjZSB0cmVlLlxuICovXG5cbid1c2Ugc3RyaWN0JztcblxudmFyIGVtcHR5RnVuY3Rpb24gPSByZXF1aXJlKCdmYmpzL2xpYi9lbXB0eUZ1bmN0aW9uJyk7XG52YXIgaW52YXJpYW50ID0gcmVxdWlyZSgnZmJqcy9saWIvaW52YXJpYW50Jyk7XG52YXIgUmVhY3RQcm9wVHlwZXNTZWNyZXQgPSByZXF1aXJlKCcuL2xpYi9SZWFjdFByb3BUeXBlc1NlY3JldCcpO1xuXG5tb2R1bGUuZXhwb3J0cyA9IGZ1bmN0aW9uKCkge1xuICBmdW5jdGlvbiBzaGltKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSwgc2VjcmV0KSB7XG4gICAgaWYgKHNlY3JldCA9PT0gUmVhY3RQcm9wVHlwZXNTZWNyZXQpIHtcbiAgICAgIC8vIEl0IGlzIHN0aWxsIHNhZmUgd2hlbiBjYWxsZWQgZnJvbSBSZWFjdC5cbiAgICAgIHJldHVybjtcbiAgICB9XG4gICAgaW52YXJpYW50KFxuICAgICAgZmFsc2UsXG4gICAgICAnQ2FsbGluZyBQcm9wVHlwZXMgdmFsaWRhdG9ycyBkaXJlY3RseSBpcyBub3Qgc3VwcG9ydGVkIGJ5IHRoZSBgcHJvcC10eXBlc2AgcGFja2FnZS4gJyArXG4gICAgICAnVXNlIFByb3BUeXBlcy5jaGVja1Byb3BUeXBlcygpIHRvIGNhbGwgdGhlbS4gJyArXG4gICAgICAnUmVhZCBtb3JlIGF0IGh0dHA6Ly9mYi5tZS91c2UtY2hlY2stcHJvcC10eXBlcydcbiAgICApO1xuICB9O1xuICBzaGltLmlzUmVxdWlyZWQgPSBzaGltO1xuICBmdW5jdGlvbiBnZXRTaGltKCkge1xuICAgIHJldHVybiBzaGltO1xuICB9O1xuICAvLyBJbXBvcnRhbnQhXG4gIC8vIEtlZXAgdGhpcyBsaXN0IGluIHN5bmMgd2l0aCBwcm9kdWN0aW9uIHZlcnNpb24gaW4gYC4vZmFjdG9yeVdpdGhUeXBlQ2hlY2tlcnMuanNgLlxuICB2YXIgUmVhY3RQcm9wVHlwZXMgPSB7XG4gICAgYXJyYXk6IHNoaW0sXG4gICAgYm9vbDogc2hpbSxcbiAgICBmdW5jOiBzaGltLFxuICAgIG51bWJlcjogc2hpbSxcbiAgICBvYmplY3Q6IHNoaW0sXG4gICAgc3RyaW5nOiBzaGltLFxuICAgIHN5bWJvbDogc2hpbSxcblxuICAgIGFueTogc2hpbSxcbiAgICBhcnJheU9mOiBnZXRTaGltLFxuICAgIGVsZW1lbnQ6IHNoaW0sXG4gICAgaW5zdGFuY2VPZjogZ2V0U2hpbSxcbiAgICBub2RlOiBzaGltLFxuICAgIG9iamVjdE9mOiBnZXRTaGltLFxuICAgIG9uZU9mOiBnZXRTaGltLFxuICAgIG9uZU9mVHlwZTogZ2V0U2hpbSxcbiAgICBzaGFwZTogZ2V0U2hpbSxcbiAgICBleGFjdDogZ2V0U2hpbVxuICB9O1xuXG4gIFJlYWN0UHJvcFR5cGVzLmNoZWNrUHJvcFR5cGVzID0gZW1wdHlGdW5jdGlvbjtcbiAgUmVhY3RQcm9wVHlwZXMuUHJvcFR5cGVzID0gUmVhY3RQcm9wVHlwZXM7XG5cbiAgcmV0dXJuIFJlYWN0UHJvcFR5cGVzO1xufTtcblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvZmFjdG9yeVdpdGhUaHJvd2luZ1NoaW1zLmpzXG4vLyBtb2R1bGUgaWQgPSAxNFxuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCJleHBvcnQgeyBkZWZhdWx0IGFzIGJsYW5rIH0gZnJvbSAnLi9ibGFuay5zdmcnO1xuZXhwb3J0IHsgZGVmYXVsdCBhcyBiYWxscyB9IGZyb20gJy4vbG9hZGluZy1iYWxscy5zdmcnO1xuZXhwb3J0IHsgZGVmYXVsdCBhcyBiYXJzIH0gZnJvbSAnLi9sb2FkaW5nLWJhcnMuc3ZnJztcbmV4cG9ydCB7IGRlZmF1bHQgYXMgYnViYmxlcyB9IGZyb20gJy4vbG9hZGluZy1idWJibGVzLnN2Zyc7XG5leHBvcnQgeyBkZWZhdWx0IGFzIGN1YmVzIH0gZnJvbSAnLi9sb2FkaW5nLWN1YmVzLnN2Zyc7XG5leHBvcnQgeyBkZWZhdWx0IGFzIGN5bG9uIH0gZnJvbSAnLi9sb2FkaW5nLWN5bG9uLnN2Zyc7XG5leHBvcnQgeyBkZWZhdWx0IGFzIHNwaW4gfSBmcm9tICcuL2xvYWRpbmctc3Bpbi5zdmcnO1xuZXhwb3J0IHsgZGVmYXVsdCBhcyBzcGlubmluZ0J1YmJsZXMgfSBmcm9tICcuL2xvYWRpbmctc3Bpbm5pbmctYnViYmxlcy5zdmcnO1xuZXhwb3J0IHsgZGVmYXVsdCBhcyBzcG9rZXMgfSBmcm9tICcuL2xvYWRpbmctc3Bva2VzLnN2Zyc7XG5cblxuXG4vLyBXRUJQQUNLIEZPT1RFUiAvL1xuLy8gLi9saWIvc3ZnL2luZGV4LmpzIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgY2xhc3M9XFxcImljb24tYmxhbmtcXFwiIHhtbG5zPVxcXCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1xcXCIgdmlld0JveD1cXFwiMCAwIDMyIDMyXFxcIj48L3N2Zz5cXG5cIlxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbGliL3N2Zy9ibGFuay5zdmdcbi8vIG1vZHVsZSBpZCA9IDE2XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIm1vZHVsZS5leHBvcnRzID0gXCI8c3ZnIGNsYXNzPVxcXCJpY29uLWxvYWRpbmdcXFwiIHhtbG5zPVxcXCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1xcXCIgdmlld0JveD1cXFwiMCAwIDMyIDMyXFxcIj5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKC04IDApXFxcIiBkPVxcXCJNNCAxMiBBNCA0IDAgMCAwIDQgMjAgQTQgNCAwIDAgMCA0IDEyXFxcIj4gXFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIi04IDA7IDIgMDsgMiAwO1xcXCIgZHVyPVxcXCIwLjhzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiIGtleXRpbWVzPVxcXCIwOy4yNTsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAgLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDIgMClcXFwiIGQ9XFxcIk00IDEyIEE0IDQgMCAwIDAgNCAyMCBBNCA0IDAgMCAwIDQgMTJcXFwiPiBcXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiMiAwOyAxMiAwOyAxMiAwO1xcXCIgZHVyPVxcXCIwLjhzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiIGtleXRpbWVzPVxcXCIwOy4zNTsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAgLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDEyIDApXFxcIiBkPVxcXCJNNCAxMiBBNCA0IDAgMCAwIDQgMjAgQTQgNCAwIDAgMCA0IDEyXFxcIj4gXFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIjEyIDA7IDIyIDA7IDIyIDA7XFxcIiBkdXI9XFxcIjAuOHNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCIga2V5dGltZXM9XFxcIjA7LjQ1OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiICAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMjQgMClcXFwiIGQ9XFxcIk00IDEyIEE0IDQgMCAwIDAgNCAyMCBBNCA0IDAgMCAwIDQgMTJcXFwiPiBcXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiMjIgMDsgMzIgMDsgMzIgMDtcXFwiIGR1cj1cXFwiMC44c1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIiBrZXl0aW1lcz1cXFwiMDsuNTU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgIC8+XFxuICA8L3BhdGg+XFxuPC9zdmc+XFxuXCJcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL2xpYi9zdmcvbG9hZGluZy1iYWxscy5zdmdcbi8vIG1vZHVsZSBpZCA9IDE3XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIm1vZHVsZS5leHBvcnRzID0gXCI8c3ZnIHhtbG5zPVxcXCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1xcXCIgdmlld0JveD1cXFwiMCAwIDMyIDMyXFxcIj5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDIpXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDQgVjEyelxcXCI+IFxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJkXFxcIiB2YWx1ZXM9XFxcIk0wIDEyIFYyMCBINCBWMTJ6OyBNMCA0IFYyOCBINCBWNHo7IE0wIDEyIFYyMCBINCBWMTJ6OyBNMCAxMiBWMjAgSDQgVjEyelxcXCIgZHVyPVxcXCIxLjJzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiIGtleXRpbWVzPVxcXCIwOy4yOy41OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjg7MC4yIDAuOCAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAgLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDgpXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDQgVjEyelxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcImRcXFwiIHZhbHVlcz1cXFwiTTAgMTIgVjIwIEg0IFYxMno7IE0wIDQgVjI4IEg0IFY0ejsgTTAgMTIgVjIwIEg0IFYxMno7IE0wIDEyIFYyMCBINCBWMTJ6XFxcIiBkdXI9XFxcIjEuMnNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC4yXFxcIiBrZXl0aW1lcz1cXFwiMDsuMjsuNTsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44OzAuMiAwLjggMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgxNClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBINCBWMTJ6XFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiZFxcXCIgdmFsdWVzPVxcXCJNMCAxMiBWMjAgSDQgVjEyejsgTTAgNCBWMjggSDQgVjR6OyBNMCAxMiBWMjAgSDQgVjEyejsgTTAgMTIgVjIwIEg0IFYxMnpcXFwiIGR1cj1cXFwiMS4yc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjRcXFwiIGtleXRpbWVzPVxcXCIwOy4yOy41OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjg7MC4yIDAuOCAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMjApXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDQgVjEyelxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcImRcXFwiIHZhbHVlcz1cXFwiTTAgMTIgVjIwIEg0IFYxMno7IE0wIDQgVjI4IEg0IFY0ejsgTTAgMTIgVjIwIEg0IFYxMno7IE0wIDEyIFYyMCBINCBWMTJ6XFxcIiBkdXI9XFxcIjEuMnNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC42XFxcIiBrZXl0aW1lcz1cXFwiMDsuMjsuNTsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44OzAuMiAwLjggMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDI2KVxcXCIgZD1cXFwiTTAgMTIgVjIwIEg0IFYxMnpcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJkXFxcIiB2YWx1ZXM9XFxcIk0wIDEyIFYyMCBINCBWMTJ6OyBNMCA0IFYyOCBINCBWNHo7IE0wIDEyIFYyMCBINCBWMTJ6OyBNMCAxMiBWMjAgSDQgVjEyelxcXCIgZHVyPVxcXCIxLjJzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuOFxcXCIga2V5dGltZXM9XFxcIjA7LjI7LjU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuODswLjIgMC44IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiIC8+XFxuICA8L3BhdGg+XFxuPC9zdmc+XFxuXCJcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL2xpYi9zdmcvbG9hZGluZy1iYXJzLnN2Z1xuLy8gbW9kdWxlIGlkID0gMThcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgeG1sbnM9XFxcImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXFxcIiB2aWV3Qm94PVxcXCIwIDAgMzIgMzJcXFwiPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSg4IDApXFxcIiBjeD1cXFwiMFxcXCIgY3k9XFxcIjE2XFxcIiByPVxcXCIwXFxcIj4gXFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDsgNDsgMDsgMFxcXCIgZHVyPVxcXCIxLjJzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiXFxuICAgICAga2V5dGltZXM9XFxcIjA7MC4yOzAuNzsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgxNiAwKVxcXCIgY3g9XFxcIjBcXFwiIGN5PVxcXCIxNlxcXCIgcj1cXFwiMFxcXCI+IFxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7IDQ7IDA7IDBcXFwiIGR1cj1cXFwiMS4yc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjNcXFwiXFxuICAgICAga2V5dGltZXM9XFxcIjA7MC4yOzAuNzsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgyNCAwKVxcXCIgY3g9XFxcIjBcXFwiIGN5PVxcXCIxNlxcXCIgcj1cXFwiMFxcXCI+IFxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7IDQ7IDA7IDBcXFwiIGR1cj1cXFwiMS4yc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjZcXFwiXFxuICAgICAga2V5dGltZXM9XFxcIjA7MC4yOzAuNzsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbjwvc3ZnPlxcblwiXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9saWIvc3ZnL2xvYWRpbmctYnViYmxlcy5zdmdcbi8vIG1vZHVsZSBpZCA9IDE5XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIm1vZHVsZS5leHBvcnRzID0gXCI8c3ZnIHhtbG5zPVxcXCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1xcXCIgdmlld0JveD1cXFwiMCAwIDMyIDMyXFxcIj5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKC04IDApXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDggVjEyelxcXCI+IFxcbiAgICA8YW5pbWF0ZVRyYW5zZm9ybSBhdHRyaWJ1dGVOYW1lPVxcXCJ0cmFuc2Zvcm1cXFwiIHR5cGU9XFxcInRyYW5zbGF0ZVxcXCIgdmFsdWVzPVxcXCItOCAwOyAyIDA7IDIgMDtcXFwiIGR1cj1cXFwiMC44c1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIiBrZXl0aW1lcz1cXFwiMDsuMjU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgyIDApXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDggVjEyelxcXCI+IFxcbiAgICA8YW5pbWF0ZVRyYW5zZm9ybSBhdHRyaWJ1dGVOYW1lPVxcXCJ0cmFuc2Zvcm1cXFwiIHR5cGU9XFxcInRyYW5zbGF0ZVxcXCIgdmFsdWVzPVxcXCIyIDA7IDEyIDA7IDEyIDA7XFxcIiBkdXI9XFxcIjAuOHNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCIga2V5dGltZXM9XFxcIjA7LjM1OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiICAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMTIgMClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBIOCBWMTJ6XFxcIj4gXFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIjEyIDA7IDIyIDA7IDIyIDA7XFxcIiBkdXI9XFxcIjAuOHNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCIga2V5dGltZXM9XFxcIjA7LjQ1OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiICAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMjQgMClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBIOCBWMTJ6XFxcIj4gXFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIjIyIDA7IDMyIDA7IDMyIDA7XFxcIiBkdXI9XFxcIjAuOHNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCIga2V5dGltZXM9XFxcIjA7LjU1OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiICAvPlxcbiAgPC9wYXRoPlxcbjwvc3ZnPlxcblwiXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9saWIvc3ZnL2xvYWRpbmctY3ViZXMuc3ZnXG4vLyBtb2R1bGUgaWQgPSAyMFxuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCJtb2R1bGUuZXhwb3J0cyA9IFwiPHN2ZyB4bWxucz1cXFwiaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmdcXFwiIHZpZXdCb3g9XFxcIjAgMCAzMiAzMlxcXCI+XFxuICA8cGF0aCB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgwIDApXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDQgVjEyelxcXCI+XFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIjAgMDsgMjggMDsgMCAwOyAwIDBcXFwiIGR1cj1cXFwiMS41c1xcXCIgYmVnaW49XFxcIjBcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBrZXl0aW1lcz1cXFwiMDswLjM7MC42OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggb3BhY2l0eT1cXFwiMC41XFxcIiB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgwIDApXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDQgVjEyelxcXCI+XFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIjAgMDsgMjggMDsgMCAwOyAwIDBcXFwiIGR1cj1cXFwiMS41c1xcXCIgYmVnaW49XFxcIjAuMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBrZXl0aW1lcz1cXFwiMDswLjM7MC42OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggb3BhY2l0eT1cXFwiMC4yNVxcXCIgdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMCAwKVxcXCIgZD1cXFwiTTAgMTIgVjIwIEg0IFYxMnpcXFwiPlxcbiAgICA8YW5pbWF0ZVRyYW5zZm9ybSBhdHRyaWJ1dGVOYW1lPVxcXCJ0cmFuc2Zvcm1cXFwiIHR5cGU9XFxcInRyYW5zbGF0ZVxcXCIgdmFsdWVzPVxcXCIwIDA7IDI4IDA7IDAgMDsgMCAwXFxcIiBkdXI9XFxcIjEuNXNcXFwiIGJlZ2luPVxcXCIwLjJzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIga2V5dGltZXM9XFxcIjA7MC4zOzAuNjsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvcGF0aD5cXG48L3N2Zz5cXG5cIlxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbGliL3N2Zy9sb2FkaW5nLWN5bG9uLnN2Z1xuLy8gbW9kdWxlIGlkID0gMjFcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgeG1sbnM9XFxcImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXFxcIiB2aWV3Qm94PVxcXCIwIDAgMzIgMzJcXFwiPlxcbiAgPHBhdGggb3BhY2l0eT1cXFwiLjI1XFxcIiBkPVxcXCJNMTYgMCBBMTYgMTYgMCAwIDAgMTYgMzIgQTE2IDE2IDAgMCAwIDE2IDAgTTE2IDQgQTEyIDEyIDAgMCAxIDE2IDI4IEExMiAxMiAwIDAgMSAxNiA0XFxcIi8+XFxuICA8cGF0aCBkPVxcXCJNMTYgMCBBMTYgMTYgMCAwIDEgMzIgMTYgTDI4IDE2IEExMiAxMiAwIDAgMCAxNiA0elxcXCI+XFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwicm90YXRlXFxcIiBmcm9tPVxcXCIwIDE2IDE2XFxcIiB0bz1cXFwiMzYwIDE2IDE2XFxcIiBkdXI9XFxcIjAuOHNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiAvPlxcbiAgPC9wYXRoPlxcbjwvc3ZnPlxcblwiXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9saWIvc3ZnL2xvYWRpbmctc3Bpbi5zdmdcbi8vIG1vZHVsZSBpZCA9IDIyXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIm1vZHVsZS5leHBvcnRzID0gXCI8c3ZnIHhtbG5zPVxcXCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1xcXCIgdmlld0JveD1cXFwiMCAwIDMyIDMyXFxcIj5cXG4gIDxjaXJjbGUgY3g9XFxcIjE2XFxcIiBjeT1cXFwiM1xcXCIgcj1cXFwiMFxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDszOzA7MFxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInJvdGF0ZSg0NSAxNiAxNilcXFwiIGN4PVxcXCIxNlxcXCIgY3k9XFxcIjNcXFwiIHI9XFxcIjBcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7MzswOzBcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC4xMjVzXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInJvdGF0ZSg5MCAxNiAxNilcXFwiIGN4PVxcXCIxNlxcXCIgY3k9XFxcIjNcXFwiIHI9XFxcIjBcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7MzswOzBcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC4yNXNcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwicm90YXRlKDEzNSAxNiAxNilcXFwiIGN4PVxcXCIxNlxcXCIgY3k9XFxcIjNcXFwiIHI9XFxcIjBcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7MzswOzBcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC4zNzVzXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInJvdGF0ZSgxODAgMTYgMTYpXFxcIiBjeD1cXFwiMTZcXFwiIGN5PVxcXCIzXFxcIiByPVxcXCIwXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiclxcXCIgdmFsdWVzPVxcXCIwOzM7MDswXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuNXNcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwicm90YXRlKDIyNSAxNiAxNilcXFwiIGN4PVxcXCIxNlxcXCIgY3k9XFxcIjNcXFwiIHI9XFxcIjBcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7MzswOzBcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC42MjVzXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInJvdGF0ZSgyNzAgMTYgMTYpXFxcIiBjeD1cXFwiMTZcXFwiIGN5PVxcXCIzXFxcIiByPVxcXCIwXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiclxcXCIgdmFsdWVzPVxcXCIwOzM7MDswXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuNzVzXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInJvdGF0ZSgzMTUgMTYgMTYpXFxcIiBjeD1cXFwiMTZcXFwiIGN5PVxcXCIzXFxcIiByPVxcXCIwXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiclxcXCIgdmFsdWVzPVxcXCIwOzM7MDswXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuODc1c1xcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiIC8+XFxuICA8L2NpcmNsZT5cXG4gIDxjaXJjbGUgdHJhbnNmb3JtPVxcXCJyb3RhdGUoMTgwIDE2IDE2KVxcXCIgY3g9XFxcIjE2XFxcIiBjeT1cXFwiM1xcXCIgcj1cXFwiMFxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDszOzA7MFxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjVzXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbjwvc3ZnPlxcblwiXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9saWIvc3ZnL2xvYWRpbmctc3Bpbm5pbmctYnViYmxlcy5zdmdcbi8vIG1vZHVsZSBpZCA9IDIzXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIm1vZHVsZS5leHBvcnRzID0gXCI8c3ZnIGlkPVxcXCJsb2FkaW5nXFxcIiB4bWxucz1cXFwiaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmdcXFwiIHZpZXdCb3g9XFxcIjAgMCAzMiAzMlxcXCI+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIuMVxcXCIgZD1cXFwiTTE0IDAgSDE4IFY4IEgxNCB6XFxcIiB0cmFuc2Zvcm09XFxcInJvdGF0ZSgwIDE2IDE2KVxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcIm9wYWNpdHlcXFwiIGZyb209XFxcIjFcXFwiIHRvPVxcXCIuMVxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIi8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIuMVxcXCIgZD1cXFwiTTE0IDAgSDE4IFY4IEgxNCB6XFxcIiB0cmFuc2Zvcm09XFxcInJvdGF0ZSg0NSAxNiAxNilcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJvcGFjaXR5XFxcIiBmcm9tPVxcXCIxXFxcIiB0bz1cXFwiLjFcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC4xMjVzXFxcIi8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIuMVxcXCIgZD1cXFwiTTE0IDAgSDE4IFY4IEgxNCB6XFxcIiB0cmFuc2Zvcm09XFxcInJvdGF0ZSg5MCAxNiAxNilcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJvcGFjaXR5XFxcIiBmcm9tPVxcXCIxXFxcIiB0bz1cXFwiLjFcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC4yNXNcXFwiLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDEzNSAxNiAxNilcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJvcGFjaXR5XFxcIiBmcm9tPVxcXCIxXFxcIiB0bz1cXFwiLjFcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC4zNzVzXFxcIi8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIuMVxcXCIgZD1cXFwiTTE0IDAgSDE4IFY4IEgxNCB6XFxcIiB0cmFuc2Zvcm09XFxcInJvdGF0ZSgxODAgMTYgMTYpXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwib3BhY2l0eVxcXCIgZnJvbT1cXFwiMVxcXCIgdG89XFxcIi4xXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuNXNcXFwiLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDIyNSAxNiAxNilcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJvcGFjaXR5XFxcIiBmcm9tPVxcXCIxXFxcIiB0bz1cXFwiLjFcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC42NzVzXFxcIi8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIuMVxcXCIgZD1cXFwiTTE0IDAgSDE4IFY4IEgxNCB6XFxcIiB0cmFuc2Zvcm09XFxcInJvdGF0ZSgyNzAgMTYgMTYpXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwib3BhY2l0eVxcXCIgZnJvbT1cXFwiMVxcXCIgdG89XFxcIi4xXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuNzVzXFxcIi8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIuMVxcXCIgZD1cXFwiTTE0IDAgSDE4IFY4IEgxNCB6XFxcIiB0cmFuc2Zvcm09XFxcInJvdGF0ZSgzMTUgMTYgMTYpXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwib3BhY2l0eVxcXCIgZnJvbT1cXFwiMVxcXCIgdG89XFxcIi4xXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuODc1c1xcXCIvPlxcbiAgPC9wYXRoPlxcbjwvc3ZnPlxcblwiXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9saWIvc3ZnL2xvYWRpbmctc3Bva2VzLnN2Z1xuLy8gbW9kdWxlIGlkID0gMjRcbi8vIG1vZHVsZSBjaHVua3MgPSAwIl0sInNvdXJjZVJvb3QiOiIifQ==
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8vd2VicGFjay91bml2ZXJzYWxNb2R1bGVEZWZpbml0aW9uIiwid2VicGFjazovLy93ZWJwYWNrL2Jvb3RzdHJhcCAwMDVhNWY1MDBlZWQ2ZTMzMWMwOCIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvZmJqcy9saWIvZW1wdHlGdW5jdGlvbi5qcyIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvZmJqcy9saWIvaW52YXJpYW50LmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9vYmplY3QtYXNzaWduL2luZGV4LmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9mYmpzL2xpYi93YXJuaW5nLmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9wcm9wLXR5cGVzL2xpYi9SZWFjdFByb3BUeXBlc1NlY3JldC5qcyIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvZmJqcy9saWIvZW1wdHlPYmplY3QuanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvY2hlY2tQcm9wVHlwZXMuanMiLCJ3ZWJwYWNrOi8vLy4vbGliL3JlYWN0LWxvYWRpbmcuanN4Iiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9yZWFjdC9pbmRleC5qcyIsIndlYnBhY2s6Ly8vLi9ub2RlX21vZHVsZXMvcmVhY3QvY2pzL3JlYWN0LnByb2R1Y3Rpb24ubWluLmpzIiwid2VicGFjazovLy8uL25vZGVfbW9kdWxlcy9yZWFjdC9janMvcmVhY3QuZGV2ZWxvcG1lbnQuanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvaW5kZXguanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvZmFjdG9yeVdpdGhUeXBlQ2hlY2tlcnMuanMiLCJ3ZWJwYWNrOi8vLy4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvZmFjdG9yeVdpdGhUaHJvd2luZ1NoaW1zLmpzIiwid2VicGFjazovLy8uL2xpYi9zdmcvaW5kZXguanMiLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9ibGFuay5zdmciLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9sb2FkaW5nLWJhbGxzLnN2ZyIsIndlYnBhY2s6Ly8vLi9saWIvc3ZnL2xvYWRpbmctYmFycy5zdmciLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9sb2FkaW5nLWJ1YmJsZXMuc3ZnIiwid2VicGFjazovLy8uL2xpYi9zdmcvbG9hZGluZy1jdWJlcy5zdmciLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9sb2FkaW5nLWN5bG9uLnN2ZyIsIndlYnBhY2s6Ly8vLi9saWIvc3ZnL2xvYWRpbmctc3Bpbi5zdmciLCJ3ZWJwYWNrOi8vLy4vbGliL3N2Zy9sb2FkaW5nLXNwaW5uaW5nLWJ1YmJsZXMuc3ZnIiwid2VicGFjazovLy8uL2xpYi9zdmcvbG9hZGluZy1zcG9rZXMuc3ZnIl0sIm5hbWVzIjpbInN2Z1NvdXJjZXMiLCJMb2FkaW5nIiwic3RhdGUiLCJkZWxheWVkIiwicHJvcHMiLCJkZWxheSIsInRpbWVvdXQiLCJzZXRUaW1lb3V0Iiwic2V0U3RhdGUiLCJjbGVhclRpbWVvdXQiLCJjb2xvciIsInR5cGUiLCJoZWlnaHQiLCJ3aWR0aCIsInJlc3RQcm9wcyIsInNlbGVjdGVkVHlwZSIsInN2ZyIsInN0eWxlIiwiZmlsbCIsIl9faHRtbCIsInByb3BUeXBlcyIsInN0cmluZyIsIm51bWJlciIsIm9uZU9mVHlwZSIsImRlZmF1bHRQcm9wcyIsImRlZmF1bHQiXSwibWFwcGluZ3MiOiJBQUFBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLENBQUM7QUFDRCxPO0FDVkE7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7OztBQUdBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7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VztBQUN4QixhQUFhLE9BQU87QUFDcEIsYUFBYSxVQUFVO0FBQ3ZCLGFBQWEsUUFBUTtBQUNyQjtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLFdBQVcsZ0JBQWdCO0FBQzNCO0FBQ0EsV0FBVyxVQUFVO0FBQ3JCO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsV0FBVyxVQUFVO0FBQ3JCO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLEtBQUs7QUFDTDtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsWUFBWTtBQUNaO0FBQ0E7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLEdBQUc7QUFDSDs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsR0FBRztBQUNIOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLFdBQVcsRUFBRTtBQUNiLFdBQVcsRUFBRTtBQUNiLFdBQVcsY0FBYztBQUN6QixXQUFXLEVBQUU7QUFDYjtBQUNBO0FBQ0E7QUFDQTtBQUNBLFdBQVcsRUFBRTtBQUNiO0FBQ0EsV0FBVyxFQUFFO0FBQ2IsV0FBVyxFQUFFO0FBQ2I7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxLQUFLO0FBQ0w7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsS0FBSztBQUNMO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsS0FBSztBQUNMO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLEdBQUc7QUFDSDtBQUNBLG1CQUFtQixvQkFBb0I7QUFDdkM7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFD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Q0g7QUFDQTtBQUNBLEdBQUc7QUFDSDtBQUNBO0FBQ0E7QUFDQTtBQUNBLEtBQUs7QUFDTDtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQSxLQUFLO0FBQ0w7QUFDQTs7QUFFQTs7QUFFQTtBQUNBOztBQUVBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsbUJBQW1CLHNCQUFzQjtBQUN6QztBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBLEdBQUc7QUFDSDtBQUNBOztBQUVBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxTQUFTO0FBQ1Q7QUFDQTtBQUNBLEtBQUs7QUFDTDs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQSxpQkFBaUIsc0JBQXNCO0FBQ3ZDO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxHQUFHOztBQUVIO0FBQ0E7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQSxHQUFHO0FBQ0g7Ozs7QUFJQTtBQUNBO0FBQ0EsQ0FBQzs7QUFFRDs7QUFFQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQSxHQUFHO0FBQ0g7Ozs7Ozs7QUM1MENBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQSxDQUFDO0FBQ0Q7QUFDQTtBQUNBO0FBQ0E7Ozs7Ozs7O0FDM0JBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBLDBDQUEwQzs7QUFFMUM7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLGFBQWEsUUFBUTtBQUNyQixjQUFjO0FBQ2Q7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsVUFBVTtBQUNWLDZCQUE2QjtBQUM3QixRQUFRO0FBQ1I7QUFDQTtBQUNBO0FBQ0E7QUFDQSwrQkFBK0IsS0FBSztBQUNwQztBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsU0FBUztBQUNULDRCQUE0QjtBQUM1QixPQUFPO0FBQ1A7QUFDQTtBQUNBOztBQUVBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLEtBQUs7QUFDTDtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsU0FBUztBQUNUO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLE9BQU87QUFDUDtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EscUJBQXFCLHNCQUFzQjtBQUMzQztBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBLHFCQUFxQiwyQkFBMkI7QUFDaEQ7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBLG1CQUFtQixnQ0FBZ0M7QUFDbkQ7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0EscUJBQXFCLGdDQUFnQztBQUNyRDtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsNkJBQTZCO0FBQzdCO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsV0FBVztBQUNYO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0EsU0FBUztBQUNUO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBLE9BQU87QUFDUDtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7O0FBRUE7QUFDQTs7Ozs7Ozs7QUM3aEJBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTs7QUFFQTs7QUFFQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBOztBQUVBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7QUFDQTtBQUNBO0FBQ0E7O0FBRUE7QUFDQTs7QUFFQTtBQUNBOzs7Ozs7Ozs7Ozs7Ozs7Ozs7OzBDQ3pEU3dCLE87Ozs7Ozs7OztpREFDQUEsTzs7Ozs7Ozs7O2dEQUNBQSxPOzs7Ozs7Ozs7bURBQ0FBLE87Ozs7Ozs7OztpREFDQUEsTzs7Ozs7Ozs7O2lEQUNBQSxPOzs7Ozs7Ozs7Z0RBQ0FBLE87Ozs7Ozs7OzsyREFDQUEsTzs7Ozs7Ozs7O2tEQUNBQSxPOzs7Ozs7Ozs7O0FDUlQsZ0g7Ozs7OztBQ0FBLG1SQUFtUixLQUFLLEtBQUssb0VBQW9FLElBQUksaUNBQWlDLDROQUE0TixNQUFNLE1BQU0sb0VBQW9FLElBQUksaUNBQWlDLDhOQUE4TixNQUFNLE1BQU0sb0VBQW9FLElBQUksaUNBQWlDLDhOQUE4TixNQUFNLE1BQU0sb0VBQW9FLElBQUksaUNBQWlDLCtEOzs7Ozs7QUNBNzNDLDhNQUE4TSxpQkFBaUIsbUJBQW1CLHNGQUFzRixHQUFHLEdBQUcsaUNBQWlDLGdCQUFnQiwrS0FBK0ssaUJBQWlCLG1CQUFtQix3RkFBd0YsR0FBRyxHQUFHLGlDQUFpQyxnQkFBZ0IsZ0xBQWdMLGlCQUFpQixtQkFBbUIsd0ZBQXdGLEdBQUcsR0FBRyxpQ0FBaUMsZ0JBQWdCLCtLQUErSyxpQkFBaUIsbUJBQW1CLHdGQUF3RixHQUFHLEdBQUcsaUNBQWlDLGdCQUFnQiwrS0FBK0ssaUJBQWlCLG1CQUFtQix3RkFBd0YsR0FBRyxHQUFHLGlDQUFpQyxnQkFBZ0IsOEQ7Ozs7OztBQ0F4d0QscU1BQXFNLEdBQUcsR0FBRyw2RUFBNkUsSUFBSSxJQUFJLGlDQUFpQyxnQkFBZ0IseUtBQXlLLEdBQUcsR0FBRywrRUFBK0UsSUFBSSxJQUFJLGlDQUFpQyxnQkFBZ0IseUtBQXlLLEdBQUcsR0FBRywrRUFBK0UsSUFBSSxJQUFJLGlDQUFpQyxnQkFBZ0IsZ0U7Ozs7OztBQ0EvN0Isd09BQXdPLEtBQUssS0FBSyxvRUFBb0UsSUFBSSxpQ0FBaUMsd01BQXdNLE1BQU0sTUFBTSxvRUFBb0UsSUFBSSxpQ0FBaUMsME1BQTBNLE1BQU0sTUFBTSxvRUFBb0UsSUFBSSxpQ0FBaUMsME1BQTBNLE1BQU0sTUFBTSxvRUFBb0UsSUFBSSxpQ0FBaUMsK0Q7Ozs7OztBQ0F0eEMscU9BQXFPLE1BQU0sS0FBSyx3RUFBd0UsSUFBSSxJQUFJLGlDQUFpQyxnQkFBZ0Isc05BQXNOLE1BQU0sS0FBSywyRUFBMkUsSUFBSSxJQUFJLGlDQUFpQyxnQkFBZ0IsdU5BQXVOLE1BQU0sS0FBSywyRUFBMkUsSUFBSSxJQUFJLGlDQUFpQyxnQkFBZ0IsOEQ7Ozs7OztBQ0E1akMsa2I7Ozs7OztBQ0FBLHVLQUF1SyxFQUFFLEVBQUUsbUZBQW1GLGdCQUFnQix5S0FBeUssRUFBRSxFQUFFLHdGQUF3RixnQkFBZ0IseUtBQXlLLEVBQUUsRUFBRSx1RkFBdUYsZ0JBQWdCLDBLQUEwSyxFQUFFLEVBQUUsd0ZBQXdGLGdCQUFnQiwwS0FBMEssRUFBRSxFQUFFLHNGQUFzRixnQkFBZ0IsMEtBQTBLLEVBQUUsRUFBRSx3RkFBd0YsZ0JBQWdCLDBLQUEwSyxFQUFFLEVBQUUsdUZBQXVGLGdCQUFnQiwwS0FBMEssRUFBRSxFQUFFLHdGQUF3RixnQkFBZ0IsMEtBQTBLLEVBQUUsRUFBRSxzRkFBc0YsZ0JBQWdCLGdFOzs7Ozs7QUNBdDdFLHV2RCIsImZpbGUiOiJyZWFjdC1sb2FkaW5nLmpzIiwic291cmNlc0NvbnRlbnQiOlsiKGZ1bmN0aW9uIHdlYnBhY2tVbml2ZXJzYWxNb2R1bGVEZWZpbml0aW9uKHJvb3QsIGZhY3RvcnkpIHtcblx0aWYodHlwZW9mIGV4cG9ydHMgPT09ICdvYmplY3QnICYmIHR5cGVvZiBtb2R1bGUgPT09ICdvYmplY3QnKVxuXHRcdG1vZHVsZS5leHBvcnRzID0gZmFjdG9yeSgpO1xuXHRlbHNlIGlmKHR5cGVvZiBkZWZpbmUgPT09ICdmdW5jdGlvbicgJiYgZGVmaW5lLmFtZClcblx0XHRkZWZpbmUoW10sIGZhY3RvcnkpO1xuXHRlbHNlIGlmKHR5cGVvZiBleHBvcnRzID09PSAnb2JqZWN0Jylcblx0XHRleHBvcnRzW1wiTG9hZGluZ1wiXSA9IGZhY3RvcnkoKTtcblx0ZWxzZVxuXHRcdHJvb3RbXCJMb2FkaW5nXCJdID0gZmFjdG9yeSgpO1xufSkodHlwZW9mIHNlbGYgIT09ICd1bmRlZmluZWQnID8gc2VsZiA6IHRoaXMsIGZ1bmN0aW9uKCkge1xucmV0dXJuIFxuXG5cbi8vIFdFQlBBQ0sgRk9PVEVSIC8vXG4vLyB3ZWJwYWNrL3VuaXZlcnNhbE1vZHVsZURlZmluaXRpb24iLCIgXHQvLyBUaGUgbW9kdWxlIGNhY2hlXG4gXHR2YXIgaW5zdGFsbGVkTW9kdWxlcyA9IHt9O1xuXG4gXHQvLyBUaGUgcmVxdWlyZSBmdW5jdGlvblxuIFx0ZnVuY3Rpb24gX193ZWJwYWNrX3JlcXVpcmVfXyhtb2R1bGVJZCkge1xuXG4gXHRcdC8vIENoZWNrIGlmIG1vZHVsZSBpcyBpbiBjYWNoZVxuIFx0XHRpZihpbnN0YWxsZWRNb2R1bGVzW21vZHVsZUlkXSkge1xuIFx0XHRcdHJldHVybiBpbnN0YWxsZWRNb2R1bGVzW21vZHVsZUlkXS5leHBvcnRzO1xuIFx0XHR9XG4gXHRcdC8vIENyZWF0ZSBhIG5ldyBtb2R1bGUgKGFuZCBwdXQgaXQgaW50byB0aGUgY2FjaGUpXG4gXHRcdHZhciBtb2R1bGUgPSBpbnN0YWxsZWRNb2R1bGVzW21vZHVsZUlkXSA9IHtcbiBcdFx0XHRpOiBtb2R1bGVJZCxcbiBcdFx0XHRsOiBmYWxzZSxcbiBcdFx0XHRleHBvcnRzOiB7fVxuIFx0XHR9O1xuXG4gXHRcdC8vIEV4ZWN1dGUgdGhlIG1vZHVsZSBmdW5jdGlvblxuIFx0XHRtb2R1bGVzW21vZHVsZUlkXS5jYWxsKG1vZHVsZS5leHBvcnRzLCBtb2R1bGUsIG1vZHVsZS5leHBvcnRzLCBfX3dlYnBhY2tfcmVxdWlyZV9fKTtcblxuIFx0XHQvLyBGbGFnIHRoZSBtb2R1bGUgYXMgbG9hZGVkXG4gXHRcdG1vZHVsZS5sID0gdHJ1ZTtcblxuIFx0XHQvLyBSZXR1cm4gdGhlIGV4cG9ydHMgb2YgdGhlIG1vZHVsZVxuIFx0XHRyZXR1cm4gbW9kdWxlLmV4cG9ydHM7XG4gXHR9XG5cblxuIFx0Ly8gZXhwb3NlIHRoZSBtb2R1bGVzIG9iamVjdCAoX193ZWJwYWNrX21vZHVsZXNfXylcbiBcdF9fd2VicGFja19yZXF1aXJlX18ubSA9IG1vZHVsZXM7XG5cbiBcdC8vIGV4cG9zZSB0aGUgbW9kdWxlIGNhY2hlXG4gXHRfX3dlYnBhY2tfcmVxdWlyZV9fLmMgPSBpbnN0YWxsZWRNb2R1bGVzO1xuXG4gXHQvLyBkZWZpbmUgZ2V0dGVyIGZ1bmN0aW9uIGZvciBoYXJtb255IGV4cG9ydHNcbiBcdF9fd2VicGFja19yZXF1aXJlX18uZCA9IGZ1bmN0aW9uKGV4cG9ydHMsIG5hbWUsIGdldHRlcikge1xuIFx0XHRpZighX193ZWJwYWNrX3JlcXVpcmVfXy5vKGV4cG9ydHMsIG5hbWUpKSB7XG4gXHRcdFx0T2JqZWN0LmRlZmluZVByb3BlcnR5KGV4cG9ydHMsIG5hbWUsIHtcbiBcdFx0XHRcdGNvbmZpZ3VyYWJsZTogZmFsc2UsXG4gXHRcdFx0XHRlbnVtZXJhYmxlOiB0cnVlLFxuIFx0XHRcdFx0Z2V0OiBnZXR0ZXJcbiBcdFx0XHR9KTtcbiBcdFx0fVxuIFx0fTtcblxuIFx0Ly8gZ2V0RGVmYXVsdEV4cG9ydCBmdW5jdGlvbiBmb3IgY29tcGF0aWJpbGl0eSB3aXRoIG5vbi1oYXJtb255IG1vZHVsZXNcbiBcdF9fd2VicGFja19yZXF1aXJlX18ubiA9IGZ1bmN0aW9uKG1vZHVsZSkge1xuIFx0XHR2YXIgZ2V0dGVyID0gbW9kdWxlICYmIG1vZHVsZS5fX2VzTW9kdWxlID9cbiBcdFx0XHRmdW5jdGlvbiBnZXREZWZhdWx0KCkgeyByZXR1cm4gbW9kdWxlWydkZWZhdWx0J107IH0gOlxuIFx0XHRcdGZ1bmN0aW9uIGdldE1vZHVsZUV4cG9ydHMoKSB7IHJldHVybiBtb2R1bGU7IH07XG4gXHRcdF9fd2VicGFja19yZXF1aXJlX18uZChnZXR0ZXIsICdhJywgZ2V0dGVyKTtcbiBcdFx0cmV0dXJuIGdldHRlcjtcbiBcdH07XG5cbiBcdC8vIE9iamVjdC5wcm90b3R5cGUuaGFzT3duUHJvcGVydHkuY2FsbFxuIFx0X193ZWJwYWNrX3JlcXVpcmVfXy5vID0gZnVuY3Rpb24ob2JqZWN0LCBwcm9wZXJ0eSkgeyByZXR1cm4gT2JqZWN0LnByb3RvdHlwZS5oYXNPd25Qcm9wZXJ0eS5jYWxsKG9iamVjdCwgcHJvcGVydHkpOyB9O1xuXG4gXHQvLyBfX3dlYnBhY2tfcHVibGljX3BhdGhfX1xuIFx0X193ZWJwYWNrX3JlcXVpcmVfXy5wID0gXCIvXCI7XG5cbiBcdC8vIExvYWQgZW50cnkgbW9kdWxlIGFuZCByZXR1cm4gZXhwb3J0c1xuIFx0cmV0dXJuIF9fd2VicGFja19yZXF1aXJlX18oX193ZWJwYWNrX3JlcXVpcmVfXy5zID0gNyk7XG5cblxuXG4vLyBXRUJQQUNLIEZPT1RFUiAvL1xuLy8gd2VicGFjay9ib290c3RyYXAgMDA1YTVmNTAwZWVkNmUzMzFjMDgiLCJcInVzZSBzdHJpY3RcIjtcblxuLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTMtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqXG4gKiBcbiAqL1xuXG5mdW5jdGlvbiBtYWtlRW1wdHlGdW5jdGlvbihhcmcpIHtcbiAgcmV0dXJuIGZ1bmN0aW9uICgpIHtcbiAgICByZXR1cm4gYXJnO1xuICB9O1xufVxuXG4vKipcbiAqIFRoaXMgZnVuY3Rpb24gYWNjZXB0cyBhbmQgZGlzY2FyZHMgaW5wdXRzOyBpdCBoYXMgbm8gc2lkZSBlZmZlY3RzLiBUaGlzIGlzXG4gKiBwcmltYXJpbHkgdXNlZnVsIGlkaW9tYXRpY2FsbHkgZm9yIG92ZXJyaWRhYmxlIGZ1bmN0aW9uIGVuZHBvaW50cyB3aGljaFxuICogYWx3YXlzIG5lZWQgdG8gYmUgY2FsbGFibGUsIHNpbmNlIEpTIGxhY2tzIGEgbnVsbC1jYWxsIGlkaW9tIGFsYSBDb2NvYS5cbiAqL1xudmFyIGVtcHR5RnVuY3Rpb24gPSBmdW5jdGlvbiBlbXB0eUZ1bmN0aW9uKCkge307XG5cbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnMgPSBtYWtlRW1wdHlGdW5jdGlvbjtcbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNGYWxzZSA9IG1ha2VFbXB0eUZ1bmN0aW9uKGZhbHNlKTtcbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNUcnVlID0gbWFrZUVtcHR5RnVuY3Rpb24odHJ1ZSk7XG5lbXB0eUZ1bmN0aW9uLnRoYXRSZXR1cm5zTnVsbCA9IG1ha2VFbXB0eUZ1bmN0aW9uKG51bGwpO1xuZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc1RoaXMgPSBmdW5jdGlvbiAoKSB7XG4gIHJldHVybiB0aGlzO1xufTtcbmVtcHR5RnVuY3Rpb24udGhhdFJldHVybnNBcmd1bWVudCA9IGZ1bmN0aW9uIChhcmcpIHtcbiAgcmV0dXJuIGFyZztcbn07XG5cbm1vZHVsZS5leHBvcnRzID0gZW1wdHlGdW5jdGlvbjtcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9mYmpzL2xpYi9lbXB0eUZ1bmN0aW9uLmpzXG4vLyBtb2R1bGUgaWQgPSAwXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKlxuICogQ29weXJpZ2h0IChjKSAyMDEzLXByZXNlbnQsIEZhY2Vib29rLCBJbmMuXG4gKlxuICogVGhpcyBzb3VyY2UgY29kZSBpcyBsaWNlbnNlZCB1bmRlciB0aGUgTUlUIGxpY2Vuc2UgZm91bmQgaW4gdGhlXG4gKiBMSUNFTlNFIGZpbGUgaW4gdGhlIHJvb3QgZGlyZWN0b3J5IG9mIHRoaXMgc291cmNlIHRyZWUuXG4gKlxuICovXG5cbid1c2Ugc3RyaWN0JztcblxuLyoqXG4gKiBVc2UgaW52YXJpYW50KCkgdG8gYXNzZXJ0IHN0YXRlIHdoaWNoIHlvdXIgcHJvZ3JhbSBhc3N1bWVzIHRvIGJlIHRydWUuXG4gKlxuICogUHJvdmlkZSBzcHJpbnRmLXN0eWxlIGZvcm1hdCAob25seSAlcyBpcyBzdXBwb3J0ZWQpIGFuZCBhcmd1bWVudHNcbiAqIHRvIHByb3ZpZGUgaW5mb3JtYXRpb24gYWJvdXQgd2hhdCBicm9rZSBhbmQgd2hhdCB5b3Ugd2VyZVxuICogZXhwZWN0aW5nLlxuICpcbiAqIFRoZSBpbnZhcmlhbnQgbWVzc2FnZSB3aWxsIGJlIHN0cmlwcGVkIGluIHByb2R1Y3Rpb24sIGJ1dCB0aGUgaW52YXJpYW50XG4gKiB3aWxsIHJlbWFpbiB0byBlbnN1cmUgbG9naWMgZG9lcyBub3QgZGlmZmVyIGluIHByb2R1Y3Rpb24uXG4gKi9cblxudmFyIHZhbGlkYXRlRm9ybWF0ID0gZnVuY3Rpb24gdmFsaWRhdGVGb3JtYXQoZm9ybWF0KSB7fTtcblxuaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgdmFsaWRhdGVGb3JtYXQgPSBmdW5jdGlvbiB2YWxpZGF0ZUZvcm1hdChmb3JtYXQpIHtcbiAgICBpZiAoZm9ybWF0ID09PSB1bmRlZmluZWQpIHtcbiAgICAgIHRocm93IG5ldyBFcnJvcignaW52YXJpYW50IHJlcXVpcmVzIGFuIGVycm9yIG1lc3NhZ2UgYXJndW1lbnQnKTtcbiAgICB9XG4gIH07XG59XG5cbmZ1bmN0aW9uIGludmFyaWFudChjb25kaXRpb24sIGZvcm1hdCwgYSwgYiwgYywgZCwgZSwgZikge1xuICB2YWxpZGF0ZUZvcm1hdChmb3JtYXQpO1xuXG4gIGlmICghY29uZGl0aW9uKSB7XG4gICAgdmFyIGVycm9yO1xuICAgIGlmIChmb3JtYXQgPT09IHVuZGVmaW5lZCkge1xuICAgICAgZXJyb3IgPSBuZXcgRXJyb3IoJ01pbmlmaWVkIGV4Y2VwdGlvbiBvY2N1cnJlZDsgdXNlIHRoZSBub24tbWluaWZpZWQgZGV2IGVudmlyb25tZW50ICcgKyAnZm9yIHRoZSBmdWxsIGVycm9yIG1lc3NhZ2UgYW5kIGFkZGl0aW9uYWwgaGVscGZ1bCB3YXJuaW5ncy4nKTtcbiAgICB9IGVsc2Uge1xuICAgICAgdmFyIGFyZ3MgPSBbYSwgYiwgYywgZCwgZSwgZl07XG4gICAgICB2YXIgYXJnSW5kZXggPSAwO1xuICAgICAgZXJyb3IgPSBuZXcgRXJyb3IoZm9ybWF0LnJlcGxhY2UoLyVzL2csIGZ1bmN0aW9uICgpIHtcbiAgICAgICAgcmV0dXJuIGFyZ3NbYXJnSW5kZXgrK107XG4gICAgICB9KSk7XG4gICAgICBlcnJvci5uYW1lID0gJ0ludmFyaWFudCBWaW9sYXRpb24nO1xuICAgIH1cblxuICAgIGVycm9yLmZyYW1lc1RvUG9wID0gMTsgLy8gd2UgZG9uJ3QgY2FyZSBhYm91dCBpbnZhcmlhbnQncyBvd24gZnJhbWVcbiAgICB0aHJvdyBlcnJvcjtcbiAgfVxufVxuXG5tb2R1bGUuZXhwb3J0cyA9IGludmFyaWFudDtcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9mYmpzL2xpYi9pbnZhcmlhbnQuanNcbi8vIG1vZHVsZSBpZCA9IDFcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLypcbm9iamVjdC1hc3NpZ25cbihjKSBTaW5kcmUgU29yaHVzXG5AbGljZW5zZSBNSVRcbiovXG5cbid1c2Ugc3RyaWN0Jztcbi8qIGVzbGludC1kaXNhYmxlIG5vLXVudXNlZC12YXJzICovXG52YXIgZ2V0T3duUHJvcGVydHlTeW1ib2xzID0gT2JqZWN0LmdldE93blByb3BlcnR5U3ltYm9scztcbnZhciBoYXNPd25Qcm9wZXJ0eSA9IE9iamVjdC5wcm90b3R5cGUuaGFzT3duUHJvcGVydHk7XG52YXIgcHJvcElzRW51bWVyYWJsZSA9IE9iamVjdC5wcm90b3R5cGUucHJvcGVydHlJc0VudW1lcmFibGU7XG5cbmZ1bmN0aW9uIHRvT2JqZWN0KHZhbCkge1xuXHRpZiAodmFsID09PSBudWxsIHx8IHZhbCA9PT0gdW5kZWZpbmVkKSB7XG5cdFx0dGhyb3cgbmV3IFR5cGVFcnJvcignT2JqZWN0LmFzc2lnbiBjYW5ub3QgYmUgY2FsbGVkIHdpdGggbnVsbCBvciB1bmRlZmluZWQnKTtcblx0fVxuXG5cdHJldHVybiBPYmplY3QodmFsKTtcbn1cblxuZnVuY3Rpb24gc2hvdWxkVXNlTmF0aXZlKCkge1xuXHR0cnkge1xuXHRcdGlmICghT2JqZWN0LmFzc2lnbikge1xuXHRcdFx0cmV0dXJuIGZhbHNlO1xuXHRcdH1cblxuXHRcdC8vIERldGVjdCBidWdneSBwcm9wZXJ0eSBlbnVtZXJhdGlvbiBvcmRlciBpbiBvbGRlciBWOCB2ZXJzaW9ucy5cblxuXHRcdC8vIGh0dHBzOi8vYnVncy5jaHJvbWl1bS5vcmcvcC92OC9pc3N1ZXMvZGV0YWlsP2lkPTQxMThcblx0XHR2YXIgdGVzdDEgPSBuZXcgU3RyaW5nKCdhYmMnKTsgIC8vIGVzbGludC1kaXNhYmxlLWxpbmUgbm8tbmV3LXdyYXBwZXJzXG5cdFx0dGVzdDFbNV0gPSAnZGUnO1xuXHRcdGlmIChPYmplY3QuZ2V0T3duUHJvcGVydHlOYW1lcyh0ZXN0MSlbMF0gPT09ICc1Jykge1xuXHRcdFx0cmV0dXJuIGZhbHNlO1xuXHRcdH1cblxuXHRcdC8vIGh0dHBzOi8vYnVncy5jaHJvbWl1bS5vcmcvcC92OC9pc3N1ZXMvZGV0YWlsP2lkPTMwNTZcblx0XHR2YXIgdGVzdDIgPSB7fTtcblx0XHRmb3IgKHZhciBpID0gMDsgaSA8IDEwOyBpKyspIHtcblx0XHRcdHRlc3QyWydfJyArIFN0cmluZy5mcm9tQ2hhckNvZGUoaSldID0gaTtcblx0XHR9XG5cdFx0dmFyIG9yZGVyMiA9IE9iamVjdC5nZXRPd25Qcm9wZXJ0eU5hbWVzKHRlc3QyKS5tYXAoZnVuY3Rpb24gKG4pIHtcblx0XHRcdHJldHVybiB0ZXN0MltuXTtcblx0XHR9KTtcblx0XHRpZiAob3JkZXIyLmpvaW4oJycpICE9PSAnMDEyMzQ1Njc4OScpIHtcblx0XHRcdHJldHVybiBmYWxzZTtcblx0XHR9XG5cblx0XHQvLyBodHRwczovL2J1Z3MuY2hyb21pdW0ub3JnL3AvdjgvaXNzdWVzL2RldGFpbD9pZD0zMDU2XG5cdFx0dmFyIHRlc3QzID0ge307XG5cdFx0J2FiY2RlZmdoaWprbG1ub3BxcnN0Jy5zcGxpdCgnJykuZm9yRWFjaChmdW5jdGlvbiAobGV0dGVyKSB7XG5cdFx0XHR0ZXN0M1tsZXR0ZXJdID0gbGV0dGVyO1xuXHRcdH0pO1xuXHRcdGlmIChPYmplY3Qua2V5cyhPYmplY3QuYXNzaWduKHt9LCB0ZXN0MykpLmpvaW4oJycpICE9PVxuXHRcdFx0XHQnYWJjZGVmZ2hpamtsbW5vcHFyc3QnKSB7XG5cdFx0XHRyZXR1cm4gZmFsc2U7XG5cdFx0fVxuXG5cdFx0cmV0dXJuIHRydWU7XG5cdH0gY2F0Y2ggKGVycikge1xuXHRcdC8vIFdlIGRvbid0IGV4cGVjdCBhbnkgb2YgdGhlIGFib3ZlIHRvIHRocm93LCBidXQgYmV0dGVyIHRvIGJlIHNhZmUuXG5cdFx0cmV0dXJuIGZhbHNlO1xuXHR9XG59XG5cbm1vZHVsZS5leHBvcnRzID0gc2hvdWxkVXNlTmF0aXZlKCkgPyBPYmplY3QuYXNzaWduIDogZnVuY3Rpb24gKHRhcmdldCwgc291cmNlKSB7XG5cdHZhciBmcm9tO1xuXHR2YXIgdG8gPSB0b09iamVjdCh0YXJnZXQpO1xuXHR2YXIgc3ltYm9scztcblxuXHRmb3IgKHZhciBzID0gMTsgcyA8IGFyZ3VtZW50cy5sZW5ndGg7IHMrKykge1xuXHRcdGZyb20gPSBPYmplY3QoYXJndW1lbnRzW3NdKTtcblxuXHRcdGZvciAodmFyIGtleSBpbiBmcm9tKSB7XG5cdFx0XHRpZiAoaGFzT3duUHJvcGVydHkuY2FsbChmcm9tLCBrZXkpKSB7XG5cdFx0XHRcdHRvW2tleV0gPSBmcm9tW2tleV07XG5cdFx0XHR9XG5cdFx0fVxuXG5cdFx0aWYgKGdldE93blByb3BlcnR5U3ltYm9scykge1xuXHRcdFx0c3ltYm9scyA9IGdldE93blByb3BlcnR5U3ltYm9scyhmcm9tKTtcblx0XHRcdGZvciAodmFyIGkgPSAwOyBpIDwgc3ltYm9scy5sZW5ndGg7IGkrKykge1xuXHRcdFx0XHRpZiAocHJvcElzRW51bWVyYWJsZS5jYWxsKGZyb20sIHN5bWJvbHNbaV0pKSB7XG5cdFx0XHRcdFx0dG9bc3ltYm9sc1tpXV0gPSBmcm9tW3N5bWJvbHNbaV1dO1xuXHRcdFx0XHR9XG5cdFx0XHR9XG5cdFx0fVxuXHR9XG5cblx0cmV0dXJuIHRvO1xufTtcblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL29iamVjdC1hc3NpZ24vaW5kZXguanNcbi8vIG1vZHVsZSBpZCA9IDJcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTQtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgZW1wdHlGdW5jdGlvbiA9IHJlcXVpcmUoJy4vZW1wdHlGdW5jdGlvbicpO1xuXG4vKipcbiAqIFNpbWlsYXIgdG8gaW52YXJpYW50IGJ1dCBvbmx5IGxvZ3MgYSB3YXJuaW5nIGlmIHRoZSBjb25kaXRpb24gaXMgbm90IG1ldC5cbiAqIFRoaXMgY2FuIGJlIHVzZWQgdG8gbG9nIGlzc3VlcyBpbiBkZXZlbG9wbWVudCBlbnZpcm9ubWVudHMgaW4gY3JpdGljYWxcbiAqIHBhdGhzLiBSZW1vdmluZyB0aGUgbG9nZ2luZyBjb2RlIGZvciBwcm9kdWN0aW9uIGVudmlyb25tZW50cyB3aWxsIGtlZXAgdGhlXG4gKiBzYW1lIGxvZ2ljIGFuZCBmb2xsb3cgdGhlIHNhbWUgY29kZSBwYXRocy5cbiAqL1xuXG52YXIgd2FybmluZyA9IGVtcHR5RnVuY3Rpb247XG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gJ3Byb2R1Y3Rpb24nKSB7XG4gIHZhciBwcmludFdhcm5pbmcgPSBmdW5jdGlvbiBwcmludFdhcm5pbmcoZm9ybWF0KSB7XG4gICAgZm9yICh2YXIgX2xlbiA9IGFyZ3VtZW50cy5sZW5ndGgsIGFyZ3MgPSBBcnJheShfbGVuID4gMSA/IF9sZW4gLSAxIDogMCksIF9rZXkgPSAxOyBfa2V5IDwgX2xlbjsgX2tleSsrKSB7XG4gICAgICBhcmdzW19rZXkgLSAxXSA9IGFyZ3VtZW50c1tfa2V5XTtcbiAgICB9XG5cbiAgICB2YXIgYXJnSW5kZXggPSAwO1xuICAgIHZhciBtZXNzYWdlID0gJ1dhcm5pbmc6ICcgKyBmb3JtYXQucmVwbGFjZSgvJXMvZywgZnVuY3Rpb24gKCkge1xuICAgICAgcmV0dXJuIGFyZ3NbYXJnSW5kZXgrK107XG4gICAgfSk7XG4gICAgaWYgKHR5cGVvZiBjb25zb2xlICE9PSAndW5kZWZpbmVkJykge1xuICAgICAgY29uc29sZS5lcnJvcihtZXNzYWdlKTtcbiAgICB9XG4gICAgdHJ5IHtcbiAgICAgIC8vIC0tLSBXZWxjb21lIHRvIGRlYnVnZ2luZyBSZWFjdCAtLS1cbiAgICAgIC8vIFRoaXMgZXJyb3Igd2FzIHRocm93biBhcyBhIGNvbnZlbmllbmNlIHNvIHRoYXQgeW91IGNhbiB1c2UgdGhpcyBzdGFja1xuICAgICAgLy8gdG8gZmluZCB0aGUgY2FsbHNpdGUgdGhhdCBjYXVzZWQgdGhpcyB3YXJuaW5nIHRvIGZpcmUuXG4gICAgICB0aHJvdyBuZXcgRXJyb3IobWVzc2FnZSk7XG4gICAgfSBjYXRjaCAoeCkge31cbiAgfTtcblxuICB3YXJuaW5nID0gZnVuY3Rpb24gd2FybmluZyhjb25kaXRpb24sIGZvcm1hdCkge1xuICAgIGlmIChmb3JtYXQgPT09IHVuZGVmaW5lZCkge1xuICAgICAgdGhyb3cgbmV3IEVycm9yKCdgd2FybmluZyhjb25kaXRpb24sIGZvcm1hdCwgLi4uYXJncylgIHJlcXVpcmVzIGEgd2FybmluZyAnICsgJ21lc3NhZ2UgYXJndW1lbnQnKTtcbiAgICB9XG5cbiAgICBpZiAoZm9ybWF0LmluZGV4T2YoJ0ZhaWxlZCBDb21wb3NpdGUgcHJvcFR5cGU6ICcpID09PSAwKSB7XG4gICAgICByZXR1cm47IC8vIElnbm9yZSBDb21wb3NpdGVDb21wb25lbnQgcHJvcHR5cGUgY2hlY2suXG4gICAgfVxuXG4gICAgaWYgKCFjb25kaXRpb24pIHtcbiAgICAgIGZvciAodmFyIF9sZW4yID0gYXJndW1lbnRzLmxlbmd0aCwgYXJncyA9IEFycmF5KF9sZW4yID4gMiA/IF9sZW4yIC0gMiA6IDApLCBfa2V5MiA9IDI7IF9rZXkyIDwgX2xlbjI7IF9rZXkyKyspIHtcbiAgICAgICAgYXJnc1tfa2V5MiAtIDJdID0gYXJndW1lbnRzW19rZXkyXTtcbiAgICAgIH1cblxuICAgICAgcHJpbnRXYXJuaW5nLmFwcGx5KHVuZGVmaW5lZCwgW2Zvcm1hdF0uY29uY2F0KGFyZ3MpKTtcbiAgICB9XG4gIH07XG59XG5cbm1vZHVsZS5leHBvcnRzID0gd2FybmluZztcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9mYmpzL2xpYi93YXJuaW5nLmpzXG4vLyBtb2R1bGUgaWQgPSAzXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKlxuICogQ29weXJpZ2h0IChjKSAyMDEzLXByZXNlbnQsIEZhY2Vib29rLCBJbmMuXG4gKlxuICogVGhpcyBzb3VyY2UgY29kZSBpcyBsaWNlbnNlZCB1bmRlciB0aGUgTUlUIGxpY2Vuc2UgZm91bmQgaW4gdGhlXG4gKiBMSUNFTlNFIGZpbGUgaW4gdGhlIHJvb3QgZGlyZWN0b3J5IG9mIHRoaXMgc291cmNlIHRyZWUuXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgUmVhY3RQcm9wVHlwZXNTZWNyZXQgPSAnU0VDUkVUX0RPX05PVF9QQVNTX1RISVNfT1JfWU9VX1dJTExfQkVfRklSRUQnO1xuXG5tb2R1bGUuZXhwb3J0cyA9IFJlYWN0UHJvcFR5cGVzU2VjcmV0O1xuXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvcHJvcC10eXBlcy9saWIvUmVhY3RQcm9wVHlwZXNTZWNyZXQuanNcbi8vIG1vZHVsZSBpZCA9IDRcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTMtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgZW1wdHlPYmplY3QgPSB7fTtcblxuaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgT2JqZWN0LmZyZWV6ZShlbXB0eU9iamVjdCk7XG59XG5cbm1vZHVsZS5leHBvcnRzID0gZW1wdHlPYmplY3Q7XG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvZmJqcy9saWIvZW1wdHlPYmplY3QuanNcbi8vIG1vZHVsZSBpZCA9IDVcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiLyoqXG4gKiBDb3B5cmlnaHQgKGMpIDIwMTMtcHJlc2VudCwgRmFjZWJvb2ssIEluYy5cbiAqXG4gKiBUaGlzIHNvdXJjZSBjb2RlIGlzIGxpY2Vuc2VkIHVuZGVyIHRoZSBNSVQgbGljZW5zZSBmb3VuZCBpbiB0aGVcbiAqIExJQ0VOU0UgZmlsZSBpbiB0aGUgcm9vdCBkaXJlY3Rvcnkgb2YgdGhpcyBzb3VyY2UgdHJlZS5cbiAqL1xuXG4ndXNlIHN0cmljdCc7XG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gJ3Byb2R1Y3Rpb24nKSB7XG4gIHZhciBpbnZhcmlhbnQgPSByZXF1aXJlKCdmYmpzL2xpYi9pbnZhcmlhbnQnKTtcbiAgdmFyIHdhcm5pbmcgPSByZXF1aXJlKCdmYmpzL2xpYi93YXJuaW5nJyk7XG4gIHZhciBSZWFjdFByb3BUeXBlc1NlY3JldCA9IHJlcXVpcmUoJy4vbGliL1JlYWN0UHJvcFR5cGVzU2VjcmV0Jyk7XG4gIHZhciBsb2dnZWRUeXBlRmFpbHVyZXMgPSB7fTtcbn1cblxuLyoqXG4gKiBBc3NlcnQgdGhhdCB0aGUgdmFsdWVzIG1hdGNoIHdpdGggdGhlIHR5cGUgc3BlY3MuXG4gKiBFcnJvciBtZXNzYWdlcyBhcmUgbWVtb3JpemVkIGFuZCB3aWxsIG9ubHkgYmUgc2hvd24gb25jZS5cbiAqXG4gKiBAcGFyYW0ge29iamVjdH0gdHlwZVNwZWNzIE1hcCBvZiBuYW1lIHRvIGEgUmVhY3RQcm9wVHlwZVxuICogQHBhcmFtIHtvYmplY3R9IHZhbHVlcyBSdW50aW1lIHZhbHVlcyB0aGF0IG5lZWQgdG8gYmUgdHlwZS1jaGVja2VkXG4gKiBAcGFyYW0ge3N0cmluZ30gbG9jYXRpb24gZS5nLiBcInByb3BcIiwgXCJjb250ZXh0XCIsIFwiY2hpbGQgY29udGV4dFwiXG4gKiBAcGFyYW0ge3N0cmluZ30gY29tcG9uZW50TmFtZSBOYW1lIG9mIHRoZSBjb21wb25lbnQgZm9yIGVycm9yIG1lc3NhZ2VzLlxuICogQHBhcmFtIHs/RnVuY3Rpb259IGdldFN0YWNrIFJldHVybnMgdGhlIGNvbXBvbmVudCBzdGFjay5cbiAqIEBwcml2YXRlXG4gKi9cbmZ1bmN0aW9uIGNoZWNrUHJvcFR5cGVzKHR5cGVTcGVjcywgdmFsdWVzLCBsb2NhdGlvbiwgY29tcG9uZW50TmFtZSwgZ2V0U3RhY2spIHtcbiAgaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgICBmb3IgKHZhciB0eXBlU3BlY05hbWUgaW4gdHlwZVNwZWNzKSB7XG4gICAgICBpZiAodHlwZVNwZWNzLmhhc093blByb3BlcnR5KHR5cGVTcGVjTmFtZSkpIHtcbiAgICAgICAgdmFyIGVycm9yO1xuICAgICAgICAvLyBQcm9wIHR5cGUgdmFsaWRhdGlvbiBtYXkgdGhyb3cuIEluIGNhc2UgdGhleSBkbywgd2UgZG9uJ3Qgd2FudCB0b1xuICAgICAgICAvLyBmYWlsIHRoZSByZW5kZXIgcGhhc2Ugd2hlcmUgaXQgZGlkbid0IGZhaWwgYmVmb3JlLiBTbyB3ZSBsb2cgaXQuXG4gICAgICAgIC8vIEFmdGVyIHRoZXNlIGhhdmUgYmVlbiBjbGVhbmVkIHVwLCB3ZSdsbCBsZXQgdGhlbSB0aHJvdy5cbiAgICAgICAgdHJ5IHtcbiAgICAgICAgICAvLyBUaGlzIGlzIGludGVudGlvbmFsbHkgYW4gaW52YXJpYW50IHRoYXQgZ2V0cyBjYXVnaHQuIEl0J3MgdGhlIHNhbWVcbiAgICAgICAgICAvLyBiZWhhdmlvciBhcyB3aXRob3V0IHRoaXMgc3RhdGVtZW50IGV4Y2VwdCB3aXRoIGEgYmV0dGVyIG1lc3NhZ2UuXG4gICAgICAgICAgaW52YXJpYW50KHR5cGVvZiB0eXBlU3BlY3NbdHlwZVNwZWNOYW1lXSA9PT0gJ2Z1bmN0aW9uJywgJyVzOiAlcyB0eXBlIGAlc2AgaXMgaW52YWxpZDsgaXQgbXVzdCBiZSBhIGZ1bmN0aW9uLCB1c3VhbGx5IGZyb20gJyArICd0aGUgYHByb3AtdHlwZXNgIHBhY2thZ2UsIGJ1dCByZWNlaXZlZCBgJXNgLicsIGNvbXBvbmVudE5hbWUgfHwgJ1JlYWN0IGNsYXNzJywgbG9jYXRpb24sIHR5cGVTcGVjTmFtZSwgdHlwZW9mIHR5cGVTcGVjc1t0eXBlU3BlY05hbWVdKTtcbiAgICAgICAgICBlcnJvciA9IHR5cGVTcGVjc1t0eXBlU3BlY05hbWVdKHZhbHVlcywgdHlwZVNwZWNOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgbnVsbCwgUmVhY3RQcm9wVHlwZXNTZWNyZXQpO1xuICAgICAgICB9IGNhdGNoIChleCkge1xuICAgICAgICAgIGVycm9yID0gZXg7XG4gICAgICAgIH1cbiAgICAgICAgd2FybmluZyghZXJyb3IgfHwgZXJyb3IgaW5zdGFuY2VvZiBFcnJvciwgJyVzOiB0eXBlIHNwZWNpZmljYXRpb24gb2YgJXMgYCVzYCBpcyBpbnZhbGlkOyB0aGUgdHlwZSBjaGVja2VyICcgKyAnZnVuY3Rpb24gbXVzdCByZXR1cm4gYG51bGxgIG9yIGFuIGBFcnJvcmAgYnV0IHJldHVybmVkIGEgJXMuICcgKyAnWW91IG1heSBoYXZlIGZvcmdvdHRlbiB0byBwYXNzIGFuIGFyZ3VtZW50IHRvIHRoZSB0eXBlIGNoZWNrZXIgJyArICdjcmVhdG9yIChhcnJheU9mLCBpbnN0YW5jZU9mLCBvYmplY3RPZiwgb25lT2YsIG9uZU9mVHlwZSwgYW5kICcgKyAnc2hhcGUgYWxsIHJlcXVpcmUgYW4gYXJndW1lbnQpLicsIGNvbXBvbmVudE5hbWUgfHwgJ1JlYWN0IGNsYXNzJywgbG9jYXRpb24sIHR5cGVTcGVjTmFtZSwgdHlwZW9mIGVycm9yKTtcbiAgICAgICAgaWYgKGVycm9yIGluc3RhbmNlb2YgRXJyb3IgJiYgIShlcnJvci5tZXNzYWdlIGluIGxvZ2dlZFR5cGVGYWlsdXJlcykpIHtcbiAgICAgICAgICAvLyBPbmx5IG1vbml0b3IgdGhpcyBmYWlsdXJlIG9uY2UgYmVjYXVzZSB0aGVyZSB0ZW5kcyB0byBiZSBhIGxvdCBvZiB0aGVcbiAgICAgICAgICAvLyBzYW1lIGVycm9yLlxuICAgICAgICAgIGxvZ2dlZFR5cGVGYWlsdXJlc1tlcnJvci5tZXNzYWdlXSA9IHRydWU7XG5cbiAgICAgICAgICB2YXIgc3RhY2sgPSBnZXRTdGFjayA/IGdldFN0YWNrKCkgOiAnJztcblxuICAgICAgICAgIHdhcm5pbmcoZmFsc2UsICdGYWlsZWQgJXMgdHlwZTogJXMlcycsIGxvY2F0aW9uLCBlcnJvci5tZXNzYWdlLCBzdGFjayAhPSBudWxsID8gc3RhY2sgOiAnJyk7XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICB9XG4gIH1cbn1cblxubW9kdWxlLmV4cG9ydHMgPSBjaGVja1Byb3BUeXBlcztcblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvY2hlY2tQcm9wVHlwZXMuanNcbi8vIG1vZHVsZSBpZCA9IDZcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwiaW1wb3J0IFJlYWN0LCB7IENvbXBvbmVudCB9IGZyb20gJ3JlYWN0JztcbmltcG9ydCBQcm9wVHlwZXMgZnJvbSAncHJvcC10eXBlcyc7XG5cbmltcG9ydCAqIGFzIHN2Z1NvdXJjZXMgZnJvbSAnLi9zdmcnO1xuXG5leHBvcnQgZGVmYXVsdCBjbGFzcyBMb2FkaW5nIGV4dGVuZHMgQ29tcG9uZW50IHtcbiAgc3RhdGljIHByb3BUeXBlcyA9IHtcbiAgICBjb2xvcjogUHJvcFR5cGVzLnN0cmluZyxcbiAgICBkZWxheTogUHJvcFR5cGVzLm51bWJlcixcbiAgICB0eXBlOiBQcm9wVHlwZXMuc3RyaW5nLFxuICAgIGhlaWdodDogUHJvcFR5cGVzLm9uZU9mVHlwZShbXG4gICAgICBQcm9wVHlwZXMubnVtYmVyLFxuICAgICAgUHJvcFR5cGVzLnN0cmluZyxcbiAgICBdKSxcbiAgICB3aWR0aDogUHJvcFR5cGVzLm9uZU9mVHlwZShbXG4gICAgICBQcm9wVHlwZXMubnVtYmVyLFxuICAgICAgUHJvcFR5cGVzLnN0cmluZyxcbiAgICBdKSxcbiAgfTtcblxuICBzdGF0aWMgZGVmYXVsdFByb3BzID0ge1xuICAgIGNvbG9yOiAnI2ZmZicsXG4gICAgZGVsYXk6IDEwMDAsXG4gICAgdHlwZTogJ2JhbGxzJyxcbiAgICBoZWlnaHQ6IDY0LFxuICAgIHdpZHRoOiA2NCxcbiAgfTtcblxuICBzdGF0ZSA9IHtcbiAgICBkZWxheWVkOiB0aGlzLnByb3BzLmRlbGF5ID4gMCxcbiAgfTtcblxuICBjb21wb25lbnREaWRNb3VudCgpIHtcbiAgICBjb25zdCB7IGRlbGF5IH0gPSB0aGlzLnByb3BzO1xuICAgIGNvbnN0IHsgZGVsYXllZCB9ID0gdGhpcy5zdGF0ZTtcblxuICAgIGlmIChkZWxheWVkKSB7XG4gICAgICB0aGlzLnRpbWVvdXQgPSBzZXRUaW1lb3V0KCgpID0+IHtcbiAgICAgICAgdGhpcy5zZXRTdGF0ZSh7XG4gICAgICAgICAgZGVsYXllZDogZmFsc2UsXG4gICAgICAgIH0pO1xuICAgICAgfSwgZGVsYXkpO1xuICAgIH1cbiAgfVxuXG4gIGNvbXBvbmVudFdpbGxVbm1vdW50KCkge1xuICAgIGNvbnN0IHsgdGltZW91dCB9ID0gdGhpcztcblxuICAgIGlmICh0aW1lb3V0KSB7XG4gICAgICBjbGVhclRpbWVvdXQodGltZW91dCk7XG4gICAgfVxuICB9XG5cbiAgcmVuZGVyKCkge1xuICAgIGNvbnN0IHtcbiAgICAgIGNvbG9yLCBkZWxheSwgdHlwZSwgaGVpZ2h0LCB3aWR0aCwgLi4ucmVzdFByb3BzXG4gICAgfSA9IHRoaXMucHJvcHM7XG4gICAgY29uc3Qgc2VsZWN0ZWRUeXBlID0gdGhpcy5zdGF0ZS5kZWxheWVkID8gJ2JsYW5rJyA6IHR5cGU7XG4gICAgY29uc3Qgc3ZnID0gc3ZnU291cmNlc1tzZWxlY3RlZFR5cGVdO1xuICAgIGNvbnN0IHN0eWxlID0ge1xuICAgICAgZmlsbDogY29sb3IsXG4gICAgICBoZWlnaHQsXG4gICAgICB3aWR0aCxcbiAgICB9O1xuXG4gICAgcmV0dXJuIChcbiAgICAgIDxkaXZcbiAgICAgICAgc3R5bGU9e3N0eWxlfVxuICAgICAgICBkYW5nZXJvdXNseVNldElubmVySFRNTD17eyBfX2h0bWw6IHN2ZyB9fVxuICAgICAgICB7Li4ucmVzdFByb3BzfVxuICAgICAgLz5cbiAgICApO1xuICB9XG59XG5cblxuXG4vLyBXRUJQQUNLIEZPT1RFUiAvL1xuLy8gLi9saWIvcmVhY3QtbG9hZGluZy5qc3giLCIndXNlIHN0cmljdCc7XG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViA9PT0gJ3Byb2R1Y3Rpb24nKSB7XG4gIG1vZHVsZS5leHBvcnRzID0gcmVxdWlyZSgnLi9janMvcmVhY3QucHJvZHVjdGlvbi5taW4uanMnKTtcbn0gZWxzZSB7XG4gIG1vZHVsZS5leHBvcnRzID0gcmVxdWlyZSgnLi9janMvcmVhY3QuZGV2ZWxvcG1lbnQuanMnKTtcbn1cblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3JlYWN0L2luZGV4LmpzXG4vLyBtb2R1bGUgaWQgPSA4XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKiBAbGljZW5zZSBSZWFjdCB2MTYuMi4wXG4gKiByZWFjdC5wcm9kdWN0aW9uLm1pbi5qc1xuICpcbiAqIENvcHlyaWdodCAoYykgMjAxMy1wcmVzZW50LCBGYWNlYm9vaywgSW5jLlxuICpcbiAqIFRoaXMgc291cmNlIGNvZGUgaXMgbGljZW5zZWQgdW5kZXIgdGhlIE1JVCBsaWNlbnNlIGZvdW5kIGluIHRoZVxuICogTElDRU5TRSBmaWxlIGluIHRoZSByb290IGRpcmVjdG9yeSBvZiB0aGlzIHNvdXJjZSB0cmVlLlxuICovXG5cbid1c2Ugc3RyaWN0Jzt2YXIgbT1yZXF1aXJlKFwib2JqZWN0LWFzc2lnblwiKSxuPXJlcXVpcmUoXCJmYmpzL2xpYi9lbXB0eU9iamVjdFwiKSxwPXJlcXVpcmUoXCJmYmpzL2xpYi9lbXB0eUZ1bmN0aW9uXCIpLHE9XCJmdW5jdGlvblwiPT09dHlwZW9mIFN5bWJvbCYmU3ltYm9sW1wiZm9yXCJdLHI9cT9TeW1ib2xbXCJmb3JcIl0oXCJyZWFjdC5lbGVtZW50XCIpOjYwMTAzLHQ9cT9TeW1ib2xbXCJmb3JcIl0oXCJyZWFjdC5jYWxsXCIpOjYwMTA0LHU9cT9TeW1ib2xbXCJmb3JcIl0oXCJyZWFjdC5yZXR1cm5cIik6NjAxMDUsdj1xP1N5bWJvbFtcImZvclwiXShcInJlYWN0LnBvcnRhbFwiKTo2MDEwNix3PXE/U3ltYm9sW1wiZm9yXCJdKFwicmVhY3QuZnJhZ21lbnRcIik6NjAxMDcseD1cImZ1bmN0aW9uXCI9PT10eXBlb2YgU3ltYm9sJiZTeW1ib2wuaXRlcmF0b3I7XG5mdW5jdGlvbiB5KGEpe2Zvcih2YXIgYj1hcmd1bWVudHMubGVuZ3RoLTEsZT1cIk1pbmlmaWVkIFJlYWN0IGVycm9yICNcIithK1wiOyB2aXNpdCBodHRwOi8vZmFjZWJvb2suZ2l0aHViLmlvL3JlYWN0L2RvY3MvZXJyb3ItZGVjb2Rlci5odG1sP2ludmFyaWFudFxceDNkXCIrYSxjPTA7YzxiO2MrKyllKz1cIlxceDI2YXJnc1tdXFx4M2RcIitlbmNvZGVVUklDb21wb25lbnQoYXJndW1lbnRzW2MrMV0pO2I9RXJyb3IoZStcIiBmb3IgdGhlIGZ1bGwgbWVzc2FnZSBvciB1c2UgdGhlIG5vbi1taW5pZmllZCBkZXYgZW52aXJvbm1lbnQgZm9yIGZ1bGwgZXJyb3JzIGFuZCBhZGRpdGlvbmFsIGhlbHBmdWwgd2FybmluZ3MuXCIpO2IubmFtZT1cIkludmFyaWFudCBWaW9sYXRpb25cIjtiLmZyYW1lc1RvUG9wPTE7dGhyb3cgYjt9XG52YXIgej17aXNNb3VudGVkOmZ1bmN0aW9uKCl7cmV0dXJuITF9LGVucXVldWVGb3JjZVVwZGF0ZTpmdW5jdGlvbigpe30sZW5xdWV1ZVJlcGxhY2VTdGF0ZTpmdW5jdGlvbigpe30sZW5xdWV1ZVNldFN0YXRlOmZ1bmN0aW9uKCl7fX07ZnVuY3Rpb24gQShhLGIsZSl7dGhpcy5wcm9wcz1hO3RoaXMuY29udGV4dD1iO3RoaXMucmVmcz1uO3RoaXMudXBkYXRlcj1lfHx6fUEucHJvdG90eXBlLmlzUmVhY3RDb21wb25lbnQ9e307QS5wcm90b3R5cGUuc2V0U3RhdGU9ZnVuY3Rpb24oYSxiKXtcIm9iamVjdFwiIT09dHlwZW9mIGEmJlwiZnVuY3Rpb25cIiE9PXR5cGVvZiBhJiZudWxsIT1hP3koXCI4NVwiKTp2b2lkIDA7dGhpcy51cGRhdGVyLmVucXVldWVTZXRTdGF0ZSh0aGlzLGEsYixcInNldFN0YXRlXCIpfTtBLnByb3RvdHlwZS5mb3JjZVVwZGF0ZT1mdW5jdGlvbihhKXt0aGlzLnVwZGF0ZXIuZW5xdWV1ZUZvcmNlVXBkYXRlKHRoaXMsYSxcImZvcmNlVXBkYXRlXCIpfTtcbmZ1bmN0aW9uIEIoYSxiLGUpe3RoaXMucHJvcHM9YTt0aGlzLmNvbnRleHQ9Yjt0aGlzLnJlZnM9bjt0aGlzLnVwZGF0ZXI9ZXx8en1mdW5jdGlvbiBDKCl7fUMucHJvdG90eXBlPUEucHJvdG90eXBlO3ZhciBEPUIucHJvdG90eXBlPW5ldyBDO0QuY29uc3RydWN0b3I9QjttKEQsQS5wcm90b3R5cGUpO0QuaXNQdXJlUmVhY3RDb21wb25lbnQ9ITA7ZnVuY3Rpb24gRShhLGIsZSl7dGhpcy5wcm9wcz1hO3RoaXMuY29udGV4dD1iO3RoaXMucmVmcz1uO3RoaXMudXBkYXRlcj1lfHx6fXZhciBGPUUucHJvdG90eXBlPW5ldyBDO0YuY29uc3RydWN0b3I9RTttKEYsQS5wcm90b3R5cGUpO0YudW5zdGFibGVfaXNBc3luY1JlYWN0Q29tcG9uZW50PSEwO0YucmVuZGVyPWZ1bmN0aW9uKCl7cmV0dXJuIHRoaXMucHJvcHMuY2hpbGRyZW59O3ZhciBHPXtjdXJyZW50Om51bGx9LEg9T2JqZWN0LnByb3RvdHlwZS5oYXNPd25Qcm9wZXJ0eSxJPXtrZXk6ITAscmVmOiEwLF9fc2VsZjohMCxfX3NvdXJjZTohMH07XG5mdW5jdGlvbiBKKGEsYixlKXt2YXIgYyxkPXt9LGc9bnVsbCxrPW51bGw7aWYobnVsbCE9Yilmb3IoYyBpbiB2b2lkIDAhPT1iLnJlZiYmKGs9Yi5yZWYpLHZvaWQgMCE9PWIua2V5JiYoZz1cIlwiK2Iua2V5KSxiKUguY2FsbChiLGMpJiYhSS5oYXNPd25Qcm9wZXJ0eShjKSYmKGRbY109YltjXSk7dmFyIGY9YXJndW1lbnRzLmxlbmd0aC0yO2lmKDE9PT1mKWQuY2hpbGRyZW49ZTtlbHNlIGlmKDE8Zil7Zm9yKHZhciBoPUFycmF5KGYpLGw9MDtsPGY7bCsrKWhbbF09YXJndW1lbnRzW2wrMl07ZC5jaGlsZHJlbj1ofWlmKGEmJmEuZGVmYXVsdFByb3BzKWZvcihjIGluIGY9YS5kZWZhdWx0UHJvcHMsZil2b2lkIDA9PT1kW2NdJiYoZFtjXT1mW2NdKTtyZXR1cm57JCR0eXBlb2Y6cix0eXBlOmEsa2V5OmcscmVmOmsscHJvcHM6ZCxfb3duZXI6Ry5jdXJyZW50fX1mdW5jdGlvbiBLKGEpe3JldHVyblwib2JqZWN0XCI9PT10eXBlb2YgYSYmbnVsbCE9PWEmJmEuJCR0eXBlb2Y9PT1yfVxuZnVuY3Rpb24gZXNjYXBlKGEpe3ZhciBiPXtcIlxceDNkXCI6XCJcXHgzZDBcIixcIjpcIjpcIlxceDNkMlwifTtyZXR1cm5cIiRcIisoXCJcIithKS5yZXBsYWNlKC9bPTpdL2csZnVuY3Rpb24oYSl7cmV0dXJuIGJbYV19KX12YXIgTD0vXFwvKy9nLE09W107ZnVuY3Rpb24gTihhLGIsZSxjKXtpZihNLmxlbmd0aCl7dmFyIGQ9TS5wb3AoKTtkLnJlc3VsdD1hO2Qua2V5UHJlZml4PWI7ZC5mdW5jPWU7ZC5jb250ZXh0PWM7ZC5jb3VudD0wO3JldHVybiBkfXJldHVybntyZXN1bHQ6YSxrZXlQcmVmaXg6YixmdW5jOmUsY29udGV4dDpjLGNvdW50OjB9fWZ1bmN0aW9uIE8oYSl7YS5yZXN1bHQ9bnVsbDthLmtleVByZWZpeD1udWxsO2EuZnVuYz1udWxsO2EuY29udGV4dD1udWxsO2EuY291bnQ9MDsxMD5NLmxlbmd0aCYmTS5wdXNoKGEpfVxuZnVuY3Rpb24gUChhLGIsZSxjKXt2YXIgZD10eXBlb2YgYTtpZihcInVuZGVmaW5lZFwiPT09ZHx8XCJib29sZWFuXCI9PT1kKWE9bnVsbDt2YXIgZz0hMTtpZihudWxsPT09YSlnPSEwO2Vsc2Ugc3dpdGNoKGQpe2Nhc2UgXCJzdHJpbmdcIjpjYXNlIFwibnVtYmVyXCI6Zz0hMDticmVhaztjYXNlIFwib2JqZWN0XCI6c3dpdGNoKGEuJCR0eXBlb2Ype2Nhc2UgcjpjYXNlIHQ6Y2FzZSB1OmNhc2UgdjpnPSEwfX1pZihnKXJldHVybiBlKGMsYSxcIlwiPT09Yj9cIi5cIitRKGEsMCk6YiksMTtnPTA7Yj1cIlwiPT09Yj9cIi5cIjpiK1wiOlwiO2lmKEFycmF5LmlzQXJyYXkoYSkpZm9yKHZhciBrPTA7azxhLmxlbmd0aDtrKyspe2Q9YVtrXTt2YXIgZj1iK1EoZCxrKTtnKz1QKGQsZixlLGMpfWVsc2UgaWYobnVsbD09PWF8fFwidW5kZWZpbmVkXCI9PT10eXBlb2YgYT9mPW51bGw6KGY9eCYmYVt4XXx8YVtcIkBAaXRlcmF0b3JcIl0sZj1cImZ1bmN0aW9uXCI9PT10eXBlb2YgZj9mOm51bGwpLFwiZnVuY3Rpb25cIj09PXR5cGVvZiBmKWZvcihhPVxuZi5jYWxsKGEpLGs9MDshKGQ9YS5uZXh0KCkpLmRvbmU7KWQ9ZC52YWx1ZSxmPWIrUShkLGsrKyksZys9UChkLGYsZSxjKTtlbHNlXCJvYmplY3RcIj09PWQmJihlPVwiXCIrYSx5KFwiMzFcIixcIltvYmplY3QgT2JqZWN0XVwiPT09ZT9cIm9iamVjdCB3aXRoIGtleXMge1wiK09iamVjdC5rZXlzKGEpLmpvaW4oXCIsIFwiKStcIn1cIjplLFwiXCIpKTtyZXR1cm4gZ31mdW5jdGlvbiBRKGEsYil7cmV0dXJuXCJvYmplY3RcIj09PXR5cGVvZiBhJiZudWxsIT09YSYmbnVsbCE9YS5rZXk/ZXNjYXBlKGEua2V5KTpiLnRvU3RyaW5nKDM2KX1mdW5jdGlvbiBSKGEsYil7YS5mdW5jLmNhbGwoYS5jb250ZXh0LGIsYS5jb3VudCsrKX1cbmZ1bmN0aW9uIFMoYSxiLGUpe3ZhciBjPWEucmVzdWx0LGQ9YS5rZXlQcmVmaXg7YT1hLmZ1bmMuY2FsbChhLmNvbnRleHQsYixhLmNvdW50KyspO0FycmF5LmlzQXJyYXkoYSk/VChhLGMsZSxwLnRoYXRSZXR1cm5zQXJndW1lbnQpOm51bGwhPWEmJihLKGEpJiYoYj1kKyghYS5rZXl8fGImJmIua2V5PT09YS5rZXk/XCJcIjooXCJcIithLmtleSkucmVwbGFjZShMLFwiJFxceDI2L1wiKStcIi9cIikrZSxhPXskJHR5cGVvZjpyLHR5cGU6YS50eXBlLGtleTpiLHJlZjphLnJlZixwcm9wczphLnByb3BzLF9vd25lcjphLl9vd25lcn0pLGMucHVzaChhKSl9ZnVuY3Rpb24gVChhLGIsZSxjLGQpe3ZhciBnPVwiXCI7bnVsbCE9ZSYmKGc9KFwiXCIrZSkucmVwbGFjZShMLFwiJFxceDI2L1wiKStcIi9cIik7Yj1OKGIsZyxjLGQpO251bGw9PWF8fFAoYSxcIlwiLFMsYik7TyhiKX1cbnZhciBVPXtDaGlsZHJlbjp7bWFwOmZ1bmN0aW9uKGEsYixlKXtpZihudWxsPT1hKXJldHVybiBhO3ZhciBjPVtdO1QoYSxjLG51bGwsYixlKTtyZXR1cm4gY30sZm9yRWFjaDpmdW5jdGlvbihhLGIsZSl7aWYobnVsbD09YSlyZXR1cm4gYTtiPU4obnVsbCxudWxsLGIsZSk7bnVsbD09YXx8UChhLFwiXCIsUixiKTtPKGIpfSxjb3VudDpmdW5jdGlvbihhKXtyZXR1cm4gbnVsbD09YT8wOlAoYSxcIlwiLHAudGhhdFJldHVybnNOdWxsLG51bGwpfSx0b0FycmF5OmZ1bmN0aW9uKGEpe3ZhciBiPVtdO1QoYSxiLG51bGwscC50aGF0UmV0dXJuc0FyZ3VtZW50KTtyZXR1cm4gYn0sb25seTpmdW5jdGlvbihhKXtLKGEpP3ZvaWQgMDp5KFwiMTQzXCIpO3JldHVybiBhfX0sQ29tcG9uZW50OkEsUHVyZUNvbXBvbmVudDpCLHVuc3RhYmxlX0FzeW5jQ29tcG9uZW50OkUsRnJhZ21lbnQ6dyxjcmVhdGVFbGVtZW50OkosY2xvbmVFbGVtZW50OmZ1bmN0aW9uKGEsYixlKXt2YXIgYz1tKHt9LGEucHJvcHMpLFxuZD1hLmtleSxnPWEucmVmLGs9YS5fb3duZXI7aWYobnVsbCE9Yil7dm9pZCAwIT09Yi5yZWYmJihnPWIucmVmLGs9Ry5jdXJyZW50KTt2b2lkIDAhPT1iLmtleSYmKGQ9XCJcIitiLmtleSk7aWYoYS50eXBlJiZhLnR5cGUuZGVmYXVsdFByb3BzKXZhciBmPWEudHlwZS5kZWZhdWx0UHJvcHM7Zm9yKGggaW4gYilILmNhbGwoYixoKSYmIUkuaGFzT3duUHJvcGVydHkoaCkmJihjW2hdPXZvaWQgMD09PWJbaF0mJnZvaWQgMCE9PWY/ZltoXTpiW2hdKX12YXIgaD1hcmd1bWVudHMubGVuZ3RoLTI7aWYoMT09PWgpYy5jaGlsZHJlbj1lO2Vsc2UgaWYoMTxoKXtmPUFycmF5KGgpO2Zvcih2YXIgbD0wO2w8aDtsKyspZltsXT1hcmd1bWVudHNbbCsyXTtjLmNoaWxkcmVuPWZ9cmV0dXJueyQkdHlwZW9mOnIsdHlwZTphLnR5cGUsa2V5OmQscmVmOmcscHJvcHM6Yyxfb3duZXI6a319LGNyZWF0ZUZhY3Rvcnk6ZnVuY3Rpb24oYSl7dmFyIGI9Si5iaW5kKG51bGwsYSk7Yi50eXBlPWE7cmV0dXJuIGJ9LFxuaXNWYWxpZEVsZW1lbnQ6Syx2ZXJzaW9uOlwiMTYuMi4wXCIsX19TRUNSRVRfSU5URVJOQUxTX0RPX05PVF9VU0VfT1JfWU9VX1dJTExfQkVfRklSRUQ6e1JlYWN0Q3VycmVudE93bmVyOkcsYXNzaWduOm19fSxWPU9iamVjdC5mcmVlemUoe2RlZmF1bHQ6VX0pLFc9ViYmVXx8Vjttb2R1bGUuZXhwb3J0cz1XW1wiZGVmYXVsdFwiXT9XW1wiZGVmYXVsdFwiXTpXO1xuXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvcmVhY3QvY2pzL3JlYWN0LnByb2R1Y3Rpb24ubWluLmpzXG4vLyBtb2R1bGUgaWQgPSA5XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKiBAbGljZW5zZSBSZWFjdCB2MTYuMi4wXG4gKiByZWFjdC5kZXZlbG9wbWVudC5qc1xuICpcbiAqIENvcHlyaWdodCAoYykgMjAxMy1wcmVzZW50LCBGYWNlYm9vaywgSW5jLlxuICpcbiAqIFRoaXMgc291cmNlIGNvZGUgaXMgbGljZW5zZWQgdW5kZXIgdGhlIE1JVCBsaWNlbnNlIGZvdW5kIGluIHRoZVxuICogTElDRU5TRSBmaWxlIGluIHRoZSByb290IGRpcmVjdG9yeSBvZiB0aGlzIHNvdXJjZSB0cmVlLlxuICovXG5cbid1c2Ugc3RyaWN0JztcblxuXG5cbmlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gXCJwcm9kdWN0aW9uXCIpIHtcbiAgKGZ1bmN0aW9uKCkge1xuJ3VzZSBzdHJpY3QnO1xuXG52YXIgX2Fzc2lnbiA9IHJlcXVpcmUoJ29iamVjdC1hc3NpZ24nKTtcbnZhciBlbXB0eU9iamVjdCA9IHJlcXVpcmUoJ2ZianMvbGliL2VtcHR5T2JqZWN0Jyk7XG52YXIgaW52YXJpYW50ID0gcmVxdWlyZSgnZmJqcy9saWIvaW52YXJpYW50Jyk7XG52YXIgd2FybmluZyA9IHJlcXVpcmUoJ2ZianMvbGliL3dhcm5pbmcnKTtcbnZhciBlbXB0eUZ1bmN0aW9uID0gcmVxdWlyZSgnZmJqcy9saWIvZW1wdHlGdW5jdGlvbicpO1xudmFyIGNoZWNrUHJvcFR5cGVzID0gcmVxdWlyZSgncHJvcC10eXBlcy9jaGVja1Byb3BUeXBlcycpO1xuXG4vLyBUT0RPOiB0aGlzIGlzIHNwZWNpYWwgYmVjYXVzZSBpdCBnZXRzIGltcG9ydGVkIGR1cmluZyBidWlsZC5cblxudmFyIFJlYWN0VmVyc2lvbiA9ICcxNi4yLjAnO1xuXG4vLyBUaGUgU3ltYm9sIHVzZWQgdG8gdGFnIHRoZSBSZWFjdEVsZW1lbnQtbGlrZSB0eXBlcy4gSWYgdGhlcmUgaXMgbm8gbmF0aXZlIFN5bWJvbFxuLy8gbm9yIHBvbHlmaWxsLCB0aGVuIGEgcGxhaW4gbnVtYmVyIGlzIHVzZWQgZm9yIHBlcmZvcm1hbmNlLlxudmFyIGhhc1N5bWJvbCA9IHR5cGVvZiBTeW1ib2wgPT09ICdmdW5jdGlvbicgJiYgU3ltYm9sWydmb3InXTtcblxudmFyIFJFQUNUX0VMRU1FTlRfVFlQRSA9IGhhc1N5bWJvbCA/IFN5bWJvbFsnZm9yJ10oJ3JlYWN0LmVsZW1lbnQnKSA6IDB4ZWFjNztcbnZhciBSRUFDVF9DQUxMX1RZUEUgPSBoYXNTeW1ib2wgPyBTeW1ib2xbJ2ZvciddKCdyZWFjdC5jYWxsJykgOiAweGVhYzg7XG52YXIgUkVBQ1RfUkVUVVJOX1RZUEUgPSBoYXNTeW1ib2wgPyBTeW1ib2xbJ2ZvciddKCdyZWFjdC5yZXR1cm4nKSA6IDB4ZWFjOTtcbnZhciBSRUFDVF9QT1JUQUxfVFlQRSA9IGhhc1N5bWJvbCA/IFN5bWJvbFsnZm9yJ10oJ3JlYWN0LnBvcnRhbCcpIDogMHhlYWNhO1xudmFyIFJFQUNUX0ZSQUdNRU5UX1RZUEUgPSBoYXNTeW1ib2wgPyBTeW1ib2xbJ2ZvciddKCdyZWFjdC5mcmFnbWVudCcpIDogMHhlYWNiO1xuXG52YXIgTUFZQkVfSVRFUkFUT1JfU1lNQk9MID0gdHlwZW9mIFN5bWJvbCA9PT0gJ2Z1bmN0aW9uJyAmJiBTeW1ib2wuaXRlcmF0b3I7XG52YXIgRkFVWF9JVEVSQVRPUl9TWU1CT0wgPSAnQEBpdGVyYXRvcic7XG5cbmZ1bmN0aW9uIGdldEl0ZXJhdG9yRm4obWF5YmVJdGVyYWJsZSkge1xuICBpZiAobWF5YmVJdGVyYWJsZSA9PT0gbnVsbCB8fCB0eXBlb2YgbWF5YmVJdGVyYWJsZSA9PT0gJ3VuZGVmaW5lZCcpIHtcbiAgICByZXR1cm4gbnVsbDtcbiAgfVxuICB2YXIgbWF5YmVJdGVyYXRvciA9IE1BWUJFX0lURVJBVE9SX1NZTUJPTCAmJiBtYXliZUl0ZXJhYmxlW01BWUJFX0lURVJBVE9SX1NZTUJPTF0gfHwgbWF5YmVJdGVyYWJsZVtGQVVYX0lURVJBVE9SX1NZTUJPTF07XG4gIGlmICh0eXBlb2YgbWF5YmVJdGVyYXRvciA9PT0gJ2Z1bmN0aW9uJykge1xuICAgIHJldHVybiBtYXliZUl0ZXJhdG9yO1xuICB9XG4gIHJldHVybiBudWxsO1xufVxuXG4vKipcbiAqIFdBUk5JTkc6IERPIE5PVCBtYW51YWxseSByZXF1aXJlIHRoaXMgbW9kdWxlLlxuICogVGhpcyBpcyBhIHJlcGxhY2VtZW50IGZvciBgaW52YXJpYW50KC4uLilgIHVzZWQgYnkgdGhlIGVycm9yIGNvZGUgc3lzdGVtXG4gKiBhbmQgd2lsbCBfb25seV8gYmUgcmVxdWlyZWQgYnkgdGhlIGNvcnJlc3BvbmRpbmcgYmFiZWwgcGFzcy5cbiAqIEl0IGFsd2F5cyB0aHJvd3MuXG4gKi9cblxuLyoqXG4gKiBGb3JrZWQgZnJvbSBmYmpzL3dhcm5pbmc6XG4gKiBodHRwczovL2dpdGh1Yi5jb20vZmFjZWJvb2svZmJqcy9ibG9iL2U2NmJhMjBhZDViZTQzM2ViNTQ0MjNmMmIwOTdkODI5MzI0ZDlkZTYvcGFja2FnZXMvZmJqcy9zcmMvX19mb3Jrc19fL3dhcm5pbmcuanNcbiAqXG4gKiBPbmx5IGNoYW5nZSBpcyB3ZSB1c2UgY29uc29sZS53YXJuIGluc3RlYWQgb2YgY29uc29sZS5lcnJvcixcbiAqIGFuZCBkbyBub3RoaW5nIHdoZW4gJ2NvbnNvbGUnIGlzIG5vdCBzdXBwb3J0ZWQuXG4gKiBUaGlzIHJlYWxseSBzaW1wbGlmaWVzIHRoZSBjb2RlLlxuICogLS0tXG4gKiBTaW1pbGFyIHRvIGludmFyaWFudCBidXQgb25seSBsb2dzIGEgd2FybmluZyBpZiB0aGUgY29uZGl0aW9uIGlzIG5vdCBtZXQuXG4gKiBUaGlzIGNhbiBiZSB1c2VkIHRvIGxvZyBpc3N1ZXMgaW4gZGV2ZWxvcG1lbnQgZW52aXJvbm1lbnRzIGluIGNyaXRpY2FsXG4gKiBwYXRocy4gUmVtb3ZpbmcgdGhlIGxvZ2dpbmcgY29kZSBmb3IgcHJvZHVjdGlvbiBlbnZpcm9ubWVudHMgd2lsbCBrZWVwIHRoZVxuICogc2FtZSBsb2dpYyBhbmQgZm9sbG93IHRoZSBzYW1lIGNvZGUgcGF0aHMuXG4gKi9cblxudmFyIGxvd1ByaW9yaXR5V2FybmluZyA9IGZ1bmN0aW9uICgpIHt9O1xuXG57XG4gIHZhciBwcmludFdhcm5pbmcgPSBmdW5jdGlvbiAoZm9ybWF0KSB7XG4gICAgZm9yICh2YXIgX2xlbiA9IGFyZ3VtZW50cy5sZW5ndGgsIGFyZ3MgPSBBcnJheShfbGVuID4gMSA/IF9sZW4gLSAxIDogMCksIF9rZXkgPSAxOyBfa2V5IDwgX2xlbjsgX2tleSsrKSB7XG4gICAgICBhcmdzW19rZXkgLSAxXSA9IGFyZ3VtZW50c1tfa2V5XTtcbiAgICB9XG5cbiAgICB2YXIgYXJnSW5kZXggPSAwO1xuICAgIHZhciBtZXNzYWdlID0gJ1dhcm5pbmc6ICcgKyBmb3JtYXQucmVwbGFjZSgvJXMvZywgZnVuY3Rpb24gKCkge1xuICAgICAgcmV0dXJuIGFyZ3NbYXJnSW5kZXgrK107XG4gICAgfSk7XG4gICAgaWYgKHR5cGVvZiBjb25zb2xlICE9PSAndW5kZWZpbmVkJykge1xuICAgICAgY29uc29sZS53YXJuKG1lc3NhZ2UpO1xuICAgIH1cbiAgICB0cnkge1xuICAgICAgLy8gLS0tIFdlbGNvbWUgdG8gZGVidWdnaW5nIFJlYWN0IC0tLVxuICAgICAgLy8gVGhpcyBlcnJvciB3YXMgdGhyb3duIGFzIGEgY29udmVuaWVuY2Ugc28gdGhhdCB5b3UgY2FuIHVzZSB0aGlzIHN0YWNrXG4gICAgICAvLyB0byBmaW5kIHRoZSBjYWxsc2l0ZSB0aGF0IGNhdXNlZCB0aGlzIHdhcm5pbmcgdG8gZmlyZS5cbiAgICAgIHRocm93IG5ldyBFcnJvcihtZXNzYWdlKTtcbiAgICB9IGNhdGNoICh4KSB7fVxuICB9O1xuXG4gIGxvd1ByaW9yaXR5V2FybmluZyA9IGZ1bmN0aW9uIChjb25kaXRpb24sIGZvcm1hdCkge1xuICAgIGlmIChmb3JtYXQgPT09IHVuZGVmaW5lZCkge1xuICAgICAgdGhyb3cgbmV3IEVycm9yKCdgd2FybmluZyhjb25kaXRpb24sIGZvcm1hdCwgLi4uYXJncylgIHJlcXVpcmVzIGEgd2FybmluZyAnICsgJ21lc3NhZ2UgYXJndW1lbnQnKTtcbiAgICB9XG4gICAgaWYgKCFjb25kaXRpb24pIHtcbiAgICAgIGZvciAodmFyIF9sZW4yID0gYXJndW1lbnRzLmxlbmd0aCwgYXJncyA9IEFycmF5KF9sZW4yID4gMiA/IF9sZW4yIC0gMiA6IDApLCBfa2V5MiA9IDI7IF9rZXkyIDwgX2xlbjI7IF9rZXkyKyspIHtcbiAgICAgICAgYXJnc1tfa2V5MiAtIDJdID0gYXJndW1lbnRzW19rZXkyXTtcbiAgICAgIH1cblxuICAgICAgcHJpbnRXYXJuaW5nLmFwcGx5KHVuZGVmaW5lZCwgW2Zvcm1hdF0uY29uY2F0KGFyZ3MpKTtcbiAgICB9XG4gIH07XG59XG5cbnZhciBsb3dQcmlvcml0eVdhcm5pbmckMSA9IGxvd1ByaW9yaXR5V2FybmluZztcblxudmFyIGRpZFdhcm5TdGF0ZVVwZGF0ZUZvclVubW91bnRlZENvbXBvbmVudCA9IHt9O1xuXG5mdW5jdGlvbiB3YXJuTm9vcChwdWJsaWNJbnN0YW5jZSwgY2FsbGVyTmFtZSkge1xuICB7XG4gICAgdmFyIGNvbnN0cnVjdG9yID0gcHVibGljSW5zdGFuY2UuY29uc3RydWN0b3I7XG4gICAgdmFyIGNvbXBvbmVudE5hbWUgPSBjb25zdHJ1Y3RvciAmJiAoY29uc3RydWN0b3IuZGlzcGxheU5hbWUgfHwgY29uc3RydWN0b3IubmFtZSkgfHwgJ1JlYWN0Q2xhc3MnO1xuICAgIHZhciB3YXJuaW5nS2V5ID0gY29tcG9uZW50TmFtZSArICcuJyArIGNhbGxlck5hbWU7XG4gICAgaWYgKGRpZFdhcm5TdGF0ZVVwZGF0ZUZvclVubW91bnRlZENvbXBvbmVudFt3YXJuaW5nS2V5XSkge1xuICAgICAgcmV0dXJuO1xuICAgIH1cbiAgICB3YXJuaW5nKGZhbHNlLCAnJXMoLi4uKTogQ2FuIG9ubHkgdXBkYXRlIGEgbW91bnRlZCBvciBtb3VudGluZyBjb21wb25lbnQuICcgKyAnVGhpcyB1c3VhbGx5IG1lYW5zIHlvdSBjYWxsZWQgJXMoKSBvbiBhbiB1bm1vdW50ZWQgY29tcG9uZW50LiAnICsgJ1RoaXMgaXMgYSBuby1vcC5cXG5cXG5QbGVhc2UgY2hlY2sgdGhlIGNvZGUgZm9yIHRoZSAlcyBjb21wb25lbnQuJywgY2FsbGVyTmFtZSwgY2FsbGVyTmFtZSwgY29tcG9uZW50TmFtZSk7XG4gICAgZGlkV2FyblN0YXRlVXBkYXRlRm9yVW5tb3VudGVkQ29tcG9uZW50W3dhcm5pbmdLZXldID0gdHJ1ZTtcbiAgfVxufVxuXG4vKipcbiAqIFRoaXMgaXMgdGhlIGFic3RyYWN0IEFQSSBmb3IgYW4gdXBkYXRlIHF1ZXVlLlxuICovXG52YXIgUmVhY3ROb29wVXBkYXRlUXVldWUgPSB7XG4gIC8qKlxuICAgKiBDaGVja3Mgd2hldGhlciBvciBub3QgdGhpcyBjb21wb3NpdGUgY29tcG9uZW50IGlzIG1vdW50ZWQuXG4gICAqIEBwYXJhbSB7UmVhY3RDbGFzc30gcHVibGljSW5zdGFuY2UgVGhlIGluc3RhbmNlIHdlIHdhbnQgdG8gdGVzdC5cbiAgICogQHJldHVybiB7Ym9vbGVhbn0gVHJ1ZSBpZiBtb3VudGVkLCBmYWxzZSBvdGhlcndpc2UuXG4gICAqIEBwcm90ZWN0ZWRcbiAgICogQGZpbmFsXG4gICAqL1xuICBpc01vdW50ZWQ6IGZ1bmN0aW9uIChwdWJsaWNJbnN0YW5jZSkge1xuICAgIHJldHVybiBmYWxzZTtcbiAgfSxcblxuICAvKipcbiAgICogRm9yY2VzIGFuIHVwZGF0ZS4gVGhpcyBzaG91bGQgb25seSBiZSBpbnZva2VkIHdoZW4gaXQgaXMga25vd24gd2l0aFxuICAgKiBjZXJ0YWludHkgdGhhdCB3ZSBhcmUgKipub3QqKiBpbiBhIERPTSB0cmFuc2FjdGlvbi5cbiAgICpcbiAgICogWW91IG1heSB3YW50IHRvIGNhbGwgdGhpcyB3aGVuIHlvdSBrbm93IHRoYXQgc29tZSBkZWVwZXIgYXNwZWN0IG9mIHRoZVxuICAgKiBjb21wb25lbnQncyBzdGF0ZSBoYXMgY2hhbmdlZCBidXQgYHNldFN0YXRlYCB3YXMgbm90IGNhbGxlZC5cbiAgICpcbiAgICogVGhpcyB3aWxsIG5vdCBpbnZva2UgYHNob3VsZENvbXBvbmVudFVwZGF0ZWAsIGJ1dCBpdCB3aWxsIGludm9rZVxuICAgKiBgY29tcG9uZW50V2lsbFVwZGF0ZWAgYW5kIGBjb21wb25lbnREaWRVcGRhdGVgLlxuICAgKlxuICAgKiBAcGFyYW0ge1JlYWN0Q2xhc3N9IHB1YmxpY0luc3RhbmNlIFRoZSBpbnN0YW5jZSB0aGF0IHNob3VsZCByZXJlbmRlci5cbiAgICogQHBhcmFtIHs/ZnVuY3Rpb259IGNhbGxiYWNrIENhbGxlZCBhZnRlciBjb21wb25lbnQgaXMgdXBkYXRlZC5cbiAgICogQHBhcmFtIHs/c3RyaW5nfSBjYWxsZXJOYW1lIG5hbWUgb2YgdGhlIGNhbGxpbmcgZnVuY3Rpb24gaW4gdGhlIHB1YmxpYyBBUEkuXG4gICAqIEBpbnRlcm5hbFxuICAgKi9cbiAgZW5xdWV1ZUZvcmNlVXBkYXRlOiBmdW5jdGlvbiAocHVibGljSW5zdGFuY2UsIGNhbGxiYWNrLCBjYWxsZXJOYW1lKSB7XG4gICAgd2Fybk5vb3AocHVibGljSW5zdGFuY2UsICdmb3JjZVVwZGF0ZScpO1xuICB9LFxuXG4gIC8qKlxuICAgKiBSZXBsYWNlcyBhbGwgb2YgdGhlIHN0YXRlLiBBbHdheXMgdXNlIHRoaXMgb3IgYHNldFN0YXRlYCB0byBtdXRhdGUgc3RhdGUuXG4gICAqIFlvdSBzaG91bGQgdHJlYXQgYHRoaXMuc3RhdGVgIGFzIGltbXV0YWJsZS5cbiAgICpcbiAgICogVGhlcmUgaXMgbm8gZ3VhcmFudGVlIHRoYXQgYHRoaXMuc3RhdGVgIHdpbGwgYmUgaW1tZWRpYXRlbHkgdXBkYXRlZCwgc29cbiAgICogYWNjZXNzaW5nIGB0aGlzLnN0YXRlYCBhZnRlciBjYWxsaW5nIHRoaXMgbWV0aG9kIG1heSByZXR1cm4gdGhlIG9sZCB2YWx1ZS5cbiAgICpcbiAgICogQHBhcmFtIHtSZWFjdENsYXNzfSBwdWJsaWNJbnN0YW5jZSBUaGUgaW5zdGFuY2UgdGhhdCBzaG91bGQgcmVyZW5kZXIuXG4gICAqIEBwYXJhbSB7b2JqZWN0fSBjb21wbGV0ZVN0YXRlIE5leHQgc3RhdGUuXG4gICAqIEBwYXJhbSB7P2Z1bmN0aW9ufSBjYWxsYmFjayBDYWxsZWQgYWZ0ZXIgY29tcG9uZW50IGlzIHVwZGF0ZWQuXG4gICAqIEBwYXJhbSB7P3N0cmluZ30gY2FsbGVyTmFtZSBuYW1lIG9mIHRoZSBjYWxsaW5nIGZ1bmN0aW9uIGluIHRoZSBwdWJsaWMgQVBJLlxuICAgKiBAaW50ZXJuYWxcbiAgICovXG4gIGVucXVldWVSZXBsYWNlU3RhdGU6IGZ1bmN0aW9uIChwdWJsaWNJbnN0YW5jZSwgY29tcGxldGVTdGF0ZSwgY2FsbGJhY2ssIGNhbGxlck5hbWUpIHtcbiAgICB3YXJuTm9vcChwdWJsaWNJbnN0YW5jZSwgJ3JlcGxhY2VTdGF0ZScpO1xuICB9LFxuXG4gIC8qKlxuICAgKiBTZXRzIGEgc3Vic2V0IG9mIHRoZSBzdGF0ZS4gVGhpcyBvbmx5IGV4aXN0cyBiZWNhdXNlIF9wZW5kaW5nU3RhdGUgaXNcbiAgICogaW50ZXJuYWwuIFRoaXMgcHJvdmlkZXMgYSBtZXJnaW5nIHN0cmF0ZWd5IHRoYXQgaXMgbm90IGF2YWlsYWJsZSB0byBkZWVwXG4gICAqIHByb3BlcnRpZXMgd2hpY2ggaXMgY29uZnVzaW5nLiBUT0RPOiBFeHBvc2UgcGVuZGluZ1N0YXRlIG9yIGRvbid0IHVzZSBpdFxuICAgKiBkdXJpbmcgdGhlIG1lcmdlLlxuICAgKlxuICAgKiBAcGFyYW0ge1JlYWN0Q2xhc3N9IHB1YmxpY0luc3RhbmNlIFRoZSBpbnN0YW5jZSB0aGF0IHNob3VsZCByZXJlbmRlci5cbiAgICogQHBhcmFtIHtvYmplY3R9IHBhcnRpYWxTdGF0ZSBOZXh0IHBhcnRpYWwgc3RhdGUgdG8gYmUgbWVyZ2VkIHdpdGggc3RhdGUuXG4gICAqIEBwYXJhbSB7P2Z1bmN0aW9ufSBjYWxsYmFjayBDYWxsZWQgYWZ0ZXIgY29tcG9uZW50IGlzIHVwZGF0ZWQuXG4gICAqIEBwYXJhbSB7P3N0cmluZ30gTmFtZSBvZiB0aGUgY2FsbGluZyBmdW5jdGlvbiBpbiB0aGUgcHVibGljIEFQSS5cbiAgICogQGludGVybmFsXG4gICAqL1xuICBlbnF1ZXVlU2V0U3RhdGU6IGZ1bmN0aW9uIChwdWJsaWNJbnN0YW5jZSwgcGFydGlhbFN0YXRlLCBjYWxsYmFjaywgY2FsbGVyTmFtZSkge1xuICAgIHdhcm5Ob29wKHB1YmxpY0luc3RhbmNlLCAnc2V0U3RhdGUnKTtcbiAgfVxufTtcblxuLyoqXG4gKiBCYXNlIGNsYXNzIGhlbHBlcnMgZm9yIHRoZSB1cGRhdGluZyBzdGF0ZSBvZiBhIGNvbXBvbmVudC5cbiAqL1xuZnVuY3Rpb24gQ29tcG9uZW50KHByb3BzLCBjb250ZXh0LCB1cGRhdGVyKSB7XG4gIHRoaXMucHJvcHMgPSBwcm9wcztcbiAgdGhpcy5jb250ZXh0ID0gY29udGV4dDtcbiAgdGhpcy5yZWZzID0gZW1wdHlPYmplY3Q7XG4gIC8vIFdlIGluaXRpYWxpemUgdGhlIGRlZmF1bHQgdXBkYXRlciBidXQgdGhlIHJlYWwgb25lIGdldHMgaW5qZWN0ZWQgYnkgdGhlXG4gIC8vIHJlbmRlcmVyLlxuICB0aGlzLnVwZGF0ZXIgPSB1cGRhdGVyIHx8IFJlYWN0Tm9vcFVwZGF0ZVF1ZXVlO1xufVxuXG5Db21wb25lbnQucHJvdG90eXBlLmlzUmVhY3RDb21wb25lbnQgPSB7fTtcblxuLyoqXG4gKiBTZXRzIGEgc3Vic2V0IG9mIHRoZSBzdGF0ZS4gQWx3YXlzIHVzZSB0aGlzIHRvIG11dGF0ZVxuICogc3RhdGUuIFlvdSBzaG91bGQgdHJlYXQgYHRoaXMuc3RhdGVgIGFzIGltbXV0YWJsZS5cbiAqXG4gKiBUaGVyZSBpcyBubyBndWFyYW50ZWUgdGhhdCBgdGhpcy5zdGF0ZWAgd2lsbCBiZSBpbW1lZGlhdGVseSB1cGRhdGVkLCBzb1xuICogYWNjZXNzaW5nIGB0aGlzLnN0YXRlYCBhZnRlciBjYWxsaW5nIHRoaXMgbWV0aG9kIG1heSByZXR1cm4gdGhlIG9sZCB2YWx1ZS5cbiAqXG4gKiBUaGVyZSBpcyBubyBndWFyYW50ZWUgdGhhdCBjYWxscyB0byBgc2V0U3RhdGVgIHdpbGwgcnVuIHN5bmNocm9ub3VzbHksXG4gKiBhcyB0aGV5IG1heSBldmVudHVhbGx5IGJlIGJhdGNoZWQgdG9nZXRoZXIuICBZb3UgY2FuIHByb3ZpZGUgYW4gb3B0aW9uYWxcbiAqIGNhbGxiYWNrIHRoYXQgd2lsbCBiZSBleGVjdXRlZCB3aGVuIHRoZSBjYWxsIHRvIHNldFN0YXRlIGlzIGFjdHVhbGx5XG4gKiBjb21wbGV0ZWQuXG4gKlxuICogV2hlbiBhIGZ1bmN0aW9uIGlzIHByb3ZpZGVkIHRvIHNldFN0YXRlLCBpdCB3aWxsIGJlIGNhbGxlZCBhdCBzb21lIHBvaW50IGluXG4gKiB0aGUgZnV0dXJlIChub3Qgc3luY2hyb25vdXNseSkuIEl0IHdpbGwgYmUgY2FsbGVkIHdpdGggdGhlIHVwIHRvIGRhdGVcbiAqIGNvbXBvbmVudCBhcmd1bWVudHMgKHN0YXRlLCBwcm9wcywgY29udGV4dCkuIFRoZXNlIHZhbHVlcyBjYW4gYmUgZGlmZmVyZW50XG4gKiBmcm9tIHRoaXMuKiBiZWNhdXNlIHlvdXIgZnVuY3Rpb24gbWF5IGJlIGNhbGxlZCBhZnRlciByZWNlaXZlUHJvcHMgYnV0IGJlZm9yZVxuICogc2hvdWxkQ29tcG9uZW50VXBkYXRlLCBhbmQgdGhpcyBuZXcgc3RhdGUsIHByb3BzLCBhbmQgY29udGV4dCB3aWxsIG5vdCB5ZXQgYmVcbiAqIGFzc2lnbmVkIHRvIHRoaXMuXG4gKlxuICogQHBhcmFtIHtvYmplY3R8ZnVuY3Rpb259IHBhcnRpYWxTdGF0ZSBOZXh0IHBhcnRpYWwgc3RhdGUgb3IgZnVuY3Rpb24gdG9cbiAqICAgICAgICBwcm9kdWNlIG5leHQgcGFydGlhbCBzdGF0ZSB0byBiZSBtZXJnZWQgd2l0aCBjdXJyZW50IHN0YXRlLlxuICogQHBhcmFtIHs/ZnVuY3Rpb259IGNhbGxiYWNrIENhbGxlZCBhZnRlciBzdGF0ZSBpcyB1cGRhdGVkLlxuICogQGZpbmFsXG4gKiBAcHJvdGVjdGVkXG4gKi9cbkNvbXBvbmVudC5wcm90b3R5cGUuc2V0U3RhdGUgPSBmdW5jdGlvbiAocGFydGlhbFN0YXRlLCBjYWxsYmFjaykge1xuICAhKHR5cGVvZiBwYXJ0aWFsU3RhdGUgPT09ICdvYmplY3QnIHx8IHR5cGVvZiBwYXJ0aWFsU3RhdGUgPT09ICdmdW5jdGlvbicgfHwgcGFydGlhbFN0YXRlID09IG51bGwpID8gaW52YXJpYW50KGZhbHNlLCAnc2V0U3RhdGUoLi4uKTogdGFrZXMgYW4gb2JqZWN0IG9mIHN0YXRlIHZhcmlhYmxlcyB0byB1cGRhdGUgb3IgYSBmdW5jdGlvbiB3aGljaCByZXR1cm5zIGFuIG9iamVjdCBvZiBzdGF0ZSB2YXJpYWJsZXMuJykgOiB2b2lkIDA7XG4gIHRoaXMudXBkYXRlci5lbnF1ZXVlU2V0U3RhdGUodGhpcywgcGFydGlhbFN0YXRlLCBjYWxsYmFjaywgJ3NldFN0YXRlJyk7XG59O1xuXG4vKipcbiAqIEZvcmNlcyBhbiB1cGRhdGUuIFRoaXMgc2hvdWxkIG9ubHkgYmUgaW52b2tlZCB3aGVuIGl0IGlzIGtub3duIHdpdGhcbiAqIGNlcnRhaW50eSB0aGF0IHdlIGFyZSAqKm5vdCoqIGluIGEgRE9NIHRyYW5zYWN0aW9uLlxuICpcbiAqIFlvdSBtYXkgd2FudCB0byBjYWxsIHRoaXMgd2hlbiB5b3Uga25vdyB0aGF0IHNvbWUgZGVlcGVyIGFzcGVjdCBvZiB0aGVcbiAqIGNvbXBvbmVudCdzIHN0YXRlIGhhcyBjaGFuZ2VkIGJ1dCBgc2V0U3RhdGVgIHdhcyBub3QgY2FsbGVkLlxuICpcbiAqIFRoaXMgd2lsbCBub3QgaW52b2tlIGBzaG91bGRDb21wb25lbnRVcGRhdGVgLCBidXQgaXQgd2lsbCBpbnZva2VcbiAqIGBjb21wb25lbnRXaWxsVXBkYXRlYCBhbmQgYGNvbXBvbmVudERpZFVwZGF0ZWAuXG4gKlxuICogQHBhcmFtIHs/ZnVuY3Rpb259IGNhbGxiYWNrIENhbGxlZCBhZnRlciB1cGRhdGUgaXMgY29tcGxldGUuXG4gKiBAZmluYWxcbiAqIEBwcm90ZWN0ZWRcbiAqL1xuQ29tcG9uZW50LnByb3RvdHlwZS5mb3JjZVVwZGF0ZSA9IGZ1bmN0aW9uIChjYWxsYmFjaykge1xuICB0aGlzLnVwZGF0ZXIuZW5xdWV1ZUZvcmNlVXBkYXRlKHRoaXMsIGNhbGxiYWNrLCAnZm9yY2VVcGRhdGUnKTtcbn07XG5cbi8qKlxuICogRGVwcmVjYXRlZCBBUElzLiBUaGVzZSBBUElzIHVzZWQgdG8gZXhpc3Qgb24gY2xhc3NpYyBSZWFjdCBjbGFzc2VzIGJ1dCBzaW5jZVxuICogd2Ugd291bGQgbGlrZSB0byBkZXByZWNhdGUgdGhlbSwgd2UncmUgbm90IGdvaW5nIHRvIG1vdmUgdGhlbSBvdmVyIHRvIHRoaXNcbiAqIG1vZGVybiBiYXNlIGNsYXNzLiBJbnN0ZWFkLCB3ZSBkZWZpbmUgYSBnZXR0ZXIgdGhhdCB3YXJucyBpZiBpdCdzIGFjY2Vzc2VkLlxuICovXG57XG4gIHZhciBkZXByZWNhdGVkQVBJcyA9IHtcbiAgICBpc01vdW50ZWQ6IFsnaXNNb3VudGVkJywgJ0luc3RlYWQsIG1ha2Ugc3VyZSB0byBjbGVhbiB1cCBzdWJzY3JpcHRpb25zIGFuZCBwZW5kaW5nIHJlcXVlc3RzIGluICcgKyAnY29tcG9uZW50V2lsbFVubW91bnQgdG8gcHJldmVudCBtZW1vcnkgbGVha3MuJ10sXG4gICAgcmVwbGFjZVN0YXRlOiBbJ3JlcGxhY2VTdGF0ZScsICdSZWZhY3RvciB5b3VyIGNvZGUgdG8gdXNlIHNldFN0YXRlIGluc3RlYWQgKHNlZSAnICsgJ2h0dHBzOi8vZ2l0aHViLmNvbS9mYWNlYm9vay9yZWFjdC9pc3N1ZXMvMzIzNikuJ11cbiAgfTtcbiAgdmFyIGRlZmluZURlcHJlY2F0aW9uV2FybmluZyA9IGZ1bmN0aW9uIChtZXRob2ROYW1lLCBpbmZvKSB7XG4gICAgT2JqZWN0LmRlZmluZVByb3BlcnR5KENvbXBvbmVudC5wcm90b3R5cGUsIG1ldGhvZE5hbWUsIHtcbiAgICAgIGdldDogZnVuY3Rpb24gKCkge1xuICAgICAgICBsb3dQcmlvcml0eVdhcm5pbmckMShmYWxzZSwgJyVzKC4uLikgaXMgZGVwcmVjYXRlZCBpbiBwbGFpbiBKYXZhU2NyaXB0IFJlYWN0IGNsYXNzZXMuICVzJywgaW5mb1swXSwgaW5mb1sxXSk7XG4gICAgICAgIHJldHVybiB1bmRlZmluZWQ7XG4gICAgICB9XG4gICAgfSk7XG4gIH07XG4gIGZvciAodmFyIGZuTmFtZSBpbiBkZXByZWNhdGVkQVBJcykge1xuICAgIGlmIChkZXByZWNhdGVkQVBJcy5oYXNPd25Qcm9wZXJ0eShmbk5hbWUpKSB7XG4gICAgICBkZWZpbmVEZXByZWNhdGlvbldhcm5pbmcoZm5OYW1lLCBkZXByZWNhdGVkQVBJc1tmbk5hbWVdKTtcbiAgICB9XG4gIH1cbn1cblxuLyoqXG4gKiBCYXNlIGNsYXNzIGhlbHBlcnMgZm9yIHRoZSB1cGRhdGluZyBzdGF0ZSBvZiBhIGNvbXBvbmVudC5cbiAqL1xuZnVuY3Rpb24gUHVyZUNvbXBvbmVudChwcm9wcywgY29udGV4dCwgdXBkYXRlcikge1xuICAvLyBEdXBsaWNhdGVkIGZyb20gQ29tcG9uZW50LlxuICB0aGlzLnByb3BzID0gcHJvcHM7XG4gIHRoaXMuY29udGV4dCA9IGNvbnRleHQ7XG4gIHRoaXMucmVmcyA9IGVtcHR5T2JqZWN0O1xuICAvLyBXZSBpbml0aWFsaXplIHRoZSBkZWZhdWx0IHVwZGF0ZXIgYnV0IHRoZSByZWFsIG9uZSBnZXRzIGluamVjdGVkIGJ5IHRoZVxuICAvLyByZW5kZXJlci5cbiAgdGhpcy51cGRhdGVyID0gdXBkYXRlciB8fCBSZWFjdE5vb3BVcGRhdGVRdWV1ZTtcbn1cblxuZnVuY3Rpb24gQ29tcG9uZW50RHVtbXkoKSB7fVxuQ29tcG9uZW50RHVtbXkucHJvdG90eXBlID0gQ29tcG9uZW50LnByb3RvdHlwZTtcbnZhciBwdXJlQ29tcG9uZW50UHJvdG90eXBlID0gUHVyZUNvbXBvbmVudC5wcm90b3R5cGUgPSBuZXcgQ29tcG9uZW50RHVtbXkoKTtcbnB1cmVDb21wb25lbnRQcm90b3R5cGUuY29uc3RydWN0b3IgPSBQdXJlQ29tcG9uZW50O1xuLy8gQXZvaWQgYW4gZXh0cmEgcHJvdG90eXBlIGp1bXAgZm9yIHRoZXNlIG1ldGhvZHMuXG5fYXNzaWduKHB1cmVDb21wb25lbnRQcm90b3R5cGUsIENvbXBvbmVudC5wcm90b3R5cGUpO1xucHVyZUNvbXBvbmVudFByb3RvdHlwZS5pc1B1cmVSZWFjdENvbXBvbmVudCA9IHRydWU7XG5cbmZ1bmN0aW9uIEFzeW5jQ29tcG9uZW50KHByb3BzLCBjb250ZXh0LCB1cGRhdGVyKSB7XG4gIC8vIER1cGxpY2F0ZWQgZnJvbSBDb21wb25lbnQuXG4gIHRoaXMucHJvcHMgPSBwcm9wcztcbiAgdGhpcy5jb250ZXh0ID0gY29udGV4dDtcbiAgdGhpcy5yZWZzID0gZW1wdHlPYmplY3Q7XG4gIC8vIFdlIGluaXRpYWxpemUgdGhlIGRlZmF1bHQgdXBkYXRlciBidXQgdGhlIHJlYWwgb25lIGdldHMgaW5qZWN0ZWQgYnkgdGhlXG4gIC8vIHJlbmRlcmVyLlxuICB0aGlzLnVwZGF0ZXIgPSB1cGRhdGVyIHx8IFJlYWN0Tm9vcFVwZGF0ZVF1ZXVlO1xufVxuXG52YXIgYXN5bmNDb21wb25lbnRQcm90b3R5cGUgPSBBc3luY0NvbXBvbmVudC5wcm90b3R5cGUgPSBuZXcgQ29tcG9uZW50RHVtbXkoKTtcbmFzeW5jQ29tcG9uZW50UHJvdG90eXBlLmNvbnN0cnVjdG9yID0gQXN5bmNDb21wb25lbnQ7XG4vLyBBdm9pZCBhbiBleHRyYSBwcm90b3R5cGUganVtcCBmb3IgdGhlc2UgbWV0aG9kcy5cbl9hc3NpZ24oYXN5bmNDb21wb25lbnRQcm90b3R5cGUsIENvbXBvbmVudC5wcm90b3R5cGUpO1xuYXN5bmNDb21wb25lbnRQcm90b3R5cGUudW5zdGFibGVfaXNBc3luY1JlYWN0Q29tcG9uZW50ID0gdHJ1ZTtcbmFzeW5jQ29tcG9uZW50UHJvdG90eXBlLnJlbmRlciA9IGZ1bmN0aW9uICgpIHtcbiAgcmV0dXJuIHRoaXMucHJvcHMuY2hpbGRyZW47XG59O1xuXG4vKipcbiAqIEtlZXBzIHRyYWNrIG9mIHRoZSBjdXJyZW50IG93bmVyLlxuICpcbiAqIFRoZSBjdXJyZW50IG93bmVyIGlzIHRoZSBjb21wb25lbnQgd2hvIHNob3VsZCBvd24gYW55IGNvbXBvbmVudHMgdGhhdCBhcmVcbiAqIGN1cnJlbnRseSBiZWluZyBjb25zdHJ1Y3RlZC5cbiAqL1xudmFyIFJlYWN0Q3VycmVudE93bmVyID0ge1xuICAvKipcbiAgICogQGludGVybmFsXG4gICAqIEB0eXBlIHtSZWFjdENvbXBvbmVudH1cbiAgICovXG4gIGN1cnJlbnQ6IG51bGxcbn07XG5cbnZhciBoYXNPd25Qcm9wZXJ0eSA9IE9iamVjdC5wcm90b3R5cGUuaGFzT3duUHJvcGVydHk7XG5cbnZhciBSRVNFUlZFRF9QUk9QUyA9IHtcbiAga2V5OiB0cnVlLFxuICByZWY6IHRydWUsXG4gIF9fc2VsZjogdHJ1ZSxcbiAgX19zb3VyY2U6IHRydWVcbn07XG5cbnZhciBzcGVjaWFsUHJvcEtleVdhcm5pbmdTaG93bjtcbnZhciBzcGVjaWFsUHJvcFJlZldhcm5pbmdTaG93bjtcblxuZnVuY3Rpb24gaGFzVmFsaWRSZWYoY29uZmlnKSB7XG4gIHtcbiAgICBpZiAoaGFzT3duUHJvcGVydHkuY2FsbChjb25maWcsICdyZWYnKSkge1xuICAgICAgdmFyIGdldHRlciA9IE9iamVjdC5nZXRPd25Qcm9wZXJ0eURlc2NyaXB0b3IoY29uZmlnLCAncmVmJykuZ2V0O1xuICAgICAgaWYgKGdldHRlciAmJiBnZXR0ZXIuaXNSZWFjdFdhcm5pbmcpIHtcbiAgICAgICAgcmV0dXJuIGZhbHNlO1xuICAgICAgfVxuICAgIH1cbiAgfVxuICByZXR1cm4gY29uZmlnLnJlZiAhPT0gdW5kZWZpbmVkO1xufVxuXG5mdW5jdGlvbiBoYXNWYWxpZEtleShjb25maWcpIHtcbiAge1xuICAgIGlmIChoYXNPd25Qcm9wZXJ0eS5jYWxsKGNvbmZpZywgJ2tleScpKSB7XG4gICAgICB2YXIgZ2V0dGVyID0gT2JqZWN0LmdldE93blByb3BlcnR5RGVzY3JpcHRvcihjb25maWcsICdrZXknKS5nZXQ7XG4gICAgICBpZiAoZ2V0dGVyICYmIGdldHRlci5pc1JlYWN0V2FybmluZykge1xuICAgICAgICByZXR1cm4gZmFsc2U7XG4gICAgICB9XG4gICAgfVxuICB9XG4gIHJldHVybiBjb25maWcua2V5ICE9PSB1bmRlZmluZWQ7XG59XG5cbmZ1bmN0aW9uIGRlZmluZUtleVByb3BXYXJuaW5nR2V0dGVyKHByb3BzLCBkaXNwbGF5TmFtZSkge1xuICB2YXIgd2FybkFib3V0QWNjZXNzaW5nS2V5ID0gZnVuY3Rpb24gKCkge1xuICAgIGlmICghc3BlY2lhbFByb3BLZXlXYXJuaW5nU2hvd24pIHtcbiAgICAgIHNwZWNpYWxQcm9wS2V5V2FybmluZ1Nob3duID0gdHJ1ZTtcbiAgICAgIHdhcm5pbmcoZmFsc2UsICclczogYGtleWAgaXMgbm90IGEgcHJvcC4gVHJ5aW5nIHRvIGFjY2VzcyBpdCB3aWxsIHJlc3VsdCAnICsgJ2luIGB1bmRlZmluZWRgIGJlaW5nIHJldHVybmVkLiBJZiB5b3UgbmVlZCB0byBhY2Nlc3MgdGhlIHNhbWUgJyArICd2YWx1ZSB3aXRoaW4gdGhlIGNoaWxkIGNvbXBvbmVudCwgeW91IHNob3VsZCBwYXNzIGl0IGFzIGEgZGlmZmVyZW50ICcgKyAncHJvcC4gKGh0dHBzOi8vZmIubWUvcmVhY3Qtc3BlY2lhbC1wcm9wcyknLCBkaXNwbGF5TmFtZSk7XG4gICAgfVxuICB9O1xuICB3YXJuQWJvdXRBY2Nlc3NpbmdLZXkuaXNSZWFjdFdhcm5pbmcgPSB0cnVlO1xuICBPYmplY3QuZGVmaW5lUHJvcGVydHkocHJvcHMsICdrZXknLCB7XG4gICAgZ2V0OiB3YXJuQWJvdXRBY2Nlc3NpbmdLZXksXG4gICAgY29uZmlndXJhYmxlOiB0cnVlXG4gIH0pO1xufVxuXG5mdW5jdGlvbiBkZWZpbmVSZWZQcm9wV2FybmluZ0dldHRlcihwcm9wcywgZGlzcGxheU5hbWUpIHtcbiAgdmFyIHdhcm5BYm91dEFjY2Vzc2luZ1JlZiA9IGZ1bmN0aW9uICgpIHtcbiAgICBpZiAoIXNwZWNpYWxQcm9wUmVmV2FybmluZ1Nob3duKSB7XG4gICAgICBzcGVjaWFsUHJvcFJlZldhcm5pbmdTaG93biA9IHRydWU7XG4gICAgICB3YXJuaW5nKGZhbHNlLCAnJXM6IGByZWZgIGlzIG5vdCBhIHByb3AuIFRyeWluZyB0byBhY2Nlc3MgaXQgd2lsbCByZXN1bHQgJyArICdpbiBgdW5kZWZpbmVkYCBiZWluZyByZXR1cm5lZC4gSWYgeW91IG5lZWQgdG8gYWNjZXNzIHRoZSBzYW1lICcgKyAndmFsdWUgd2l0aGluIHRoZSBjaGlsZCBjb21wb25lbnQsIHlvdSBzaG91bGQgcGFzcyBpdCBhcyBhIGRpZmZlcmVudCAnICsgJ3Byb3AuIChodHRwczovL2ZiLm1lL3JlYWN0LXNwZWNpYWwtcHJvcHMpJywgZGlzcGxheU5hbWUpO1xuICAgIH1cbiAgfTtcbiAgd2FybkFib3V0QWNjZXNzaW5nUmVmLmlzUmVhY3RXYXJuaW5nID0gdHJ1ZTtcbiAgT2JqZWN0LmRlZmluZVByb3BlcnR5KHByb3BzLCAncmVmJywge1xuICAgIGdldDogd2FybkFib3V0QWNjZXNzaW5nUmVmLFxuICAgIGNvbmZpZ3VyYWJsZTogdHJ1ZVxuICB9KTtcbn1cblxuLyoqXG4gKiBGYWN0b3J5IG1ldGhvZCB0byBjcmVhdGUgYSBuZXcgUmVhY3QgZWxlbWVudC4gVGhpcyBubyBsb25nZXIgYWRoZXJlcyB0b1xuICogdGhlIGNsYXNzIHBhdHRlcm4sIHNvIGRvIG5vdCB1c2UgbmV3IHRvIGNhbGwgaXQuIEFsc28sIG5vIGluc3RhbmNlb2YgY2hlY2tcbiAqIHdpbGwgd29yay4gSW5zdGVhZCB0ZXN0ICQkdHlwZW9mIGZpZWxkIGFnYWluc3QgU3ltYm9sLmZvcigncmVhY3QuZWxlbWVudCcpIHRvIGNoZWNrXG4gKiBpZiBzb21ldGhpbmcgaXMgYSBSZWFjdCBFbGVtZW50LlxuICpcbiAqIEBwYXJhbSB7Kn0gdHlwZVxuICogQHBhcmFtIHsqfSBrZXlcbiAqIEBwYXJhbSB7c3RyaW5nfG9iamVjdH0gcmVmXG4gKiBAcGFyYW0geyp9IHNlbGYgQSAqdGVtcG9yYXJ5KiBoZWxwZXIgdG8gZGV0ZWN0IHBsYWNlcyB3aGVyZSBgdGhpc2AgaXNcbiAqIGRpZmZlcmVudCBmcm9tIHRoZSBgb3duZXJgIHdoZW4gUmVhY3QuY3JlYXRlRWxlbWVudCBpcyBjYWxsZWQsIHNvIHRoYXQgd2VcbiAqIGNhbiB3YXJuLiBXZSB3YW50IHRvIGdldCByaWQgb2Ygb3duZXIgYW5kIHJlcGxhY2Ugc3RyaW5nIGByZWZgcyB3aXRoIGFycm93XG4gKiBmdW5jdGlvbnMsIGFuZCBhcyBsb25nIGFzIGB0aGlzYCBhbmQgb3duZXIgYXJlIHRoZSBzYW1lLCB0aGVyZSB3aWxsIGJlIG5vXG4gKiBjaGFuZ2UgaW4gYmVoYXZpb3IuXG4gKiBAcGFyYW0geyp9IHNvdXJjZSBBbiBhbm5vdGF0aW9uIG9iamVjdCAoYWRkZWQgYnkgYSB0cmFuc3BpbGVyIG9yIG90aGVyd2lzZSlcbiAqIGluZGljYXRpbmcgZmlsZW5hbWUsIGxpbmUgbnVtYmVyLCBhbmQvb3Igb3RoZXIgaW5mb3JtYXRpb24uXG4gKiBAcGFyYW0geyp9IG93bmVyXG4gKiBAcGFyYW0geyp9IHByb3BzXG4gKiBAaW50ZXJuYWxcbiAqL1xudmFyIFJlYWN0RWxlbWVudCA9IGZ1bmN0aW9uICh0eXBlLCBrZXksIHJlZiwgc2VsZiwgc291cmNlLCBvd25lciwgcHJvcHMpIHtcbiAgdmFyIGVsZW1lbnQgPSB7XG4gICAgLy8gVGhpcyB0YWcgYWxsb3cgdXMgdG8gdW5pcXVlbHkgaWRlbnRpZnkgdGhpcyBhcyBhIFJlYWN0IEVsZW1lbnRcbiAgICAkJHR5cGVvZjogUkVBQ1RfRUxFTUVOVF9UWVBFLFxuXG4gICAgLy8gQnVpbHQtaW4gcHJvcGVydGllcyB0aGF0IGJlbG9uZyBvbiB0aGUgZWxlbWVudFxuICAgIHR5cGU6IHR5cGUsXG4gICAga2V5OiBrZXksXG4gICAgcmVmOiByZWYsXG4gICAgcHJvcHM6IHByb3BzLFxuXG4gICAgLy8gUmVjb3JkIHRoZSBjb21wb25lbnQgcmVzcG9uc2libGUgZm9yIGNyZWF0aW5nIHRoaXMgZWxlbWVudC5cbiAgICBfb3duZXI6IG93bmVyXG4gIH07XG5cbiAge1xuICAgIC8vIFRoZSB2YWxpZGF0aW9uIGZsYWcgaXMgY3VycmVudGx5IG11dGF0aXZlLiBXZSBwdXQgaXQgb25cbiAgICAvLyBhbiBleHRlcm5hbCBiYWNraW5nIHN0b3JlIHNvIHRoYXQgd2UgY2FuIGZyZWV6ZSB0aGUgd2hvbGUgb2JqZWN0LlxuICAgIC8vIFRoaXMgY2FuIGJlIHJlcGxhY2VkIHdpdGggYSBXZWFrTWFwIG9uY2UgdGhleSBhcmUgaW1wbGVtZW50ZWQgaW5cbiAgICAvLyBjb21tb25seSB1c2VkIGRldmVsb3BtZW50IGVudmlyb25tZW50cy5cbiAgICBlbGVtZW50Ll9zdG9yZSA9IHt9O1xuXG4gICAgLy8gVG8gbWFrZSBjb21wYXJpbmcgUmVhY3RFbGVtZW50cyBlYXNpZXIgZm9yIHRlc3RpbmcgcHVycG9zZXMsIHdlIG1ha2VcbiAgICAvLyB0aGUgdmFsaWRhdGlvbiBmbGFnIG5vbi1lbnVtZXJhYmxlICh3aGVyZSBwb3NzaWJsZSwgd2hpY2ggc2hvdWxkXG4gICAgLy8gaW5jbHVkZSBldmVyeSBlbnZpcm9ubWVudCB3ZSBydW4gdGVzdHMgaW4pLCBzbyB0aGUgdGVzdCBmcmFtZXdvcmtcbiAgICAvLyBpZ25vcmVzIGl0LlxuICAgIE9iamVjdC5kZWZpbmVQcm9wZXJ0eShlbGVtZW50Ll9zdG9yZSwgJ3ZhbGlkYXRlZCcsIHtcbiAgICAgIGNvbmZpZ3VyYWJsZTogZmFsc2UsXG4gICAgICBlbnVtZXJhYmxlOiBmYWxzZSxcbiAgICAgIHdyaXRhYmxlOiB0cnVlLFxuICAgICAgdmFsdWU6IGZhbHNlXG4gICAgfSk7XG4gICAgLy8gc2VsZiBhbmQgc291cmNlIGFyZSBERVYgb25seSBwcm9wZXJ0aWVzLlxuICAgIE9iamVjdC5kZWZpbmVQcm9wZXJ0eShlbGVtZW50LCAnX3NlbGYnLCB7XG4gICAgICBjb25maWd1cmFibGU6IGZhbHNlLFxuICAgICAgZW51bWVyYWJsZTogZmFsc2UsXG4gICAgICB3cml0YWJsZTogZmFsc2UsXG4gICAgICB2YWx1ZTogc2VsZlxuICAgIH0pO1xuICAgIC8vIFR3byBlbGVtZW50cyBjcmVhdGVkIGluIHR3byBkaWZmZXJlbnQgcGxhY2VzIHNob3VsZCBiZSBjb25zaWRlcmVkXG4gICAgLy8gZXF1YWwgZm9yIHRlc3RpbmcgcHVycG9zZXMgYW5kIHRoZXJlZm9yZSB3ZSBoaWRlIGl0IGZyb20gZW51bWVyYXRpb24uXG4gICAgT2JqZWN0LmRlZmluZVByb3BlcnR5KGVsZW1lbnQsICdfc291cmNlJywge1xuICAgICAgY29uZmlndXJhYmxlOiBmYWxzZSxcbiAgICAgIGVudW1lcmFibGU6IGZhbHNlLFxuICAgICAgd3JpdGFibGU6IGZhbHNlLFxuICAgICAgdmFsdWU6IHNvdXJjZVxuICAgIH0pO1xuICAgIGlmIChPYmplY3QuZnJlZXplKSB7XG4gICAgICBPYmplY3QuZnJlZXplKGVsZW1lbnQucHJvcHMpO1xuICAgICAgT2JqZWN0LmZyZWV6ZShlbGVtZW50KTtcbiAgICB9XG4gIH1cblxuICByZXR1cm4gZWxlbWVudDtcbn07XG5cbi8qKlxuICogQ3JlYXRlIGFuZCByZXR1cm4gYSBuZXcgUmVhY3RFbGVtZW50IG9mIHRoZSBnaXZlbiB0eXBlLlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNjcmVhdGVlbGVtZW50XG4gKi9cbmZ1bmN0aW9uIGNyZWF0ZUVsZW1lbnQodHlwZSwgY29uZmlnLCBjaGlsZHJlbikge1xuICB2YXIgcHJvcE5hbWU7XG5cbiAgLy8gUmVzZXJ2ZWQgbmFtZXMgYXJlIGV4dHJhY3RlZFxuICB2YXIgcHJvcHMgPSB7fTtcblxuICB2YXIga2V5ID0gbnVsbDtcbiAgdmFyIHJlZiA9IG51bGw7XG4gIHZhciBzZWxmID0gbnVsbDtcbiAgdmFyIHNvdXJjZSA9IG51bGw7XG5cbiAgaWYgKGNvbmZpZyAhPSBudWxsKSB7XG4gICAgaWYgKGhhc1ZhbGlkUmVmKGNvbmZpZykpIHtcbiAgICAgIHJlZiA9IGNvbmZpZy5yZWY7XG4gICAgfVxuICAgIGlmIChoYXNWYWxpZEtleShjb25maWcpKSB7XG4gICAgICBrZXkgPSAnJyArIGNvbmZpZy5rZXk7XG4gICAgfVxuXG4gICAgc2VsZiA9IGNvbmZpZy5fX3NlbGYgPT09IHVuZGVmaW5lZCA/IG51bGwgOiBjb25maWcuX19zZWxmO1xuICAgIHNvdXJjZSA9IGNvbmZpZy5fX3NvdXJjZSA9PT0gdW5kZWZpbmVkID8gbnVsbCA6IGNvbmZpZy5fX3NvdXJjZTtcbiAgICAvLyBSZW1haW5pbmcgcHJvcGVydGllcyBhcmUgYWRkZWQgdG8gYSBuZXcgcHJvcHMgb2JqZWN0XG4gICAgZm9yIChwcm9wTmFtZSBpbiBjb25maWcpIHtcbiAgICAgIGlmIChoYXNPd25Qcm9wZXJ0eS5jYWxsKGNvbmZpZywgcHJvcE5hbWUpICYmICFSRVNFUlZFRF9QUk9QUy5oYXNPd25Qcm9wZXJ0eShwcm9wTmFtZSkpIHtcbiAgICAgICAgcHJvcHNbcHJvcE5hbWVdID0gY29uZmlnW3Byb3BOYW1lXTtcbiAgICAgIH1cbiAgICB9XG4gIH1cblxuICAvLyBDaGlsZHJlbiBjYW4gYmUgbW9yZSB0aGFuIG9uZSBhcmd1bWVudCwgYW5kIHRob3NlIGFyZSB0cmFuc2ZlcnJlZCBvbnRvXG4gIC8vIHRoZSBuZXdseSBhbGxvY2F0ZWQgcHJvcHMgb2JqZWN0LlxuICB2YXIgY2hpbGRyZW5MZW5ndGggPSBhcmd1bWVudHMubGVuZ3RoIC0gMjtcbiAgaWYgKGNoaWxkcmVuTGVuZ3RoID09PSAxKSB7XG4gICAgcHJvcHMuY2hpbGRyZW4gPSBjaGlsZHJlbjtcbiAgfSBlbHNlIGlmIChjaGlsZHJlbkxlbmd0aCA+IDEpIHtcbiAgICB2YXIgY2hpbGRBcnJheSA9IEFycmF5KGNoaWxkcmVuTGVuZ3RoKTtcbiAgICBmb3IgKHZhciBpID0gMDsgaSA8IGNoaWxkcmVuTGVuZ3RoOyBpKyspIHtcbiAgICAgIGNoaWxkQXJyYXlbaV0gPSBhcmd1bWVudHNbaSArIDJdO1xuICAgIH1cbiAgICB7XG4gICAgICBpZiAoT2JqZWN0LmZyZWV6ZSkge1xuICAgICAgICBPYmplY3QuZnJlZXplKGNoaWxkQXJyYXkpO1xuICAgICAgfVxuICAgIH1cbiAgICBwcm9wcy5jaGlsZHJlbiA9IGNoaWxkQXJyYXk7XG4gIH1cblxuICAvLyBSZXNvbHZlIGRlZmF1bHQgcHJvcHNcbiAgaWYgKHR5cGUgJiYgdHlwZS5kZWZhdWx0UHJvcHMpIHtcbiAgICB2YXIgZGVmYXVsdFByb3BzID0gdHlwZS5kZWZhdWx0UHJvcHM7XG4gICAgZm9yIChwcm9wTmFtZSBpbiBkZWZhdWx0UHJvcHMpIHtcbiAgICAgIGlmIChwcm9wc1twcm9wTmFtZV0gPT09IHVuZGVmaW5lZCkge1xuICAgICAgICBwcm9wc1twcm9wTmFtZV0gPSBkZWZhdWx0UHJvcHNbcHJvcE5hbWVdO1xuICAgICAgfVxuICAgIH1cbiAgfVxuICB7XG4gICAgaWYgKGtleSB8fCByZWYpIHtcbiAgICAgIGlmICh0eXBlb2YgcHJvcHMuJCR0eXBlb2YgPT09ICd1bmRlZmluZWQnIHx8IHByb3BzLiQkdHlwZW9mICE9PSBSRUFDVF9FTEVNRU5UX1RZUEUpIHtcbiAgICAgICAgdmFyIGRpc3BsYXlOYW1lID0gdHlwZW9mIHR5cGUgPT09ICdmdW5jdGlvbicgPyB0eXBlLmRpc3BsYXlOYW1lIHx8IHR5cGUubmFtZSB8fCAnVW5rbm93bicgOiB0eXBlO1xuICAgICAgICBpZiAoa2V5KSB7XG4gICAgICAgICAgZGVmaW5lS2V5UHJvcFdhcm5pbmdHZXR0ZXIocHJvcHMsIGRpc3BsYXlOYW1lKTtcbiAgICAgICAgfVxuICAgICAgICBpZiAocmVmKSB7XG4gICAgICAgICAgZGVmaW5lUmVmUHJvcFdhcm5pbmdHZXR0ZXIocHJvcHMsIGRpc3BsYXlOYW1lKTtcbiAgICAgICAgfVxuICAgICAgfVxuICAgIH1cbiAgfVxuICByZXR1cm4gUmVhY3RFbGVtZW50KHR5cGUsIGtleSwgcmVmLCBzZWxmLCBzb3VyY2UsIFJlYWN0Q3VycmVudE93bmVyLmN1cnJlbnQsIHByb3BzKTtcbn1cblxuLyoqXG4gKiBSZXR1cm4gYSBmdW5jdGlvbiB0aGF0IHByb2R1Y2VzIFJlYWN0RWxlbWVudHMgb2YgYSBnaXZlbiB0eXBlLlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNjcmVhdGVmYWN0b3J5XG4gKi9cblxuXG5mdW5jdGlvbiBjbG9uZUFuZFJlcGxhY2VLZXkob2xkRWxlbWVudCwgbmV3S2V5KSB7XG4gIHZhciBuZXdFbGVtZW50ID0gUmVhY3RFbGVtZW50KG9sZEVsZW1lbnQudHlwZSwgbmV3S2V5LCBvbGRFbGVtZW50LnJlZiwgb2xkRWxlbWVudC5fc2VsZiwgb2xkRWxlbWVudC5fc291cmNlLCBvbGRFbGVtZW50Ll9vd25lciwgb2xkRWxlbWVudC5wcm9wcyk7XG5cbiAgcmV0dXJuIG5ld0VsZW1lbnQ7XG59XG5cbi8qKlxuICogQ2xvbmUgYW5kIHJldHVybiBhIG5ldyBSZWFjdEVsZW1lbnQgdXNpbmcgZWxlbWVudCBhcyB0aGUgc3RhcnRpbmcgcG9pbnQuXG4gKiBTZWUgaHR0cHM6Ly9yZWFjdGpzLm9yZy9kb2NzL3JlYWN0LWFwaS5odG1sI2Nsb25lZWxlbWVudFxuICovXG5mdW5jdGlvbiBjbG9uZUVsZW1lbnQoZWxlbWVudCwgY29uZmlnLCBjaGlsZHJlbikge1xuICB2YXIgcHJvcE5hbWU7XG5cbiAgLy8gT3JpZ2luYWwgcHJvcHMgYXJlIGNvcGllZFxuICB2YXIgcHJvcHMgPSBfYXNzaWduKHt9LCBlbGVtZW50LnByb3BzKTtcblxuICAvLyBSZXNlcnZlZCBuYW1lcyBhcmUgZXh0cmFjdGVkXG4gIHZhciBrZXkgPSBlbGVtZW50LmtleTtcbiAgdmFyIHJlZiA9IGVsZW1lbnQucmVmO1xuICAvLyBTZWxmIGlzIHByZXNlcnZlZCBzaW5jZSB0aGUgb3duZXIgaXMgcHJlc2VydmVkLlxuICB2YXIgc2VsZiA9IGVsZW1lbnQuX3NlbGY7XG4gIC8vIFNvdXJjZSBpcyBwcmVzZXJ2ZWQgc2luY2UgY2xvbmVFbGVtZW50IGlzIHVubGlrZWx5IHRvIGJlIHRhcmdldGVkIGJ5IGFcbiAgLy8gdHJhbnNwaWxlciwgYW5kIHRoZSBvcmlnaW5hbCBzb3VyY2UgaXMgcHJvYmFibHkgYSBiZXR0ZXIgaW5kaWNhdG9yIG9mIHRoZVxuICAvLyB0cnVlIG93bmVyLlxuICB2YXIgc291cmNlID0gZWxlbWVudC5fc291cmNlO1xuXG4gIC8vIE93bmVyIHdpbGwgYmUgcHJlc2VydmVkLCB1bmxlc3MgcmVmIGlzIG92ZXJyaWRkZW5cbiAgdmFyIG93bmVyID0gZWxlbWVudC5fb3duZXI7XG5cbiAgaWYgKGNvbmZpZyAhPSBudWxsKSB7XG4gICAgaWYgKGhhc1ZhbGlkUmVmKGNvbmZpZykpIHtcbiAgICAgIC8vIFNpbGVudGx5IHN0ZWFsIHRoZSByZWYgZnJvbSB0aGUgcGFyZW50LlxuICAgICAgcmVmID0gY29uZmlnLnJlZjtcbiAgICAgIG93bmVyID0gUmVhY3RDdXJyZW50T3duZXIuY3VycmVudDtcbiAgICB9XG4gICAgaWYgKGhhc1ZhbGlkS2V5KGNvbmZpZykpIHtcbiAgICAgIGtleSA9ICcnICsgY29uZmlnLmtleTtcbiAgICB9XG5cbiAgICAvLyBSZW1haW5pbmcgcHJvcGVydGllcyBvdmVycmlkZSBleGlzdGluZyBwcm9wc1xuICAgIHZhciBkZWZhdWx0UHJvcHM7XG4gICAgaWYgKGVsZW1lbnQudHlwZSAmJiBlbGVtZW50LnR5cGUuZGVmYXVsdFByb3BzKSB7XG4gICAgICBkZWZhdWx0UHJvcHMgPSBlbGVtZW50LnR5cGUuZGVmYXVsdFByb3BzO1xuICAgIH1cbiAgICBmb3IgKHByb3BOYW1lIGluIGNvbmZpZykge1xuICAgICAgaWYgKGhhc093blByb3BlcnR5LmNhbGwoY29uZmlnLCBwcm9wTmFtZSkgJiYgIVJFU0VSVkVEX1BST1BTLmhhc093blByb3BlcnR5KHByb3BOYW1lKSkge1xuICAgICAgICBpZiAoY29uZmlnW3Byb3BOYW1lXSA9PT0gdW5kZWZpbmVkICYmIGRlZmF1bHRQcm9wcyAhPT0gdW5kZWZpbmVkKSB7XG4gICAgICAgICAgLy8gUmVzb2x2ZSBkZWZhdWx0IHByb3BzXG4gICAgICAgICAgcHJvcHNbcHJvcE5hbWVdID0gZGVmYXVsdFByb3BzW3Byb3BOYW1lXTtcbiAgICAgICAgfSBlbHNlIHtcbiAgICAgICAgICBwcm9wc1twcm9wTmFtZV0gPSBjb25maWdbcHJvcE5hbWVdO1xuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG5cbiAgLy8gQ2hpbGRyZW4gY2FuIGJlIG1vcmUgdGhhbiBvbmUgYXJndW1lbnQsIGFuZCB0aG9zZSBhcmUgdHJhbnNmZXJyZWQgb250b1xuICAvLyB0aGUgbmV3bHkgYWxsb2NhdGVkIHByb3BzIG9iamVjdC5cbiAgdmFyIGNoaWxkcmVuTGVuZ3RoID0gYXJndW1lbnRzLmxlbmd0aCAtIDI7XG4gIGlmIChjaGlsZHJlbkxlbmd0aCA9PT0gMSkge1xuICAgIHByb3BzLmNoaWxkcmVuID0gY2hpbGRyZW47XG4gIH0gZWxzZSBpZiAoY2hpbGRyZW5MZW5ndGggPiAxKSB7XG4gICAgdmFyIGNoaWxkQXJyYXkgPSBBcnJheShjaGlsZHJlbkxlbmd0aCk7XG4gICAgZm9yICh2YXIgaSA9IDA7IGkgPCBjaGlsZHJlbkxlbmd0aDsgaSsrKSB7XG4gICAgICBjaGlsZEFycmF5W2ldID0gYXJndW1lbnRzW2kgKyAyXTtcbiAgICB9XG4gICAgcHJvcHMuY2hpbGRyZW4gPSBjaGlsZEFycmF5O1xuICB9XG5cbiAgcmV0dXJuIFJlYWN0RWxlbWVudChlbGVtZW50LnR5cGUsIGtleSwgcmVmLCBzZWxmLCBzb3VyY2UsIG93bmVyLCBwcm9wcyk7XG59XG5cbi8qKlxuICogVmVyaWZpZXMgdGhlIG9iamVjdCBpcyBhIFJlYWN0RWxlbWVudC5cbiAqIFNlZSBodHRwczovL3JlYWN0anMub3JnL2RvY3MvcmVhY3QtYXBpLmh0bWwjaXN2YWxpZGVsZW1lbnRcbiAqIEBwYXJhbSB7P29iamVjdH0gb2JqZWN0XG4gKiBAcmV0dXJuIHtib29sZWFufSBUcnVlIGlmIGBvYmplY3RgIGlzIGEgdmFsaWQgY29tcG9uZW50LlxuICogQGZpbmFsXG4gKi9cbmZ1bmN0aW9uIGlzVmFsaWRFbGVtZW50KG9iamVjdCkge1xuICByZXR1cm4gdHlwZW9mIG9iamVjdCA9PT0gJ29iamVjdCcgJiYgb2JqZWN0ICE9PSBudWxsICYmIG9iamVjdC4kJHR5cGVvZiA9PT0gUkVBQ1RfRUxFTUVOVF9UWVBFO1xufVxuXG52YXIgUmVhY3REZWJ1Z0N1cnJlbnRGcmFtZSA9IHt9O1xuXG57XG4gIC8vIENvbXBvbmVudCB0aGF0IGlzIGJlaW5nIHdvcmtlZCBvblxuICBSZWFjdERlYnVnQ3VycmVudEZyYW1lLmdldEN1cnJlbnRTdGFjayA9IG51bGw7XG5cbiAgUmVhY3REZWJ1Z0N1cnJlbnRGcmFtZS5nZXRTdGFja0FkZGVuZHVtID0gZnVuY3Rpb24gKCkge1xuICAgIHZhciBpbXBsID0gUmVhY3REZWJ1Z0N1cnJlbnRGcmFtZS5nZXRDdXJyZW50U3RhY2s7XG4gICAgaWYgKGltcGwpIHtcbiAgICAgIHJldHVybiBpbXBsKCk7XG4gICAgfVxuICAgIHJldHVybiBudWxsO1xuICB9O1xufVxuXG52YXIgU0VQQVJBVE9SID0gJy4nO1xudmFyIFNVQlNFUEFSQVRPUiA9ICc6JztcblxuLyoqXG4gKiBFc2NhcGUgYW5kIHdyYXAga2V5IHNvIGl0IGlzIHNhZmUgdG8gdXNlIGFzIGEgcmVhY3RpZFxuICpcbiAqIEBwYXJhbSB7c3RyaW5nfSBrZXkgdG8gYmUgZXNjYXBlZC5cbiAqIEByZXR1cm4ge3N0cmluZ30gdGhlIGVzY2FwZWQga2V5LlxuICovXG5mdW5jdGlvbiBlc2NhcGUoa2V5KSB7XG4gIHZhciBlc2NhcGVSZWdleCA9IC9bPTpdL2c7XG4gIHZhciBlc2NhcGVyTG9va3VwID0ge1xuICAgICc9JzogJz0wJyxcbiAgICAnOic6ICc9MidcbiAgfTtcbiAgdmFyIGVzY2FwZWRTdHJpbmcgPSAoJycgKyBrZXkpLnJlcGxhY2UoZXNjYXBlUmVnZXgsIGZ1bmN0aW9uIChtYXRjaCkge1xuICAgIHJldHVybiBlc2NhcGVyTG9va3VwW21hdGNoXTtcbiAgfSk7XG5cbiAgcmV0dXJuICckJyArIGVzY2FwZWRTdHJpbmc7XG59XG5cbi8qKlxuICogVE9ETzogVGVzdCB0aGF0IGEgc2luZ2xlIGNoaWxkIGFuZCBhbiBhcnJheSB3aXRoIG9uZSBpdGVtIGhhdmUgdGhlIHNhbWUga2V5XG4gKiBwYXR0ZXJuLlxuICovXG5cbnZhciBkaWRXYXJuQWJvdXRNYXBzID0gZmFsc2U7XG5cbnZhciB1c2VyUHJvdmlkZWRLZXlFc2NhcGVSZWdleCA9IC9cXC8rL2c7XG5mdW5jdGlvbiBlc2NhcGVVc2VyUHJvdmlkZWRLZXkodGV4dCkge1xuICByZXR1cm4gKCcnICsgdGV4dCkucmVwbGFjZSh1c2VyUHJvdmlkZWRLZXlFc2NhcGVSZWdleCwgJyQmLycpO1xufVxuXG52YXIgUE9PTF9TSVpFID0gMTA7XG52YXIgdHJhdmVyc2VDb250ZXh0UG9vbCA9IFtdO1xuZnVuY3Rpb24gZ2V0UG9vbGVkVHJhdmVyc2VDb250ZXh0KG1hcFJlc3VsdCwga2V5UHJlZml4LCBtYXBGdW5jdGlvbiwgbWFwQ29udGV4dCkge1xuICBpZiAodHJhdmVyc2VDb250ZXh0UG9vbC5sZW5ndGgpIHtcbiAgICB2YXIgdHJhdmVyc2VDb250ZXh0ID0gdHJhdmVyc2VDb250ZXh0UG9vbC5wb3AoKTtcbiAgICB0cmF2ZXJzZUNvbnRleHQucmVzdWx0ID0gbWFwUmVzdWx0O1xuICAgIHRyYXZlcnNlQ29udGV4dC5rZXlQcmVmaXggPSBrZXlQcmVmaXg7XG4gICAgdHJhdmVyc2VDb250ZXh0LmZ1bmMgPSBtYXBGdW5jdGlvbjtcbiAgICB0cmF2ZXJzZUNvbnRleHQuY29udGV4dCA9IG1hcENvbnRleHQ7XG4gICAgdHJhdmVyc2VDb250ZXh0LmNvdW50ID0gMDtcbiAgICByZXR1cm4gdHJhdmVyc2VDb250ZXh0O1xuICB9IGVsc2Uge1xuICAgIHJldHVybiB7XG4gICAgICByZXN1bHQ6IG1hcFJlc3VsdCxcbiAgICAgIGtleVByZWZpeDoga2V5UHJlZml4LFxuICAgICAgZnVuYzogbWFwRnVuY3Rpb24sXG4gICAgICBjb250ZXh0OiBtYXBDb250ZXh0LFxuICAgICAgY291bnQ6IDBcbiAgICB9O1xuICB9XG59XG5cbmZ1bmN0aW9uIHJlbGVhc2VUcmF2ZXJzZUNvbnRleHQodHJhdmVyc2VDb250ZXh0KSB7XG4gIHRyYXZlcnNlQ29udGV4dC5yZXN1bHQgPSBudWxsO1xuICB0cmF2ZXJzZUNvbnRleHQua2V5UHJlZml4ID0gbnVsbDtcbiAgdHJhdmVyc2VDb250ZXh0LmZ1bmMgPSBudWxsO1xuICB0cmF2ZXJzZUNvbnRleHQuY29udGV4dCA9IG51bGw7XG4gIHRyYXZlcnNlQ29udGV4dC5jb3VudCA9IDA7XG4gIGlmICh0cmF2ZXJzZUNvbnRleHRQb29sLmxlbmd0aCA8IFBPT0xfU0laRSkge1xuICAgIHRyYXZlcnNlQ29udGV4dFBvb2wucHVzaCh0cmF2ZXJzZUNvbnRleHQpO1xuICB9XG59XG5cbi8qKlxuICogQHBhcmFtIHs/Kn0gY2hpbGRyZW4gQ2hpbGRyZW4gdHJlZSBjb250YWluZXIuXG4gKiBAcGFyYW0geyFzdHJpbmd9IG5hbWVTb0ZhciBOYW1lIG9mIHRoZSBrZXkgcGF0aCBzbyBmYXIuXG4gKiBAcGFyYW0geyFmdW5jdGlvbn0gY2FsbGJhY2sgQ2FsbGJhY2sgdG8gaW52b2tlIHdpdGggZWFjaCBjaGlsZCBmb3VuZC5cbiAqIEBwYXJhbSB7Pyp9IHRyYXZlcnNlQ29udGV4dCBVc2VkIHRvIHBhc3MgaW5mb3JtYXRpb24gdGhyb3VnaG91dCB0aGUgdHJhdmVyc2FsXG4gKiBwcm9jZXNzLlxuICogQHJldHVybiB7IW51bWJlcn0gVGhlIG51bWJlciBvZiBjaGlsZHJlbiBpbiB0aGlzIHN1YnRyZWUuXG4gKi9cbmZ1bmN0aW9uIHRyYXZlcnNlQWxsQ2hpbGRyZW5JbXBsKGNoaWxkcmVuLCBuYW1lU29GYXIsIGNhbGxiYWNrLCB0cmF2ZXJzZUNvbnRleHQpIHtcbiAgdmFyIHR5cGUgPSB0eXBlb2YgY2hpbGRyZW47XG5cbiAgaWYgKHR5cGUgPT09ICd1bmRlZmluZWQnIHx8IHR5cGUgPT09ICdib29sZWFuJykge1xuICAgIC8vIEFsbCBvZiB0aGUgYWJvdmUgYXJlIHBlcmNlaXZlZCBhcyBudWxsLlxuICAgIGNoaWxkcmVuID0gbnVsbDtcbiAgfVxuXG4gIHZhciBpbnZva2VDYWxsYmFjayA9IGZhbHNlO1xuXG4gIGlmIChjaGlsZHJlbiA9PT0gbnVsbCkge1xuICAgIGludm9rZUNhbGxiYWNrID0gdHJ1ZTtcbiAgfSBlbHNlIHtcbiAgICBzd2l0Y2ggKHR5cGUpIHtcbiAgICAgIGNhc2UgJ3N0cmluZyc6XG4gICAgICBjYXNlICdudW1iZXInOlxuICAgICAgICBpbnZva2VDYWxsYmFjayA9IHRydWU7XG4gICAgICAgIGJyZWFrO1xuICAgICAgY2FzZSAnb2JqZWN0JzpcbiAgICAgICAgc3dpdGNoIChjaGlsZHJlbi4kJHR5cGVvZikge1xuICAgICAgICAgIGNhc2UgUkVBQ1RfRUxFTUVOVF9UWVBFOlxuICAgICAgICAgIGNhc2UgUkVBQ1RfQ0FMTF9UWVBFOlxuICAgICAgICAgIGNhc2UgUkVBQ1RfUkVUVVJOX1RZUEU6XG4gICAgICAgICAgY2FzZSBSRUFDVF9QT1JUQUxfVFlQRTpcbiAgICAgICAgICAgIGludm9rZUNhbGxiYWNrID0gdHJ1ZTtcbiAgICAgICAgfVxuICAgIH1cbiAgfVxuXG4gIGlmIChpbnZva2VDYWxsYmFjaykge1xuICAgIGNhbGxiYWNrKHRyYXZlcnNlQ29udGV4dCwgY2hpbGRyZW4sXG4gICAgLy8gSWYgaXQncyB0aGUgb25seSBjaGlsZCwgdHJlYXQgdGhlIG5hbWUgYXMgaWYgaXQgd2FzIHdyYXBwZWQgaW4gYW4gYXJyYXlcbiAgICAvLyBzbyB0aGF0IGl0J3MgY29uc2lzdGVudCBpZiB0aGUgbnVtYmVyIG9mIGNoaWxkcmVuIGdyb3dzLlxuICAgIG5hbWVTb0ZhciA9PT0gJycgPyBTRVBBUkFUT1IgKyBnZXRDb21wb25lbnRLZXkoY2hpbGRyZW4sIDApIDogbmFtZVNvRmFyKTtcbiAgICByZXR1cm4gMTtcbiAgfVxuXG4gIHZhciBjaGlsZDtcbiAgdmFyIG5leHROYW1lO1xuICB2YXIgc3VidHJlZUNvdW50ID0gMDsgLy8gQ291bnQgb2YgY2hpbGRyZW4gZm91bmQgaW4gdGhlIGN1cnJlbnQgc3VidHJlZS5cbiAgdmFyIG5leHROYW1lUHJlZml4ID0gbmFtZVNvRmFyID09PSAnJyA/IFNFUEFSQVRPUiA6IG5hbWVTb0ZhciArIFNVQlNFUEFSQVRPUjtcblxuICBpZiAoQXJyYXkuaXNBcnJheShjaGlsZHJlbikpIHtcbiAgICBmb3IgKHZhciBpID0gMDsgaSA8IGNoaWxkcmVuLmxlbmd0aDsgaSsrKSB7XG4gICAgICBjaGlsZCA9IGNoaWxkcmVuW2ldO1xuICAgICAgbmV4dE5hbWUgPSBuZXh0TmFtZVByZWZpeCArIGdldENvbXBvbmVudEtleShjaGlsZCwgaSk7XG4gICAgICBzdWJ0cmVlQ291bnQgKz0gdHJhdmVyc2VBbGxDaGlsZHJlbkltcGwoY2hpbGQsIG5leHROYW1lLCBjYWxsYmFjaywgdHJhdmVyc2VDb250ZXh0KTtcbiAgICB9XG4gIH0gZWxzZSB7XG4gICAgdmFyIGl0ZXJhdG9yRm4gPSBnZXRJdGVyYXRvckZuKGNoaWxkcmVuKTtcbiAgICBpZiAodHlwZW9mIGl0ZXJhdG9yRm4gPT09ICdmdW5jdGlvbicpIHtcbiAgICAgIHtcbiAgICAgICAgLy8gV2FybiBhYm91dCB1c2luZyBNYXBzIGFzIGNoaWxkcmVuXG4gICAgICAgIGlmIChpdGVyYXRvckZuID09PSBjaGlsZHJlbi5lbnRyaWVzKSB7XG4gICAgICAgICAgd2FybmluZyhkaWRXYXJuQWJvdXRNYXBzLCAnVXNpbmcgTWFwcyBhcyBjaGlsZHJlbiBpcyB1bnN1cHBvcnRlZCBhbmQgd2lsbCBsaWtlbHkgeWllbGQgJyArICd1bmV4cGVjdGVkIHJlc3VsdHMuIENvbnZlcnQgaXQgdG8gYSBzZXF1ZW5jZS9pdGVyYWJsZSBvZiBrZXllZCAnICsgJ1JlYWN0RWxlbWVudHMgaW5zdGVhZC4lcycsIFJlYWN0RGVidWdDdXJyZW50RnJhbWUuZ2V0U3RhY2tBZGRlbmR1bSgpKTtcbiAgICAgICAgICBkaWRXYXJuQWJvdXRNYXBzID0gdHJ1ZTtcbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICB2YXIgaXRlcmF0b3IgPSBpdGVyYXRvckZuLmNhbGwoY2hpbGRyZW4pO1xuICAgICAgdmFyIHN0ZXA7XG4gICAgICB2YXIgaWkgPSAwO1xuICAgICAgd2hpbGUgKCEoc3RlcCA9IGl0ZXJhdG9yLm5leHQoKSkuZG9uZSkge1xuICAgICAgICBjaGlsZCA9IHN0ZXAudmFsdWU7XG4gICAgICAgIG5leHROYW1lID0gbmV4dE5hbWVQcmVmaXggKyBnZXRDb21wb25lbnRLZXkoY2hpbGQsIGlpKyspO1xuICAgICAgICBzdWJ0cmVlQ291bnQgKz0gdHJhdmVyc2VBbGxDaGlsZHJlbkltcGwoY2hpbGQsIG5leHROYW1lLCBjYWxsYmFjaywgdHJhdmVyc2VDb250ZXh0KTtcbiAgICAgIH1cbiAgICB9IGVsc2UgaWYgKHR5cGUgPT09ICdvYmplY3QnKSB7XG4gICAgICB2YXIgYWRkZW5kdW0gPSAnJztcbiAgICAgIHtcbiAgICAgICAgYWRkZW5kdW0gPSAnIElmIHlvdSBtZWFudCB0byByZW5kZXIgYSBjb2xsZWN0aW9uIG9mIGNoaWxkcmVuLCB1c2UgYW4gYXJyYXkgJyArICdpbnN0ZWFkLicgKyBSZWFjdERlYnVnQ3VycmVudEZyYW1lLmdldFN0YWNrQWRkZW5kdW0oKTtcbiAgICAgIH1cbiAgICAgIHZhciBjaGlsZHJlblN0cmluZyA9ICcnICsgY2hpbGRyZW47XG4gICAgICBpbnZhcmlhbnQoZmFsc2UsICdPYmplY3RzIGFyZSBub3QgdmFsaWQgYXMgYSBSZWFjdCBjaGlsZCAoZm91bmQ6ICVzKS4lcycsIGNoaWxkcmVuU3RyaW5nID09PSAnW29iamVjdCBPYmplY3RdJyA/ICdvYmplY3Qgd2l0aCBrZXlzIHsnICsgT2JqZWN0LmtleXMoY2hpbGRyZW4pLmpvaW4oJywgJykgKyAnfScgOiBjaGlsZHJlblN0cmluZywgYWRkZW5kdW0pO1xuICAgIH1cbiAgfVxuXG4gIHJldHVybiBzdWJ0cmVlQ291bnQ7XG59XG5cbi8qKlxuICogVHJhdmVyc2VzIGNoaWxkcmVuIHRoYXQgYXJlIHR5cGljYWxseSBzcGVjaWZpZWQgYXMgYHByb3BzLmNoaWxkcmVuYCwgYnV0XG4gKiBtaWdodCBhbHNvIGJlIHNwZWNpZmllZCB0aHJvdWdoIGF0dHJpYnV0ZXM6XG4gKlxuICogLSBgdHJhdmVyc2VBbGxDaGlsZHJlbih0aGlzLnByb3BzLmNoaWxkcmVuLCAuLi4pYFxuICogLSBgdHJhdmVyc2VBbGxDaGlsZHJlbih0aGlzLnByb3BzLmxlZnRQYW5lbENoaWxkcmVuLCAuLi4pYFxuICpcbiAqIFRoZSBgdHJhdmVyc2VDb250ZXh0YCBpcyBhbiBvcHRpb25hbCBhcmd1bWVudCB0aGF0IGlzIHBhc3NlZCB0aHJvdWdoIHRoZVxuICogZW50aXJlIHRyYXZlcnNhbC4gSXQgY2FuIGJlIHVzZWQgdG8gc3RvcmUgYWNjdW11bGF0aW9ucyBvciBhbnl0aGluZyBlbHNlIHRoYXRcbiAqIHRoZSBjYWxsYmFjayBtaWdodCBmaW5kIHJlbGV2YW50LlxuICpcbiAqIEBwYXJhbSB7Pyp9IGNoaWxkcmVuIENoaWxkcmVuIHRyZWUgb2JqZWN0LlxuICogQHBhcmFtIHshZnVuY3Rpb259IGNhbGxiYWNrIFRvIGludm9rZSB1cG9uIHRyYXZlcnNpbmcgZWFjaCBjaGlsZC5cbiAqIEBwYXJhbSB7Pyp9IHRyYXZlcnNlQ29udGV4dCBDb250ZXh0IGZvciB0cmF2ZXJzYWwuXG4gKiBAcmV0dXJuIHshbnVtYmVyfSBUaGUgbnVtYmVyIG9mIGNoaWxkcmVuIGluIHRoaXMgc3VidHJlZS5cbiAqL1xuZnVuY3Rpb24gdHJhdmVyc2VBbGxDaGlsZHJlbihjaGlsZHJlbiwgY2FsbGJhY2ssIHRyYXZlcnNlQ29udGV4dCkge1xuICBpZiAoY2hpbGRyZW4gPT0gbnVsbCkge1xuICAgIHJldHVybiAwO1xuICB9XG5cbiAgcmV0dXJuIHRyYXZlcnNlQWxsQ2hpbGRyZW5JbXBsKGNoaWxkcmVuLCAnJywgY2FsbGJhY2ssIHRyYXZlcnNlQ29udGV4dCk7XG59XG5cbi8qKlxuICogR2VuZXJhdGUgYSBrZXkgc3RyaW5nIHRoYXQgaWRlbnRpZmllcyBhIGNvbXBvbmVudCB3aXRoaW4gYSBzZXQuXG4gKlxuICogQHBhcmFtIHsqfSBjb21wb25lbnQgQSBjb21wb25lbnQgdGhhdCBjb3VsZCBjb250YWluIGEgbWFudWFsIGtleS5cbiAqIEBwYXJhbSB7bnVtYmVyfSBpbmRleCBJbmRleCB0aGF0IGlzIHVzZWQgaWYgYSBtYW51YWwga2V5IGlzIG5vdCBwcm92aWRlZC5cbiAqIEByZXR1cm4ge3N0cmluZ31cbiAqL1xuZnVuY3Rpb24gZ2V0Q29tcG9uZW50S2V5KGNvbXBvbmVudCwgaW5kZXgpIHtcbiAgLy8gRG8gc29tZSB0eXBlY2hlY2tpbmcgaGVyZSBzaW5jZSB3ZSBjYWxsIHRoaXMgYmxpbmRseS4gV2Ugd2FudCB0byBlbnN1cmVcbiAgLy8gdGhhdCB3ZSBkb24ndCBibG9jayBwb3RlbnRpYWwgZnV0dXJlIEVTIEFQSXMuXG4gIGlmICh0eXBlb2YgY29tcG9uZW50ID09PSAnb2JqZWN0JyAmJiBjb21wb25lbnQgIT09IG51bGwgJiYgY29tcG9uZW50LmtleSAhPSBudWxsKSB7XG4gICAgLy8gRXhwbGljaXQga2V5XG4gICAgcmV0dXJuIGVzY2FwZShjb21wb25lbnQua2V5KTtcbiAgfVxuICAvLyBJbXBsaWNpdCBrZXkgZGV0ZXJtaW5lZCBieSB0aGUgaW5kZXggaW4gdGhlIHNldFxuICByZXR1cm4gaW5kZXgudG9TdHJpbmcoMzYpO1xufVxuXG5mdW5jdGlvbiBmb3JFYWNoU2luZ2xlQ2hpbGQoYm9va0tlZXBpbmcsIGNoaWxkLCBuYW1lKSB7XG4gIHZhciBmdW5jID0gYm9va0tlZXBpbmcuZnVuYyxcbiAgICAgIGNvbnRleHQgPSBib29rS2VlcGluZy5jb250ZXh0O1xuXG4gIGZ1bmMuY2FsbChjb250ZXh0LCBjaGlsZCwgYm9va0tlZXBpbmcuY291bnQrKyk7XG59XG5cbi8qKlxuICogSXRlcmF0ZXMgdGhyb3VnaCBjaGlsZHJlbiB0aGF0IGFyZSB0eXBpY2FsbHkgc3BlY2lmaWVkIGFzIGBwcm9wcy5jaGlsZHJlbmAuXG4gKlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNyZWFjdC5jaGlsZHJlbi5mb3JlYWNoXG4gKlxuICogVGhlIHByb3ZpZGVkIGZvckVhY2hGdW5jKGNoaWxkLCBpbmRleCkgd2lsbCBiZSBjYWxsZWQgZm9yIGVhY2hcbiAqIGxlYWYgY2hpbGQuXG4gKlxuICogQHBhcmFtIHs/Kn0gY2hpbGRyZW4gQ2hpbGRyZW4gdHJlZSBjb250YWluZXIuXG4gKiBAcGFyYW0ge2Z1bmN0aW9uKCosIGludCl9IGZvckVhY2hGdW5jXG4gKiBAcGFyYW0geyp9IGZvckVhY2hDb250ZXh0IENvbnRleHQgZm9yIGZvckVhY2hDb250ZXh0LlxuICovXG5mdW5jdGlvbiBmb3JFYWNoQ2hpbGRyZW4oY2hpbGRyZW4sIGZvckVhY2hGdW5jLCBmb3JFYWNoQ29udGV4dCkge1xuICBpZiAoY2hpbGRyZW4gPT0gbnVsbCkge1xuICAgIHJldHVybiBjaGlsZHJlbjtcbiAgfVxuICB2YXIgdHJhdmVyc2VDb250ZXh0ID0gZ2V0UG9vbGVkVHJhdmVyc2VDb250ZXh0KG51bGwsIG51bGwsIGZvckVhY2hGdW5jLCBmb3JFYWNoQ29udGV4dCk7XG4gIHRyYXZlcnNlQWxsQ2hpbGRyZW4oY2hpbGRyZW4sIGZvckVhY2hTaW5nbGVDaGlsZCwgdHJhdmVyc2VDb250ZXh0KTtcbiAgcmVsZWFzZVRyYXZlcnNlQ29udGV4dCh0cmF2ZXJzZUNvbnRleHQpO1xufVxuXG5mdW5jdGlvbiBtYXBTaW5nbGVDaGlsZEludG9Db250ZXh0KGJvb2tLZWVwaW5nLCBjaGlsZCwgY2hpbGRLZXkpIHtcbiAgdmFyIHJlc3VsdCA9IGJvb2tLZWVwaW5nLnJlc3VsdCxcbiAgICAgIGtleVByZWZpeCA9IGJvb2tLZWVwaW5nLmtleVByZWZpeCxcbiAgICAgIGZ1bmMgPSBib29rS2VlcGluZy5mdW5jLFxuICAgICAgY29udGV4dCA9IGJvb2tLZWVwaW5nLmNvbnRleHQ7XG5cblxuICB2YXIgbWFwcGVkQ2hpbGQgPSBmdW5jLmNhbGwoY29udGV4dCwgY2hpbGQsIGJvb2tLZWVwaW5nLmNvdW50KyspO1xuICBpZiAoQXJyYXkuaXNBcnJheShtYXBwZWRDaGlsZCkpIHtcbiAgICBtYXBJbnRvV2l0aEtleVByZWZpeEludGVybmFsKG1hcHBlZENoaWxkLCByZXN1bHQsIGNoaWxkS2V5LCBlbXB0eUZ1bmN0aW9uLnRoYXRSZXR1cm5zQXJndW1lbnQpO1xuICB9IGVsc2UgaWYgKG1hcHBlZENoaWxkICE9IG51bGwpIHtcbiAgICBpZiAoaXNWYWxpZEVsZW1lbnQobWFwcGVkQ2hpbGQpKSB7XG4gICAgICBtYXBwZWRDaGlsZCA9IGNsb25lQW5kUmVwbGFjZUtleShtYXBwZWRDaGlsZCxcbiAgICAgIC8vIEtlZXAgYm90aCB0aGUgKG1hcHBlZCkgYW5kIG9sZCBrZXlzIGlmIHRoZXkgZGlmZmVyLCBqdXN0IGFzXG4gICAgICAvLyB0cmF2ZXJzZUFsbENoaWxkcmVuIHVzZWQgdG8gZG8gZm9yIG9iamVjdHMgYXMgY2hpbGRyZW5cbiAgICAgIGtleVByZWZpeCArIChtYXBwZWRDaGlsZC5rZXkgJiYgKCFjaGlsZCB8fCBjaGlsZC5rZXkgIT09IG1hcHBlZENoaWxkLmtleSkgPyBlc2NhcGVVc2VyUHJvdmlkZWRLZXkobWFwcGVkQ2hpbGQua2V5KSArICcvJyA6ICcnKSArIGNoaWxkS2V5KTtcbiAgICB9XG4gICAgcmVzdWx0LnB1c2gobWFwcGVkQ2hpbGQpO1xuICB9XG59XG5cbmZ1bmN0aW9uIG1hcEludG9XaXRoS2V5UHJlZml4SW50ZXJuYWwoY2hpbGRyZW4sIGFycmF5LCBwcmVmaXgsIGZ1bmMsIGNvbnRleHQpIHtcbiAgdmFyIGVzY2FwZWRQcmVmaXggPSAnJztcbiAgaWYgKHByZWZpeCAhPSBudWxsKSB7XG4gICAgZXNjYXBlZFByZWZpeCA9IGVzY2FwZVVzZXJQcm92aWRlZEtleShwcmVmaXgpICsgJy8nO1xuICB9XG4gIHZhciB0cmF2ZXJzZUNvbnRleHQgPSBnZXRQb29sZWRUcmF2ZXJzZUNvbnRleHQoYXJyYXksIGVzY2FwZWRQcmVmaXgsIGZ1bmMsIGNvbnRleHQpO1xuICB0cmF2ZXJzZUFsbENoaWxkcmVuKGNoaWxkcmVuLCBtYXBTaW5nbGVDaGlsZEludG9Db250ZXh0LCB0cmF2ZXJzZUNvbnRleHQpO1xuICByZWxlYXNlVHJhdmVyc2VDb250ZXh0KHRyYXZlcnNlQ29udGV4dCk7XG59XG5cbi8qKlxuICogTWFwcyBjaGlsZHJlbiB0aGF0IGFyZSB0eXBpY2FsbHkgc3BlY2lmaWVkIGFzIGBwcm9wcy5jaGlsZHJlbmAuXG4gKlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNyZWFjdC5jaGlsZHJlbi5tYXBcbiAqXG4gKiBUaGUgcHJvdmlkZWQgbWFwRnVuY3Rpb24oY2hpbGQsIGtleSwgaW5kZXgpIHdpbGwgYmUgY2FsbGVkIGZvciBlYWNoXG4gKiBsZWFmIGNoaWxkLlxuICpcbiAqIEBwYXJhbSB7Pyp9IGNoaWxkcmVuIENoaWxkcmVuIHRyZWUgY29udGFpbmVyLlxuICogQHBhcmFtIHtmdW5jdGlvbigqLCBpbnQpfSBmdW5jIFRoZSBtYXAgZnVuY3Rpb24uXG4gKiBAcGFyYW0geyp9IGNvbnRleHQgQ29udGV4dCBmb3IgbWFwRnVuY3Rpb24uXG4gKiBAcmV0dXJuIHtvYmplY3R9IE9iamVjdCBjb250YWluaW5nIHRoZSBvcmRlcmVkIG1hcCBvZiByZXN1bHRzLlxuICovXG5mdW5jdGlvbiBtYXBDaGlsZHJlbihjaGlsZHJlbiwgZnVuYywgY29udGV4dCkge1xuICBpZiAoY2hpbGRyZW4gPT0gbnVsbCkge1xuICAgIHJldHVybiBjaGlsZHJlbjtcbiAgfVxuICB2YXIgcmVzdWx0ID0gW107XG4gIG1hcEludG9XaXRoS2V5UHJlZml4SW50ZXJuYWwoY2hpbGRyZW4sIHJlc3VsdCwgbnVsbCwgZnVuYywgY29udGV4dCk7XG4gIHJldHVybiByZXN1bHQ7XG59XG5cbi8qKlxuICogQ291bnQgdGhlIG51bWJlciBvZiBjaGlsZHJlbiB0aGF0IGFyZSB0eXBpY2FsbHkgc3BlY2lmaWVkIGFzXG4gKiBgcHJvcHMuY2hpbGRyZW5gLlxuICpcbiAqIFNlZSBodHRwczovL3JlYWN0anMub3JnL2RvY3MvcmVhY3QtYXBpLmh0bWwjcmVhY3QuY2hpbGRyZW4uY291bnRcbiAqXG4gKiBAcGFyYW0gez8qfSBjaGlsZHJlbiBDaGlsZHJlbiB0cmVlIGNvbnRhaW5lci5cbiAqIEByZXR1cm4ge251bWJlcn0gVGhlIG51bWJlciBvZiBjaGlsZHJlbi5cbiAqL1xuZnVuY3Rpb24gY291bnRDaGlsZHJlbihjaGlsZHJlbiwgY29udGV4dCkge1xuICByZXR1cm4gdHJhdmVyc2VBbGxDaGlsZHJlbihjaGlsZHJlbiwgZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc051bGwsIG51bGwpO1xufVxuXG4vKipcbiAqIEZsYXR0ZW4gYSBjaGlsZHJlbiBvYmplY3QgKHR5cGljYWxseSBzcGVjaWZpZWQgYXMgYHByb3BzLmNoaWxkcmVuYCkgYW5kXG4gKiByZXR1cm4gYW4gYXJyYXkgd2l0aCBhcHByb3ByaWF0ZWx5IHJlLWtleWVkIGNoaWxkcmVuLlxuICpcbiAqIFNlZSBodHRwczovL3JlYWN0anMub3JnL2RvY3MvcmVhY3QtYXBpLmh0bWwjcmVhY3QuY2hpbGRyZW4udG9hcnJheVxuICovXG5mdW5jdGlvbiB0b0FycmF5KGNoaWxkcmVuKSB7XG4gIHZhciByZXN1bHQgPSBbXTtcbiAgbWFwSW50b1dpdGhLZXlQcmVmaXhJbnRlcm5hbChjaGlsZHJlbiwgcmVzdWx0LCBudWxsLCBlbXB0eUZ1bmN0aW9uLnRoYXRSZXR1cm5zQXJndW1lbnQpO1xuICByZXR1cm4gcmVzdWx0O1xufVxuXG4vKipcbiAqIFJldHVybnMgdGhlIGZpcnN0IGNoaWxkIGluIGEgY29sbGVjdGlvbiBvZiBjaGlsZHJlbiBhbmQgdmVyaWZpZXMgdGhhdCB0aGVyZVxuICogaXMgb25seSBvbmUgY2hpbGQgaW4gdGhlIGNvbGxlY3Rpb24uXG4gKlxuICogU2VlIGh0dHBzOi8vcmVhY3Rqcy5vcmcvZG9jcy9yZWFjdC1hcGkuaHRtbCNyZWFjdC5jaGlsZHJlbi5vbmx5XG4gKlxuICogVGhlIGN1cnJlbnQgaW1wbGVtZW50YXRpb24gb2YgdGhpcyBmdW5jdGlvbiBhc3N1bWVzIHRoYXQgYSBzaW5nbGUgY2hpbGQgZ2V0c1xuICogcGFzc2VkIHdpdGhvdXQgYSB3cmFwcGVyLCBidXQgdGhlIHB1cnBvc2Ugb2YgdGhpcyBoZWxwZXIgZnVuY3Rpb24gaXMgdG9cbiAqIGFic3RyYWN0IGF3YXkgdGhlIHBhcnRpY3VsYXIgc3RydWN0dXJlIG9mIGNoaWxkcmVuLlxuICpcbiAqIEBwYXJhbSB7P29iamVjdH0gY2hpbGRyZW4gQ2hpbGQgY29sbGVjdGlvbiBzdHJ1Y3R1cmUuXG4gKiBAcmV0dXJuIHtSZWFjdEVsZW1lbnR9IFRoZSBmaXJzdCBhbmQgb25seSBgUmVhY3RFbGVtZW50YCBjb250YWluZWQgaW4gdGhlXG4gKiBzdHJ1Y3R1cmUuXG4gKi9cbmZ1bmN0aW9uIG9ubHlDaGlsZChjaGlsZHJlbikge1xuICAhaXNWYWxpZEVsZW1lbnQoY2hpbGRyZW4pID8gaW52YXJpYW50KGZhbHNlLCAnUmVhY3QuQ2hpbGRyZW4ub25seSBleHBlY3RlZCB0byByZWNlaXZlIGEgc2luZ2xlIFJlYWN0IGVsZW1lbnQgY2hpbGQuJykgOiB2b2lkIDA7XG4gIHJldHVybiBjaGlsZHJlbjtcbn1cblxudmFyIGRlc2NyaWJlQ29tcG9uZW50RnJhbWUgPSBmdW5jdGlvbiAobmFtZSwgc291cmNlLCBvd25lck5hbWUpIHtcbiAgcmV0dXJuICdcXG4gICAgaW4gJyArIChuYW1lIHx8ICdVbmtub3duJykgKyAoc291cmNlID8gJyAoYXQgJyArIHNvdXJjZS5maWxlTmFtZS5yZXBsYWNlKC9eLipbXFxcXFxcL10vLCAnJykgKyAnOicgKyBzb3VyY2UubGluZU51bWJlciArICcpJyA6IG93bmVyTmFtZSA/ICcgKGNyZWF0ZWQgYnkgJyArIG93bmVyTmFtZSArICcpJyA6ICcnKTtcbn07XG5cbmZ1bmN0aW9uIGdldENvbXBvbmVudE5hbWUoZmliZXIpIHtcbiAgdmFyIHR5cGUgPSBmaWJlci50eXBlO1xuXG4gIGlmICh0eXBlb2YgdHlwZSA9PT0gJ3N0cmluZycpIHtcbiAgICByZXR1cm4gdHlwZTtcbiAgfVxuICBpZiAodHlwZW9mIHR5cGUgPT09ICdmdW5jdGlvbicpIHtcbiAgICByZXR1cm4gdHlwZS5kaXNwbGF5TmFtZSB8fCB0eXBlLm5hbWU7XG4gIH1cbiAgcmV0dXJuIG51bGw7XG59XG5cbi8qKlxuICogUmVhY3RFbGVtZW50VmFsaWRhdG9yIHByb3ZpZGVzIGEgd3JhcHBlciBhcm91bmQgYSBlbGVtZW50IGZhY3RvcnlcbiAqIHdoaWNoIHZhbGlkYXRlcyB0aGUgcHJvcHMgcGFzc2VkIHRvIHRoZSBlbGVtZW50LiBUaGlzIGlzIGludGVuZGVkIHRvIGJlXG4gKiB1c2VkIG9ubHkgaW4gREVWIGFuZCBjb3VsZCBiZSByZXBsYWNlZCBieSBhIHN0YXRpYyB0eXBlIGNoZWNrZXIgZm9yIGxhbmd1YWdlc1xuICogdGhhdCBzdXBwb3J0IGl0LlxuICovXG5cbntcbiAgdmFyIGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50ID0gbnVsbDtcblxuICB2YXIgcHJvcFR5cGVzTWlzc3BlbGxXYXJuaW5nU2hvd24gPSBmYWxzZTtcblxuICB2YXIgZ2V0RGlzcGxheU5hbWUgPSBmdW5jdGlvbiAoZWxlbWVudCkge1xuICAgIGlmIChlbGVtZW50ID09IG51bGwpIHtcbiAgICAgIHJldHVybiAnI2VtcHR5JztcbiAgICB9IGVsc2UgaWYgKHR5cGVvZiBlbGVtZW50ID09PSAnc3RyaW5nJyB8fCB0eXBlb2YgZWxlbWVudCA9PT0gJ251bWJlcicpIHtcbiAgICAgIHJldHVybiAnI3RleHQnO1xuICAgIH0gZWxzZSBpZiAodHlwZW9mIGVsZW1lbnQudHlwZSA9PT0gJ3N0cmluZycpIHtcbiAgICAgIHJldHVybiBlbGVtZW50LnR5cGU7XG4gICAgfSBlbHNlIGlmIChlbGVtZW50LnR5cGUgPT09IFJFQUNUX0ZSQUdNRU5UX1RZUEUpIHtcbiAgICAgIHJldHVybiAnUmVhY3QuRnJhZ21lbnQnO1xuICAgIH0gZWxzZSB7XG4gICAgICByZXR1cm4gZWxlbWVudC50eXBlLmRpc3BsYXlOYW1lIHx8IGVsZW1lbnQudHlwZS5uYW1lIHx8ICdVbmtub3duJztcbiAgICB9XG4gIH07XG5cbiAgdmFyIGdldFN0YWNrQWRkZW5kdW0gPSBmdW5jdGlvbiAoKSB7XG4gICAgdmFyIHN0YWNrID0gJyc7XG4gICAgaWYgKGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50KSB7XG4gICAgICB2YXIgbmFtZSA9IGdldERpc3BsYXlOYW1lKGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50KTtcbiAgICAgIHZhciBvd25lciA9IGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50Ll9vd25lcjtcbiAgICAgIHN0YWNrICs9IGRlc2NyaWJlQ29tcG9uZW50RnJhbWUobmFtZSwgY3VycmVudGx5VmFsaWRhdGluZ0VsZW1lbnQuX3NvdXJjZSwgb3duZXIgJiYgZ2V0Q29tcG9uZW50TmFtZShvd25lcikpO1xuICAgIH1cbiAgICBzdGFjayArPSBSZWFjdERlYnVnQ3VycmVudEZyYW1lLmdldFN0YWNrQWRkZW5kdW0oKSB8fCAnJztcbiAgICByZXR1cm4gc3RhY2s7XG4gIH07XG5cbiAgdmFyIFZBTElEX0ZSQUdNRU5UX1BST1BTID0gbmV3IE1hcChbWydjaGlsZHJlbicsIHRydWVdLCBbJ2tleScsIHRydWVdXSk7XG59XG5cbmZ1bmN0aW9uIGdldERlY2xhcmF0aW9uRXJyb3JBZGRlbmR1bSgpIHtcbiAgaWYgKFJlYWN0Q3VycmVudE93bmVyLmN1cnJlbnQpIHtcbiAgICB2YXIgbmFtZSA9IGdldENvbXBvbmVudE5hbWUoUmVhY3RDdXJyZW50T3duZXIuY3VycmVudCk7XG4gICAgaWYgKG5hbWUpIHtcbiAgICAgIHJldHVybiAnXFxuXFxuQ2hlY2sgdGhlIHJlbmRlciBtZXRob2Qgb2YgYCcgKyBuYW1lICsgJ2AuJztcbiAgICB9XG4gIH1cbiAgcmV0dXJuICcnO1xufVxuXG5mdW5jdGlvbiBnZXRTb3VyY2VJbmZvRXJyb3JBZGRlbmR1bShlbGVtZW50UHJvcHMpIHtcbiAgaWYgKGVsZW1lbnRQcm9wcyAhPT0gbnVsbCAmJiBlbGVtZW50UHJvcHMgIT09IHVuZGVmaW5lZCAmJiBlbGVtZW50UHJvcHMuX19zb3VyY2UgIT09IHVuZGVmaW5lZCkge1xuICAgIHZhciBzb3VyY2UgPSBlbGVtZW50UHJvcHMuX19zb3VyY2U7XG4gICAgdmFyIGZpbGVOYW1lID0gc291cmNlLmZpbGVOYW1lLnJlcGxhY2UoL14uKltcXFxcXFwvXS8sICcnKTtcbiAgICB2YXIgbGluZU51bWJlciA9IHNvdXJjZS5saW5lTnVtYmVyO1xuICAgIHJldHVybiAnXFxuXFxuQ2hlY2sgeW91ciBjb2RlIGF0ICcgKyBmaWxlTmFtZSArICc6JyArIGxpbmVOdW1iZXIgKyAnLic7XG4gIH1cbiAgcmV0dXJuICcnO1xufVxuXG4vKipcbiAqIFdhcm4gaWYgdGhlcmUncyBubyBrZXkgZXhwbGljaXRseSBzZXQgb24gZHluYW1pYyBhcnJheXMgb2YgY2hpbGRyZW4gb3JcbiAqIG9iamVjdCBrZXlzIGFyZSBub3QgdmFsaWQuIFRoaXMgYWxsb3dzIHVzIHRvIGtlZXAgdHJhY2sgb2YgY2hpbGRyZW4gYmV0d2VlblxuICogdXBkYXRlcy5cbiAqL1xudmFyIG93bmVySGFzS2V5VXNlV2FybmluZyA9IHt9O1xuXG5mdW5jdGlvbiBnZXRDdXJyZW50Q29tcG9uZW50RXJyb3JJbmZvKHBhcmVudFR5cGUpIHtcbiAgdmFyIGluZm8gPSBnZXREZWNsYXJhdGlvbkVycm9yQWRkZW5kdW0oKTtcblxuICBpZiAoIWluZm8pIHtcbiAgICB2YXIgcGFyZW50TmFtZSA9IHR5cGVvZiBwYXJlbnRUeXBlID09PSAnc3RyaW5nJyA/IHBhcmVudFR5cGUgOiBwYXJlbnRUeXBlLmRpc3BsYXlOYW1lIHx8IHBhcmVudFR5cGUubmFtZTtcbiAgICBpZiAocGFyZW50TmFtZSkge1xuICAgICAgaW5mbyA9ICdcXG5cXG5DaGVjayB0aGUgdG9wLWxldmVsIHJlbmRlciBjYWxsIHVzaW5nIDwnICsgcGFyZW50TmFtZSArICc+Lic7XG4gICAgfVxuICB9XG4gIHJldHVybiBpbmZvO1xufVxuXG4vKipcbiAqIFdhcm4gaWYgdGhlIGVsZW1lbnQgZG9lc24ndCBoYXZlIGFuIGV4cGxpY2l0IGtleSBhc3NpZ25lZCB0byBpdC5cbiAqIFRoaXMgZWxlbWVudCBpcyBpbiBhbiBhcnJheS4gVGhlIGFycmF5IGNvdWxkIGdyb3cgYW5kIHNocmluayBvciBiZVxuICogcmVvcmRlcmVkLiBBbGwgY2hpbGRyZW4gdGhhdCBoYXZlbid0IGFscmVhZHkgYmVlbiB2YWxpZGF0ZWQgYXJlIHJlcXVpcmVkIHRvXG4gKiBoYXZlIGEgXCJrZXlcIiBwcm9wZXJ0eSBhc3NpZ25lZCB0byBpdC4gRXJyb3Igc3RhdHVzZXMgYXJlIGNhY2hlZCBzbyBhIHdhcm5pbmdcbiAqIHdpbGwgb25seSBiZSBzaG93biBvbmNlLlxuICpcbiAqIEBpbnRlcm5hbFxuICogQHBhcmFtIHtSZWFjdEVsZW1lbnR9IGVsZW1lbnQgRWxlbWVudCB0aGF0IHJlcXVpcmVzIGEga2V5LlxuICogQHBhcmFtIHsqfSBwYXJlbnRUeXBlIGVsZW1lbnQncyBwYXJlbnQncyB0eXBlLlxuICovXG5mdW5jdGlvbiB2YWxpZGF0ZUV4cGxpY2l0S2V5KGVsZW1lbnQsIHBhcmVudFR5cGUpIHtcbiAgaWYgKCFlbGVtZW50Ll9zdG9yZSB8fCBlbGVtZW50Ll9zdG9yZS52YWxpZGF0ZWQgfHwgZWxlbWVudC5rZXkgIT0gbnVsbCkge1xuICAgIHJldHVybjtcbiAgfVxuICBlbGVtZW50Ll9zdG9yZS52YWxpZGF0ZWQgPSB0cnVlO1xuXG4gIHZhciBjdXJyZW50Q29tcG9uZW50RXJyb3JJbmZvID0gZ2V0Q3VycmVudENvbXBvbmVudEVycm9ySW5mbyhwYXJlbnRUeXBlKTtcbiAgaWYgKG93bmVySGFzS2V5VXNlV2FybmluZ1tjdXJyZW50Q29tcG9uZW50RXJyb3JJbmZvXSkge1xuICAgIHJldHVybjtcbiAgfVxuICBvd25lckhhc0tleVVzZVdhcm5pbmdbY3VycmVudENvbXBvbmVudEVycm9ySW5mb10gPSB0cnVlO1xuXG4gIC8vIFVzdWFsbHkgdGhlIGN1cnJlbnQgb3duZXIgaXMgdGhlIG9mZmVuZGVyLCBidXQgaWYgaXQgYWNjZXB0cyBjaGlsZHJlbiBhcyBhXG4gIC8vIHByb3BlcnR5LCBpdCBtYXkgYmUgdGhlIGNyZWF0b3Igb2YgdGhlIGNoaWxkIHRoYXQncyByZXNwb25zaWJsZSBmb3JcbiAgLy8gYXNzaWduaW5nIGl0IGEga2V5LlxuICB2YXIgY2hpbGRPd25lciA9ICcnO1xuICBpZiAoZWxlbWVudCAmJiBlbGVtZW50Ll9vd25lciAmJiBlbGVtZW50Ll9vd25lciAhPT0gUmVhY3RDdXJyZW50T3duZXIuY3VycmVudCkge1xuICAgIC8vIEdpdmUgdGhlIGNvbXBvbmVudCB0aGF0IG9yaWdpbmFsbHkgY3JlYXRlZCB0aGlzIGNoaWxkLlxuICAgIGNoaWxkT3duZXIgPSAnIEl0IHdhcyBwYXNzZWQgYSBjaGlsZCBmcm9tICcgKyBnZXRDb21wb25lbnROYW1lKGVsZW1lbnQuX293bmVyKSArICcuJztcbiAgfVxuXG4gIGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50ID0gZWxlbWVudDtcbiAge1xuICAgIHdhcm5pbmcoZmFsc2UsICdFYWNoIGNoaWxkIGluIGFuIGFycmF5IG9yIGl0ZXJhdG9yIHNob3VsZCBoYXZlIGEgdW5pcXVlIFwia2V5XCIgcHJvcC4nICsgJyVzJXMgU2VlIGh0dHBzOi8vZmIubWUvcmVhY3Qtd2FybmluZy1rZXlzIGZvciBtb3JlIGluZm9ybWF0aW9uLiVzJywgY3VycmVudENvbXBvbmVudEVycm9ySW5mbywgY2hpbGRPd25lciwgZ2V0U3RhY2tBZGRlbmR1bSgpKTtcbiAgfVxuICBjdXJyZW50bHlWYWxpZGF0aW5nRWxlbWVudCA9IG51bGw7XG59XG5cbi8qKlxuICogRW5zdXJlIHRoYXQgZXZlcnkgZWxlbWVudCBlaXRoZXIgaXMgcGFzc2VkIGluIGEgc3RhdGljIGxvY2F0aW9uLCBpbiBhblxuICogYXJyYXkgd2l0aCBhbiBleHBsaWNpdCBrZXlzIHByb3BlcnR5IGRlZmluZWQsIG9yIGluIGFuIG9iamVjdCBsaXRlcmFsXG4gKiB3aXRoIHZhbGlkIGtleSBwcm9wZXJ0eS5cbiAqXG4gKiBAaW50ZXJuYWxcbiAqIEBwYXJhbSB7UmVhY3ROb2RlfSBub2RlIFN0YXRpY2FsbHkgcGFzc2VkIGNoaWxkIG9mIGFueSB0eXBlLlxuICogQHBhcmFtIHsqfSBwYXJlbnRUeXBlIG5vZGUncyBwYXJlbnQncyB0eXBlLlxuICovXG5mdW5jdGlvbiB2YWxpZGF0ZUNoaWxkS2V5cyhub2RlLCBwYXJlbnRUeXBlKSB7XG4gIGlmICh0eXBlb2Ygbm9kZSAhPT0gJ29iamVjdCcpIHtcbiAgICByZXR1cm47XG4gIH1cbiAgaWYgKEFycmF5LmlzQXJyYXkobm9kZSkpIHtcbiAgICBmb3IgKHZhciBpID0gMDsgaSA8IG5vZGUubGVuZ3RoOyBpKyspIHtcbiAgICAgIHZhciBjaGlsZCA9IG5vZGVbaV07XG4gICAgICBpZiAoaXNWYWxpZEVsZW1lbnQoY2hpbGQpKSB7XG4gICAgICAgIHZhbGlkYXRlRXhwbGljaXRLZXkoY2hpbGQsIHBhcmVudFR5cGUpO1xuICAgICAgfVxuICAgIH1cbiAgfSBlbHNlIGlmIChpc1ZhbGlkRWxlbWVudChub2RlKSkge1xuICAgIC8vIFRoaXMgZWxlbWVudCB3YXMgcGFzc2VkIGluIGEgdmFsaWQgbG9jYXRpb24uXG4gICAgaWYgKG5vZGUuX3N0b3JlKSB7XG4gICAgICBub2RlLl9zdG9yZS52YWxpZGF0ZWQgPSB0cnVlO1xuICAgIH1cbiAgfSBlbHNlIGlmIChub2RlKSB7XG4gICAgdmFyIGl0ZXJhdG9yRm4gPSBnZXRJdGVyYXRvckZuKG5vZGUpO1xuICAgIGlmICh0eXBlb2YgaXRlcmF0b3JGbiA9PT0gJ2Z1bmN0aW9uJykge1xuICAgICAgLy8gRW50cnkgaXRlcmF0b3JzIHVzZWQgdG8gcHJvdmlkZSBpbXBsaWNpdCBrZXlzLFxuICAgICAgLy8gYnV0IG5vdyB3ZSBwcmludCBhIHNlcGFyYXRlIHdhcm5pbmcgZm9yIHRoZW0gbGF0ZXIuXG4gICAgICBpZiAoaXRlcmF0b3JGbiAhPT0gbm9kZS5lbnRyaWVzKSB7XG4gICAgICAgIHZhciBpdGVyYXRvciA9IGl0ZXJhdG9yRm4uY2FsbChub2RlKTtcbiAgICAgICAgdmFyIHN0ZXA7XG4gICAgICAgIHdoaWxlICghKHN0ZXAgPSBpdGVyYXRvci5uZXh0KCkpLmRvbmUpIHtcbiAgICAgICAgICBpZiAoaXNWYWxpZEVsZW1lbnQoc3RlcC52YWx1ZSkpIHtcbiAgICAgICAgICAgIHZhbGlkYXRlRXhwbGljaXRLZXkoc3RlcC52YWx1ZSwgcGFyZW50VHlwZSk7XG4gICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICB9XG4gICAgfVxuICB9XG59XG5cbi8qKlxuICogR2l2ZW4gYW4gZWxlbWVudCwgdmFsaWRhdGUgdGhhdCBpdHMgcHJvcHMgZm9sbG93IHRoZSBwcm9wVHlwZXMgZGVmaW5pdGlvbixcbiAqIHByb3ZpZGVkIGJ5IHRoZSB0eXBlLlxuICpcbiAqIEBwYXJhbSB7UmVhY3RFbGVtZW50fSBlbGVtZW50XG4gKi9cbmZ1bmN0aW9uIHZhbGlkYXRlUHJvcFR5cGVzKGVsZW1lbnQpIHtcbiAgdmFyIGNvbXBvbmVudENsYXNzID0gZWxlbWVudC50eXBlO1xuICBpZiAodHlwZW9mIGNvbXBvbmVudENsYXNzICE9PSAnZnVuY3Rpb24nKSB7XG4gICAgcmV0dXJuO1xuICB9XG4gIHZhciBuYW1lID0gY29tcG9uZW50Q2xhc3MuZGlzcGxheU5hbWUgfHwgY29tcG9uZW50Q2xhc3MubmFtZTtcbiAgdmFyIHByb3BUeXBlcyA9IGNvbXBvbmVudENsYXNzLnByb3BUeXBlcztcbiAgaWYgKHByb3BUeXBlcykge1xuICAgIGN1cnJlbnRseVZhbGlkYXRpbmdFbGVtZW50ID0gZWxlbWVudDtcbiAgICBjaGVja1Byb3BUeXBlcyhwcm9wVHlwZXMsIGVsZW1lbnQucHJvcHMsICdwcm9wJywgbmFtZSwgZ2V0U3RhY2tBZGRlbmR1bSk7XG4gICAgY3VycmVudGx5VmFsaWRhdGluZ0VsZW1lbnQgPSBudWxsO1xuICB9IGVsc2UgaWYgKGNvbXBvbmVudENsYXNzLlByb3BUeXBlcyAhPT0gdW5kZWZpbmVkICYmICFwcm9wVHlwZXNNaXNzcGVsbFdhcm5pbmdTaG93bikge1xuICAgIHByb3BUeXBlc01pc3NwZWxsV2FybmluZ1Nob3duID0gdHJ1ZTtcbiAgICB3YXJuaW5nKGZhbHNlLCAnQ29tcG9uZW50ICVzIGRlY2xhcmVkIGBQcm9wVHlwZXNgIGluc3RlYWQgb2YgYHByb3BUeXBlc2AuIERpZCB5b3UgbWlzc3BlbGwgdGhlIHByb3BlcnR5IGFzc2lnbm1lbnQ/JywgbmFtZSB8fCAnVW5rbm93bicpO1xuICB9XG4gIGlmICh0eXBlb2YgY29tcG9uZW50Q2xhc3MuZ2V0RGVmYXVsdFByb3BzID09PSAnZnVuY3Rpb24nKSB7XG4gICAgd2FybmluZyhjb21wb25lbnRDbGFzcy5nZXREZWZhdWx0UHJvcHMuaXNSZWFjdENsYXNzQXBwcm92ZWQsICdnZXREZWZhdWx0UHJvcHMgaXMgb25seSB1c2VkIG9uIGNsYXNzaWMgUmVhY3QuY3JlYXRlQ2xhc3MgJyArICdkZWZpbml0aW9ucy4gVXNlIGEgc3RhdGljIHByb3BlcnR5IG5hbWVkIGBkZWZhdWx0UHJvcHNgIGluc3RlYWQuJyk7XG4gIH1cbn1cblxuLyoqXG4gKiBHaXZlbiBhIGZyYWdtZW50LCB2YWxpZGF0ZSB0aGF0IGl0IGNhbiBvbmx5IGJlIHByb3ZpZGVkIHdpdGggZnJhZ21lbnQgcHJvcHNcbiAqIEBwYXJhbSB7UmVhY3RFbGVtZW50fSBmcmFnbWVudFxuICovXG5mdW5jdGlvbiB2YWxpZGF0ZUZyYWdtZW50UHJvcHMoZnJhZ21lbnQpIHtcbiAgY3VycmVudGx5VmFsaWRhdGluZ0VsZW1lbnQgPSBmcmFnbWVudDtcblxuICB2YXIgX2l0ZXJhdG9yTm9ybWFsQ29tcGxldGlvbiA9IHRydWU7XG4gIHZhciBfZGlkSXRlcmF0b3JFcnJvciA9IGZhbHNlO1xuICB2YXIgX2l0ZXJhdG9yRXJyb3IgPSB1bmRlZmluZWQ7XG5cbiAgdHJ5IHtcbiAgICBmb3IgKHZhciBfaXRlcmF0b3IgPSBPYmplY3Qua2V5cyhmcmFnbWVudC5wcm9wcylbU3ltYm9sLml0ZXJhdG9yXSgpLCBfc3RlcDsgIShfaXRlcmF0b3JOb3JtYWxDb21wbGV0aW9uID0gKF9zdGVwID0gX2l0ZXJhdG9yLm5leHQoKSkuZG9uZSk7IF9pdGVyYXRvck5vcm1hbENvbXBsZXRpb24gPSB0cnVlKSB7XG4gICAgICB2YXIga2V5ID0gX3N0ZXAudmFsdWU7XG5cbiAgICAgIGlmICghVkFMSURfRlJBR01FTlRfUFJPUFMuaGFzKGtleSkpIHtcbiAgICAgICAgd2FybmluZyhmYWxzZSwgJ0ludmFsaWQgcHJvcCBgJXNgIHN1cHBsaWVkIHRvIGBSZWFjdC5GcmFnbWVudGAuICcgKyAnUmVhY3QuRnJhZ21lbnQgY2FuIG9ubHkgaGF2ZSBga2V5YCBhbmQgYGNoaWxkcmVuYCBwcm9wcy4lcycsIGtleSwgZ2V0U3RhY2tBZGRlbmR1bSgpKTtcbiAgICAgICAgYnJlYWs7XG4gICAgICB9XG4gICAgfVxuICB9IGNhdGNoIChlcnIpIHtcbiAgICBfZGlkSXRlcmF0b3JFcnJvciA9IHRydWU7XG4gICAgX2l0ZXJhdG9yRXJyb3IgPSBlcnI7XG4gIH0gZmluYWxseSB7XG4gICAgdHJ5IHtcbiAgICAgIGlmICghX2l0ZXJhdG9yTm9ybWFsQ29tcGxldGlvbiAmJiBfaXRlcmF0b3JbJ3JldHVybiddKSB7XG4gICAgICAgIF9pdGVyYXRvclsncmV0dXJuJ10oKTtcbiAgICAgIH1cbiAgICB9IGZpbmFsbHkge1xuICAgICAgaWYgKF9kaWRJdGVyYXRvckVycm9yKSB7XG4gICAgICAgIHRocm93IF9pdGVyYXRvckVycm9yO1xuICAgICAgfVxuICAgIH1cbiAgfVxuXG4gIGlmIChmcmFnbWVudC5yZWYgIT09IG51bGwpIHtcbiAgICB3YXJuaW5nKGZhbHNlLCAnSW52YWxpZCBhdHRyaWJ1dGUgYHJlZmAgc3VwcGxpZWQgdG8gYFJlYWN0LkZyYWdtZW50YC4lcycsIGdldFN0YWNrQWRkZW5kdW0oKSk7XG4gIH1cblxuICBjdXJyZW50bHlWYWxpZGF0aW5nRWxlbWVudCA9IG51bGw7XG59XG5cbmZ1bmN0aW9uIGNyZWF0ZUVsZW1lbnRXaXRoVmFsaWRhdGlvbih0eXBlLCBwcm9wcywgY2hpbGRyZW4pIHtcbiAgdmFyIHZhbGlkVHlwZSA9IHR5cGVvZiB0eXBlID09PSAnc3RyaW5nJyB8fCB0eXBlb2YgdHlwZSA9PT0gJ2Z1bmN0aW9uJyB8fCB0eXBlb2YgdHlwZSA9PT0gJ3N5bWJvbCcgfHwgdHlwZW9mIHR5cGUgPT09ICdudW1iZXInO1xuICAvLyBXZSB3YXJuIGluIHRoaXMgY2FzZSBidXQgZG9uJ3QgdGhyb3cuIFdlIGV4cGVjdCB0aGUgZWxlbWVudCBjcmVhdGlvbiB0b1xuICAvLyBzdWNjZWVkIGFuZCB0aGVyZSB3aWxsIGxpa2VseSBiZSBlcnJvcnMgaW4gcmVuZGVyLlxuICBpZiAoIXZhbGlkVHlwZSkge1xuICAgIHZhciBpbmZvID0gJyc7XG4gICAgaWYgKHR5cGUgPT09IHVuZGVmaW5lZCB8fCB0eXBlb2YgdHlwZSA9PT0gJ29iamVjdCcgJiYgdHlwZSAhPT0gbnVsbCAmJiBPYmplY3Qua2V5cyh0eXBlKS5sZW5ndGggPT09IDApIHtcbiAgICAgIGluZm8gKz0gJyBZb3UgbGlrZWx5IGZvcmdvdCB0byBleHBvcnQgeW91ciBjb21wb25lbnQgZnJvbSB0aGUgZmlsZSAnICsgXCJpdCdzIGRlZmluZWQgaW4sIG9yIHlvdSBtaWdodCBoYXZlIG1peGVkIHVwIGRlZmF1bHQgYW5kIG5hbWVkIGltcG9ydHMuXCI7XG4gICAgfVxuXG4gICAgdmFyIHNvdXJjZUluZm8gPSBnZXRTb3VyY2VJbmZvRXJyb3JBZGRlbmR1bShwcm9wcyk7XG4gICAgaWYgKHNvdXJjZUluZm8pIHtcbiAgICAgIGluZm8gKz0gc291cmNlSW5mbztcbiAgICB9IGVsc2Uge1xuICAgICAgaW5mbyArPSBnZXREZWNsYXJhdGlvbkVycm9yQWRkZW5kdW0oKTtcbiAgICB9XG5cbiAgICBpbmZvICs9IGdldFN0YWNrQWRkZW5kdW0oKSB8fCAnJztcblxuICAgIHdhcm5pbmcoZmFsc2UsICdSZWFjdC5jcmVhdGVFbGVtZW50OiB0eXBlIGlzIGludmFsaWQgLS0gZXhwZWN0ZWQgYSBzdHJpbmcgKGZvciAnICsgJ2J1aWx0LWluIGNvbXBvbmVudHMpIG9yIGEgY2xhc3MvZnVuY3Rpb24gKGZvciBjb21wb3NpdGUgJyArICdjb21wb25lbnRzKSBidXQgZ290OiAlcy4lcycsIHR5cGUgPT0gbnVsbCA/IHR5cGUgOiB0eXBlb2YgdHlwZSwgaW5mbyk7XG4gIH1cblxuICB2YXIgZWxlbWVudCA9IGNyZWF0ZUVsZW1lbnQuYXBwbHkodGhpcywgYXJndW1lbnRzKTtcblxuICAvLyBUaGUgcmVzdWx0IGNhbiBiZSBudWxsaXNoIGlmIGEgbW9jayBvciBhIGN1c3RvbSBmdW5jdGlvbiBpcyB1c2VkLlxuICAvLyBUT0RPOiBEcm9wIHRoaXMgd2hlbiB0aGVzZSBhcmUgbm8gbG9uZ2VyIGFsbG93ZWQgYXMgdGhlIHR5cGUgYXJndW1lbnQuXG4gIGlmIChlbGVtZW50ID09IG51bGwpIHtcbiAgICByZXR1cm4gZWxlbWVudDtcbiAgfVxuXG4gIC8vIFNraXAga2V5IHdhcm5pbmcgaWYgdGhlIHR5cGUgaXNuJ3QgdmFsaWQgc2luY2Ugb3VyIGtleSB2YWxpZGF0aW9uIGxvZ2ljXG4gIC8vIGRvZXNuJ3QgZXhwZWN0IGEgbm9uLXN0cmluZy9mdW5jdGlvbiB0eXBlIGFuZCBjYW4gdGhyb3cgY29uZnVzaW5nIGVycm9ycy5cbiAgLy8gV2UgZG9uJ3Qgd2FudCBleGNlcHRpb24gYmVoYXZpb3IgdG8gZGlmZmVyIGJldHdlZW4gZGV2IGFuZCBwcm9kLlxuICAvLyAoUmVuZGVyaW5nIHdpbGwgdGhyb3cgd2l0aCBhIGhlbHBmdWwgbWVzc2FnZSBhbmQgYXMgc29vbiBhcyB0aGUgdHlwZSBpc1xuICAvLyBmaXhlZCwgdGhlIGtleSB3YXJuaW5ncyB3aWxsIGFwcGVhci4pXG4gIGlmICh2YWxpZFR5cGUpIHtcbiAgICBmb3IgKHZhciBpID0gMjsgaSA8IGFyZ3VtZW50cy5sZW5ndGg7IGkrKykge1xuICAgICAgdmFsaWRhdGVDaGlsZEtleXMoYXJndW1lbnRzW2ldLCB0eXBlKTtcbiAgICB9XG4gIH1cblxuICBpZiAodHlwZW9mIHR5cGUgPT09ICdzeW1ib2wnICYmIHR5cGUgPT09IFJFQUNUX0ZSQUdNRU5UX1RZUEUpIHtcbiAgICB2YWxpZGF0ZUZyYWdtZW50UHJvcHMoZWxlbWVudCk7XG4gIH0gZWxzZSB7XG4gICAgdmFsaWRhdGVQcm9wVHlwZXMoZWxlbWVudCk7XG4gIH1cblxuICByZXR1cm4gZWxlbWVudDtcbn1cblxuZnVuY3Rpb24gY3JlYXRlRmFjdG9yeVdpdGhWYWxpZGF0aW9uKHR5cGUpIHtcbiAgdmFyIHZhbGlkYXRlZEZhY3RvcnkgPSBjcmVhdGVFbGVtZW50V2l0aFZhbGlkYXRpb24uYmluZChudWxsLCB0eXBlKTtcbiAgLy8gTGVnYWN5IGhvb2sgVE9ETzogV2FybiBpZiB0aGlzIGlzIGFjY2Vzc2VkXG4gIHZhbGlkYXRlZEZhY3RvcnkudHlwZSA9IHR5cGU7XG5cbiAge1xuICAgIE9iamVjdC5kZWZpbmVQcm9wZXJ0eSh2YWxpZGF0ZWRGYWN0b3J5LCAndHlwZScsIHtcbiAgICAgIGVudW1lcmFibGU6IGZhbHNlLFxuICAgICAgZ2V0OiBmdW5jdGlvbiAoKSB7XG4gICAgICAgIGxvd1ByaW9yaXR5V2FybmluZyQxKGZhbHNlLCAnRmFjdG9yeS50eXBlIGlzIGRlcHJlY2F0ZWQuIEFjY2VzcyB0aGUgY2xhc3MgZGlyZWN0bHkgJyArICdiZWZvcmUgcGFzc2luZyBpdCB0byBjcmVhdGVGYWN0b3J5LicpO1xuICAgICAgICBPYmplY3QuZGVmaW5lUHJvcGVydHkodGhpcywgJ3R5cGUnLCB7XG4gICAgICAgICAgdmFsdWU6IHR5cGVcbiAgICAgICAgfSk7XG4gICAgICAgIHJldHVybiB0eXBlO1xuICAgICAgfVxuICAgIH0pO1xuICB9XG5cbiAgcmV0dXJuIHZhbGlkYXRlZEZhY3Rvcnk7XG59XG5cbmZ1bmN0aW9uIGNsb25lRWxlbWVudFdpdGhWYWxpZGF0aW9uKGVsZW1lbnQsIHByb3BzLCBjaGlsZHJlbikge1xuICB2YXIgbmV3RWxlbWVudCA9IGNsb25lRWxlbWVudC5hcHBseSh0aGlzLCBhcmd1bWVudHMpO1xuICBmb3IgKHZhciBpID0gMjsgaSA8IGFyZ3VtZW50cy5sZW5ndGg7IGkrKykge1xuICAgIHZhbGlkYXRlQ2hpbGRLZXlzKGFyZ3VtZW50c1tpXSwgbmV3RWxlbWVudC50eXBlKTtcbiAgfVxuICB2YWxpZGF0ZVByb3BUeXBlcyhuZXdFbGVtZW50KTtcbiAgcmV0dXJuIG5ld0VsZW1lbnQ7XG59XG5cbnZhciBSZWFjdCA9IHtcbiAgQ2hpbGRyZW46IHtcbiAgICBtYXA6IG1hcENoaWxkcmVuLFxuICAgIGZvckVhY2g6IGZvckVhY2hDaGlsZHJlbixcbiAgICBjb3VudDogY291bnRDaGlsZHJlbixcbiAgICB0b0FycmF5OiB0b0FycmF5LFxuICAgIG9ubHk6IG9ubHlDaGlsZFxuICB9LFxuXG4gIENvbXBvbmVudDogQ29tcG9uZW50LFxuICBQdXJlQ29tcG9uZW50OiBQdXJlQ29tcG9uZW50LFxuICB1bnN0YWJsZV9Bc3luY0NvbXBvbmVudDogQXN5bmNDb21wb25lbnQsXG5cbiAgRnJhZ21lbnQ6IFJFQUNUX0ZSQUdNRU5UX1RZUEUsXG5cbiAgY3JlYXRlRWxlbWVudDogY3JlYXRlRWxlbWVudFdpdGhWYWxpZGF0aW9uLFxuICBjbG9uZUVsZW1lbnQ6IGNsb25lRWxlbWVudFdpdGhWYWxpZGF0aW9uLFxuICBjcmVhdGVGYWN0b3J5OiBjcmVhdGVGYWN0b3J5V2l0aFZhbGlkYXRpb24sXG4gIGlzVmFsaWRFbGVtZW50OiBpc1ZhbGlkRWxlbWVudCxcblxuICB2ZXJzaW9uOiBSZWFjdFZlcnNpb24sXG5cbiAgX19TRUNSRVRfSU5URVJOQUxTX0RPX05PVF9VU0VfT1JfWU9VX1dJTExfQkVfRklSRUQ6IHtcbiAgICBSZWFjdEN1cnJlbnRPd25lcjogUmVhY3RDdXJyZW50T3duZXIsXG4gICAgLy8gVXNlZCBieSByZW5kZXJlcnMgdG8gYXZvaWQgYnVuZGxpbmcgb2JqZWN0LWFzc2lnbiB0d2ljZSBpbiBVTUQgYnVuZGxlczpcbiAgICBhc3NpZ246IF9hc3NpZ25cbiAgfVxufTtcblxue1xuICBfYXNzaWduKFJlYWN0Ll9fU0VDUkVUX0lOVEVSTkFMU19ET19OT1RfVVNFX09SX1lPVV9XSUxMX0JFX0ZJUkVELCB7XG4gICAgLy8gVGhlc2Ugc2hvdWxkIG5vdCBiZSBpbmNsdWRlZCBpbiBwcm9kdWN0aW9uLlxuICAgIFJlYWN0RGVidWdDdXJyZW50RnJhbWU6IFJlYWN0RGVidWdDdXJyZW50RnJhbWUsXG4gICAgLy8gU2hpbSBmb3IgUmVhY3QgRE9NIDE2LjAuMCB3aGljaCBzdGlsbCBkZXN0cnVjdHVyZWQgKGJ1dCBub3QgdXNlZCkgdGhpcy5cbiAgICAvLyBUT0RPOiByZW1vdmUgaW4gUmVhY3QgMTcuMC5cbiAgICBSZWFjdENvbXBvbmVudFRyZWVIb29rOiB7fVxuICB9KTtcbn1cblxuXG5cbnZhciBSZWFjdCQyID0gT2JqZWN0LmZyZWV6ZSh7XG5cdGRlZmF1bHQ6IFJlYWN0XG59KTtcblxudmFyIFJlYWN0JDMgPSAoIFJlYWN0JDIgJiYgUmVhY3QgKSB8fCBSZWFjdCQyO1xuXG4vLyBUT0RPOiBkZWNpZGUgb24gdGhlIHRvcC1sZXZlbCBleHBvcnQgZm9ybS5cbi8vIFRoaXMgaXMgaGFja3kgYnV0IG1ha2VzIGl0IHdvcmsgd2l0aCBib3RoIFJvbGx1cCBhbmQgSmVzdC5cbnZhciByZWFjdCA9IFJlYWN0JDNbJ2RlZmF1bHQnXSA/IFJlYWN0JDNbJ2RlZmF1bHQnXSA6IFJlYWN0JDM7XG5cbm1vZHVsZS5leHBvcnRzID0gcmVhY3Q7XG4gIH0pKCk7XG59XG5cblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL25vZGVfbW9kdWxlcy9yZWFjdC9janMvcmVhY3QuZGV2ZWxvcG1lbnQuanNcbi8vIG1vZHVsZSBpZCA9IDEwXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKlxuICogQ29weXJpZ2h0IChjKSAyMDEzLXByZXNlbnQsIEZhY2Vib29rLCBJbmMuXG4gKlxuICogVGhpcyBzb3VyY2UgY29kZSBpcyBsaWNlbnNlZCB1bmRlciB0aGUgTUlUIGxpY2Vuc2UgZm91bmQgaW4gdGhlXG4gKiBMSUNFTlNFIGZpbGUgaW4gdGhlIHJvb3QgZGlyZWN0b3J5IG9mIHRoaXMgc291cmNlIHRyZWUuXG4gKi9cblxuaWYgKHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicpIHtcbiAgdmFyIFJFQUNUX0VMRU1FTlRfVFlQRSA9ICh0eXBlb2YgU3ltYm9sID09PSAnZnVuY3Rpb24nICYmXG4gICAgU3ltYm9sLmZvciAmJlxuICAgIFN5bWJvbC5mb3IoJ3JlYWN0LmVsZW1lbnQnKSkgfHxcbiAgICAweGVhYzc7XG5cbiAgdmFyIGlzVmFsaWRFbGVtZW50ID0gZnVuY3Rpb24ob2JqZWN0KSB7XG4gICAgcmV0dXJuIHR5cGVvZiBvYmplY3QgPT09ICdvYmplY3QnICYmXG4gICAgICBvYmplY3QgIT09IG51bGwgJiZcbiAgICAgIG9iamVjdC4kJHR5cGVvZiA9PT0gUkVBQ1RfRUxFTUVOVF9UWVBFO1xuICB9O1xuXG4gIC8vIEJ5IGV4cGxpY2l0bHkgdXNpbmcgYHByb3AtdHlwZXNgIHlvdSBhcmUgb3B0aW5nIGludG8gbmV3IGRldmVsb3BtZW50IGJlaGF2aW9yLlxuICAvLyBodHRwOi8vZmIubWUvcHJvcC10eXBlcy1pbi1wcm9kXG4gIHZhciB0aHJvd09uRGlyZWN0QWNjZXNzID0gdHJ1ZTtcbiAgbW9kdWxlLmV4cG9ydHMgPSByZXF1aXJlKCcuL2ZhY3RvcnlXaXRoVHlwZUNoZWNrZXJzJykoaXNWYWxpZEVsZW1lbnQsIHRocm93T25EaXJlY3RBY2Nlc3MpO1xufSBlbHNlIHtcbiAgLy8gQnkgZXhwbGljaXRseSB1c2luZyBgcHJvcC10eXBlc2AgeW91IGFyZSBvcHRpbmcgaW50byBuZXcgcHJvZHVjdGlvbiBiZWhhdmlvci5cbiAgLy8gaHR0cDovL2ZiLm1lL3Byb3AtdHlwZXMtaW4tcHJvZFxuICBtb2R1bGUuZXhwb3J0cyA9IHJlcXVpcmUoJy4vZmFjdG9yeVdpdGhUaHJvd2luZ1NoaW1zJykoKTtcbn1cblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvaW5kZXguanNcbi8vIG1vZHVsZSBpZCA9IDExXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKlxuICogQ29weXJpZ2h0IChjKSAyMDEzLXByZXNlbnQsIEZhY2Vib29rLCBJbmMuXG4gKlxuICogVGhpcyBzb3VyY2UgY29kZSBpcyBsaWNlbnNlZCB1bmRlciB0aGUgTUlUIGxpY2Vuc2UgZm91bmQgaW4gdGhlXG4gKiBMSUNFTlNFIGZpbGUgaW4gdGhlIHJvb3QgZGlyZWN0b3J5IG9mIHRoaXMgc291cmNlIHRyZWUuXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgZW1wdHlGdW5jdGlvbiA9IHJlcXVpcmUoJ2ZianMvbGliL2VtcHR5RnVuY3Rpb24nKTtcbnZhciBpbnZhcmlhbnQgPSByZXF1aXJlKCdmYmpzL2xpYi9pbnZhcmlhbnQnKTtcbnZhciB3YXJuaW5nID0gcmVxdWlyZSgnZmJqcy9saWIvd2FybmluZycpO1xudmFyIGFzc2lnbiA9IHJlcXVpcmUoJ29iamVjdC1hc3NpZ24nKTtcblxudmFyIFJlYWN0UHJvcFR5cGVzU2VjcmV0ID0gcmVxdWlyZSgnLi9saWIvUmVhY3RQcm9wVHlwZXNTZWNyZXQnKTtcbnZhciBjaGVja1Byb3BUeXBlcyA9IHJlcXVpcmUoJy4vY2hlY2tQcm9wVHlwZXMnKTtcblxubW9kdWxlLmV4cG9ydHMgPSBmdW5jdGlvbihpc1ZhbGlkRWxlbWVudCwgdGhyb3dPbkRpcmVjdEFjY2Vzcykge1xuICAvKiBnbG9iYWwgU3ltYm9sICovXG4gIHZhciBJVEVSQVRPUl9TWU1CT0wgPSB0eXBlb2YgU3ltYm9sID09PSAnZnVuY3Rpb24nICYmIFN5bWJvbC5pdGVyYXRvcjtcbiAgdmFyIEZBVVhfSVRFUkFUT1JfU1lNQk9MID0gJ0BAaXRlcmF0b3InOyAvLyBCZWZvcmUgU3ltYm9sIHNwZWMuXG5cbiAgLyoqXG4gICAqIFJldHVybnMgdGhlIGl0ZXJhdG9yIG1ldGhvZCBmdW5jdGlvbiBjb250YWluZWQgb24gdGhlIGl0ZXJhYmxlIG9iamVjdC5cbiAgICpcbiAgICogQmUgc3VyZSB0byBpbnZva2UgdGhlIGZ1bmN0aW9uIHdpdGggdGhlIGl0ZXJhYmxlIGFzIGNvbnRleHQ6XG4gICAqXG4gICAqICAgICB2YXIgaXRlcmF0b3JGbiA9IGdldEl0ZXJhdG9yRm4obXlJdGVyYWJsZSk7XG4gICAqICAgICBpZiAoaXRlcmF0b3JGbikge1xuICAgKiAgICAgICB2YXIgaXRlcmF0b3IgPSBpdGVyYXRvckZuLmNhbGwobXlJdGVyYWJsZSk7XG4gICAqICAgICAgIC4uLlxuICAgKiAgICAgfVxuICAgKlxuICAgKiBAcGFyYW0gez9vYmplY3R9IG1heWJlSXRlcmFibGVcbiAgICogQHJldHVybiB7P2Z1bmN0aW9ufVxuICAgKi9cbiAgZnVuY3Rpb24gZ2V0SXRlcmF0b3JGbihtYXliZUl0ZXJhYmxlKSB7XG4gICAgdmFyIGl0ZXJhdG9yRm4gPSBtYXliZUl0ZXJhYmxlICYmIChJVEVSQVRPUl9TWU1CT0wgJiYgbWF5YmVJdGVyYWJsZVtJVEVSQVRPUl9TWU1CT0xdIHx8IG1heWJlSXRlcmFibGVbRkFVWF9JVEVSQVRPUl9TWU1CT0xdKTtcbiAgICBpZiAodHlwZW9mIGl0ZXJhdG9yRm4gPT09ICdmdW5jdGlvbicpIHtcbiAgICAgIHJldHVybiBpdGVyYXRvckZuO1xuICAgIH1cbiAgfVxuXG4gIC8qKlxuICAgKiBDb2xsZWN0aW9uIG9mIG1ldGhvZHMgdGhhdCBhbGxvdyBkZWNsYXJhdGlvbiBhbmQgdmFsaWRhdGlvbiBvZiBwcm9wcyB0aGF0IGFyZVxuICAgKiBzdXBwbGllZCB0byBSZWFjdCBjb21wb25lbnRzLiBFeGFtcGxlIHVzYWdlOlxuICAgKlxuICAgKiAgIHZhciBQcm9wcyA9IHJlcXVpcmUoJ1JlYWN0UHJvcFR5cGVzJyk7XG4gICAqICAgdmFyIE15QXJ0aWNsZSA9IFJlYWN0LmNyZWF0ZUNsYXNzKHtcbiAgICogICAgIHByb3BUeXBlczoge1xuICAgKiAgICAgICAvLyBBbiBvcHRpb25hbCBzdHJpbmcgcHJvcCBuYW1lZCBcImRlc2NyaXB0aW9uXCIuXG4gICAqICAgICAgIGRlc2NyaXB0aW9uOiBQcm9wcy5zdHJpbmcsXG4gICAqXG4gICAqICAgICAgIC8vIEEgcmVxdWlyZWQgZW51bSBwcm9wIG5hbWVkIFwiY2F0ZWdvcnlcIi5cbiAgICogICAgICAgY2F0ZWdvcnk6IFByb3BzLm9uZU9mKFsnTmV3cycsJ1Bob3RvcyddKS5pc1JlcXVpcmVkLFxuICAgKlxuICAgKiAgICAgICAvLyBBIHByb3AgbmFtZWQgXCJkaWFsb2dcIiB0aGF0IHJlcXVpcmVzIGFuIGluc3RhbmNlIG9mIERpYWxvZy5cbiAgICogICAgICAgZGlhbG9nOiBQcm9wcy5pbnN0YW5jZU9mKERpYWxvZykuaXNSZXF1aXJlZFxuICAgKiAgICAgfSxcbiAgICogICAgIHJlbmRlcjogZnVuY3Rpb24oKSB7IC4uLiB9XG4gICAqICAgfSk7XG4gICAqXG4gICAqIEEgbW9yZSBmb3JtYWwgc3BlY2lmaWNhdGlvbiBvZiBob3cgdGhlc2UgbWV0aG9kcyBhcmUgdXNlZDpcbiAgICpcbiAgICogICB0eXBlIDo9IGFycmF5fGJvb2x8ZnVuY3xvYmplY3R8bnVtYmVyfHN0cmluZ3xvbmVPZihbLi4uXSl8aW5zdGFuY2VPZiguLi4pXG4gICAqICAgZGVjbCA6PSBSZWFjdFByb3BUeXBlcy57dHlwZX0oLmlzUmVxdWlyZWQpP1xuICAgKlxuICAgKiBFYWNoIGFuZCBldmVyeSBkZWNsYXJhdGlvbiBwcm9kdWNlcyBhIGZ1bmN0aW9uIHdpdGggdGhlIHNhbWUgc2lnbmF0dXJlLiBUaGlzXG4gICAqIGFsbG93cyB0aGUgY3JlYXRpb24gb2YgY3VzdG9tIHZhbGlkYXRpb24gZnVuY3Rpb25zLiBGb3IgZXhhbXBsZTpcbiAgICpcbiAgICogIHZhciBNeUxpbmsgPSBSZWFjdC5jcmVhdGVDbGFzcyh7XG4gICAqICAgIHByb3BUeXBlczoge1xuICAgKiAgICAgIC8vIEFuIG9wdGlvbmFsIHN0cmluZyBvciBVUkkgcHJvcCBuYW1lZCBcImhyZWZcIi5cbiAgICogICAgICBocmVmOiBmdW5jdGlvbihwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUpIHtcbiAgICogICAgICAgIHZhciBwcm9wVmFsdWUgPSBwcm9wc1twcm9wTmFtZV07XG4gICAqICAgICAgICBpZiAocHJvcFZhbHVlICE9IG51bGwgJiYgdHlwZW9mIHByb3BWYWx1ZSAhPT0gJ3N0cmluZycgJiZcbiAgICogICAgICAgICAgICAhKHByb3BWYWx1ZSBpbnN0YW5jZW9mIFVSSSkpIHtcbiAgICogICAgICAgICAgcmV0dXJuIG5ldyBFcnJvcihcbiAgICogICAgICAgICAgICAnRXhwZWN0ZWQgYSBzdHJpbmcgb3IgYW4gVVJJIGZvciAnICsgcHJvcE5hbWUgKyAnIGluICcgK1xuICAgKiAgICAgICAgICAgIGNvbXBvbmVudE5hbWVcbiAgICogICAgICAgICAgKTtcbiAgICogICAgICAgIH1cbiAgICogICAgICB9XG4gICAqICAgIH0sXG4gICAqICAgIHJlbmRlcjogZnVuY3Rpb24oKSB7Li4ufVxuICAgKiAgfSk7XG4gICAqXG4gICAqIEBpbnRlcm5hbFxuICAgKi9cblxuICB2YXIgQU5PTllNT1VTID0gJzw8YW5vbnltb3VzPj4nO1xuXG4gIC8vIEltcG9ydGFudCFcbiAgLy8gS2VlcCB0aGlzIGxpc3QgaW4gc3luYyB3aXRoIHByb2R1Y3Rpb24gdmVyc2lvbiBpbiBgLi9mYWN0b3J5V2l0aFRocm93aW5nU2hpbXMuanNgLlxuICB2YXIgUmVhY3RQcm9wVHlwZXMgPSB7XG4gICAgYXJyYXk6IGNyZWF0ZVByaW1pdGl2ZVR5cGVDaGVja2VyKCdhcnJheScpLFxuICAgIGJvb2w6IGNyZWF0ZVByaW1pdGl2ZVR5cGVDaGVja2VyKCdib29sZWFuJyksXG4gICAgZnVuYzogY3JlYXRlUHJpbWl0aXZlVHlwZUNoZWNrZXIoJ2Z1bmN0aW9uJyksXG4gICAgbnVtYmVyOiBjcmVhdGVQcmltaXRpdmVUeXBlQ2hlY2tlcignbnVtYmVyJyksXG4gICAgb2JqZWN0OiBjcmVhdGVQcmltaXRpdmVUeXBlQ2hlY2tlcignb2JqZWN0JyksXG4gICAgc3RyaW5nOiBjcmVhdGVQcmltaXRpdmVUeXBlQ2hlY2tlcignc3RyaW5nJyksXG4gICAgc3ltYm9sOiBjcmVhdGVQcmltaXRpdmVUeXBlQ2hlY2tlcignc3ltYm9sJyksXG5cbiAgICBhbnk6IGNyZWF0ZUFueVR5cGVDaGVja2VyKCksXG4gICAgYXJyYXlPZjogY3JlYXRlQXJyYXlPZlR5cGVDaGVja2VyLFxuICAgIGVsZW1lbnQ6IGNyZWF0ZUVsZW1lbnRUeXBlQ2hlY2tlcigpLFxuICAgIGluc3RhbmNlT2Y6IGNyZWF0ZUluc3RhbmNlVHlwZUNoZWNrZXIsXG4gICAgbm9kZTogY3JlYXRlTm9kZUNoZWNrZXIoKSxcbiAgICBvYmplY3RPZjogY3JlYXRlT2JqZWN0T2ZUeXBlQ2hlY2tlcixcbiAgICBvbmVPZjogY3JlYXRlRW51bVR5cGVDaGVja2VyLFxuICAgIG9uZU9mVHlwZTogY3JlYXRlVW5pb25UeXBlQ2hlY2tlcixcbiAgICBzaGFwZTogY3JlYXRlU2hhcGVUeXBlQ2hlY2tlcixcbiAgICBleGFjdDogY3JlYXRlU3RyaWN0U2hhcGVUeXBlQ2hlY2tlcixcbiAgfTtcblxuICAvKipcbiAgICogaW5saW5lZCBPYmplY3QuaXMgcG9seWZpbGwgdG8gYXZvaWQgcmVxdWlyaW5nIGNvbnN1bWVycyBzaGlwIHRoZWlyIG93blxuICAgKiBodHRwczovL2RldmVsb3Blci5tb3ppbGxhLm9yZy9lbi1VUy9kb2NzL1dlYi9KYXZhU2NyaXB0L1JlZmVyZW5jZS9HbG9iYWxfT2JqZWN0cy9PYmplY3QvaXNcbiAgICovXG4gIC8qZXNsaW50LWRpc2FibGUgbm8tc2VsZi1jb21wYXJlKi9cbiAgZnVuY3Rpb24gaXMoeCwgeSkge1xuICAgIC8vIFNhbWVWYWx1ZSBhbGdvcml0aG1cbiAgICBpZiAoeCA9PT0geSkge1xuICAgICAgLy8gU3RlcHMgMS01LCA3LTEwXG4gICAgICAvLyBTdGVwcyA2LmItNi5lOiArMCAhPSAtMFxuICAgICAgcmV0dXJuIHggIT09IDAgfHwgMSAvIHggPT09IDEgLyB5O1xuICAgIH0gZWxzZSB7XG4gICAgICAvLyBTdGVwIDYuYTogTmFOID09IE5hTlxuICAgICAgcmV0dXJuIHggIT09IHggJiYgeSAhPT0geTtcbiAgICB9XG4gIH1cbiAgLyplc2xpbnQtZW5hYmxlIG5vLXNlbGYtY29tcGFyZSovXG5cbiAgLyoqXG4gICAqIFdlIHVzZSBhbiBFcnJvci1saWtlIG9iamVjdCBmb3IgYmFja3dhcmQgY29tcGF0aWJpbGl0eSBhcyBwZW9wbGUgbWF5IGNhbGxcbiAgICogUHJvcFR5cGVzIGRpcmVjdGx5IGFuZCBpbnNwZWN0IHRoZWlyIG91dHB1dC4gSG93ZXZlciwgd2UgZG9uJ3QgdXNlIHJlYWxcbiAgICogRXJyb3JzIGFueW1vcmUuIFdlIGRvbid0IGluc3BlY3QgdGhlaXIgc3RhY2sgYW55d2F5LCBhbmQgY3JlYXRpbmcgdGhlbVxuICAgKiBpcyBwcm9oaWJpdGl2ZWx5IGV4cGVuc2l2ZSBpZiB0aGV5IGFyZSBjcmVhdGVkIHRvbyBvZnRlbiwgc3VjaCBhcyB3aGF0XG4gICAqIGhhcHBlbnMgaW4gb25lT2ZUeXBlKCkgZm9yIGFueSB0eXBlIGJlZm9yZSB0aGUgb25lIHRoYXQgbWF0Y2hlZC5cbiAgICovXG4gIGZ1bmN0aW9uIFByb3BUeXBlRXJyb3IobWVzc2FnZSkge1xuICAgIHRoaXMubWVzc2FnZSA9IG1lc3NhZ2U7XG4gICAgdGhpcy5zdGFjayA9ICcnO1xuICB9XG4gIC8vIE1ha2UgYGluc3RhbmNlb2YgRXJyb3JgIHN0aWxsIHdvcmsgZm9yIHJldHVybmVkIGVycm9ycy5cbiAgUHJvcFR5cGVFcnJvci5wcm90b3R5cGUgPSBFcnJvci5wcm90b3R5cGU7XG5cbiAgZnVuY3Rpb24gY3JlYXRlQ2hhaW5hYmxlVHlwZUNoZWNrZXIodmFsaWRhdGUpIHtcbiAgICBpZiAocHJvY2Vzcy5lbnYuTk9ERV9FTlYgIT09ICdwcm9kdWN0aW9uJykge1xuICAgICAgdmFyIG1hbnVhbFByb3BUeXBlQ2FsbENhY2hlID0ge307XG4gICAgICB2YXIgbWFudWFsUHJvcFR5cGVXYXJuaW5nQ291bnQgPSAwO1xuICAgIH1cbiAgICBmdW5jdGlvbiBjaGVja1R5cGUoaXNSZXF1aXJlZCwgcHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lLCBzZWNyZXQpIHtcbiAgICAgIGNvbXBvbmVudE5hbWUgPSBjb21wb25lbnROYW1lIHx8IEFOT05ZTU9VUztcbiAgICAgIHByb3BGdWxsTmFtZSA9IHByb3BGdWxsTmFtZSB8fCBwcm9wTmFtZTtcblxuICAgICAgaWYgKHNlY3JldCAhPT0gUmVhY3RQcm9wVHlwZXNTZWNyZXQpIHtcbiAgICAgICAgaWYgKHRocm93T25EaXJlY3RBY2Nlc3MpIHtcbiAgICAgICAgICAvLyBOZXcgYmVoYXZpb3Igb25seSBmb3IgdXNlcnMgb2YgYHByb3AtdHlwZXNgIHBhY2thZ2VcbiAgICAgICAgICBpbnZhcmlhbnQoXG4gICAgICAgICAgICBmYWxzZSxcbiAgICAgICAgICAgICdDYWxsaW5nIFByb3BUeXBlcyB2YWxpZGF0b3JzIGRpcmVjdGx5IGlzIG5vdCBzdXBwb3J0ZWQgYnkgdGhlIGBwcm9wLXR5cGVzYCBwYWNrYWdlLiAnICtcbiAgICAgICAgICAgICdVc2UgYFByb3BUeXBlcy5jaGVja1Byb3BUeXBlcygpYCB0byBjYWxsIHRoZW0uICcgK1xuICAgICAgICAgICAgJ1JlYWQgbW9yZSBhdCBodHRwOi8vZmIubWUvdXNlLWNoZWNrLXByb3AtdHlwZXMnXG4gICAgICAgICAgKTtcbiAgICAgICAgfSBlbHNlIGlmIChwcm9jZXNzLmVudi5OT0RFX0VOViAhPT0gJ3Byb2R1Y3Rpb24nICYmIHR5cGVvZiBjb25zb2xlICE9PSAndW5kZWZpbmVkJykge1xuICAgICAgICAgIC8vIE9sZCBiZWhhdmlvciBmb3IgcGVvcGxlIHVzaW5nIFJlYWN0LlByb3BUeXBlc1xuICAgICAgICAgIHZhciBjYWNoZUtleSA9IGNvbXBvbmVudE5hbWUgKyAnOicgKyBwcm9wTmFtZTtcbiAgICAgICAgICBpZiAoXG4gICAgICAgICAgICAhbWFudWFsUHJvcFR5cGVDYWxsQ2FjaGVbY2FjaGVLZXldICYmXG4gICAgICAgICAgICAvLyBBdm9pZCBzcGFtbWluZyB0aGUgY29uc29sZSBiZWNhdXNlIHRoZXkgYXJlIG9mdGVuIG5vdCBhY3Rpb25hYmxlIGV4Y2VwdCBmb3IgbGliIGF1dGhvcnNcbiAgICAgICAgICAgIG1hbnVhbFByb3BUeXBlV2FybmluZ0NvdW50IDwgM1xuICAgICAgICAgICkge1xuICAgICAgICAgICAgd2FybmluZyhcbiAgICAgICAgICAgICAgZmFsc2UsXG4gICAgICAgICAgICAgICdZb3UgYXJlIG1hbnVhbGx5IGNhbGxpbmcgYSBSZWFjdC5Qcm9wVHlwZXMgdmFsaWRhdGlvbiAnICtcbiAgICAgICAgICAgICAgJ2Z1bmN0aW9uIGZvciB0aGUgYCVzYCBwcm9wIG9uIGAlc2AuIFRoaXMgaXMgZGVwcmVjYXRlZCAnICtcbiAgICAgICAgICAgICAgJ2FuZCB3aWxsIHRocm93IGluIHRoZSBzdGFuZGFsb25lIGBwcm9wLXR5cGVzYCBwYWNrYWdlLiAnICtcbiAgICAgICAgICAgICAgJ1lvdSBtYXkgYmUgc2VlaW5nIHRoaXMgd2FybmluZyBkdWUgdG8gYSB0aGlyZC1wYXJ0eSBQcm9wVHlwZXMgJyArXG4gICAgICAgICAgICAgICdsaWJyYXJ5LiBTZWUgaHR0cHM6Ly9mYi5tZS9yZWFjdC13YXJuaW5nLWRvbnQtY2FsbC1wcm9wdHlwZXMgJyArICdmb3IgZGV0YWlscy4nLFxuICAgICAgICAgICAgICBwcm9wRnVsbE5hbWUsXG4gICAgICAgICAgICAgIGNvbXBvbmVudE5hbWVcbiAgICAgICAgICAgICk7XG4gICAgICAgICAgICBtYW51YWxQcm9wVHlwZUNhbGxDYWNoZVtjYWNoZUtleV0gPSB0cnVlO1xuICAgICAgICAgICAgbWFudWFsUHJvcFR5cGVXYXJuaW5nQ291bnQrKztcbiAgICAgICAgICB9XG4gICAgICAgIH1cbiAgICAgIH1cbiAgICAgIGlmIChwcm9wc1twcm9wTmFtZV0gPT0gbnVsbCkge1xuICAgICAgICBpZiAoaXNSZXF1aXJlZCkge1xuICAgICAgICAgIGlmIChwcm9wc1twcm9wTmFtZV0gPT09IG51bGwpIHtcbiAgICAgICAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignVGhlICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBpcyBtYXJrZWQgYXMgcmVxdWlyZWQgJyArICgnaW4gYCcgKyBjb21wb25lbnROYW1lICsgJ2AsIGJ1dCBpdHMgdmFsdWUgaXMgYG51bGxgLicpKTtcbiAgICAgICAgICB9XG4gICAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdUaGUgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIGlzIG1hcmtlZCBhcyByZXF1aXJlZCBpbiAnICsgKCdgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgYnV0IGl0cyB2YWx1ZSBpcyBgdW5kZWZpbmVkYC4nKSk7XG4gICAgICAgIH1cbiAgICAgICAgcmV0dXJuIG51bGw7XG4gICAgICB9IGVsc2Uge1xuICAgICAgICByZXR1cm4gdmFsaWRhdGUocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lKTtcbiAgICAgIH1cbiAgICB9XG5cbiAgICB2YXIgY2hhaW5lZENoZWNrVHlwZSA9IGNoZWNrVHlwZS5iaW5kKG51bGwsIGZhbHNlKTtcbiAgICBjaGFpbmVkQ2hlY2tUeXBlLmlzUmVxdWlyZWQgPSBjaGVja1R5cGUuYmluZChudWxsLCB0cnVlKTtcblxuICAgIHJldHVybiBjaGFpbmVkQ2hlY2tUeXBlO1xuICB9XG5cbiAgZnVuY3Rpb24gY3JlYXRlUHJpbWl0aXZlVHlwZUNoZWNrZXIoZXhwZWN0ZWRUeXBlKSB7XG4gICAgZnVuY3Rpb24gdmFsaWRhdGUocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lLCBzZWNyZXQpIHtcbiAgICAgIHZhciBwcm9wVmFsdWUgPSBwcm9wc1twcm9wTmFtZV07XG4gICAgICB2YXIgcHJvcFR5cGUgPSBnZXRQcm9wVHlwZShwcm9wVmFsdWUpO1xuICAgICAgaWYgKHByb3BUeXBlICE9PSBleHBlY3RlZFR5cGUpIHtcbiAgICAgICAgLy8gYHByb3BWYWx1ZWAgYmVpbmcgaW5zdGFuY2Ugb2YsIHNheSwgZGF0ZS9yZWdleHAsIHBhc3MgdGhlICdvYmplY3QnXG4gICAgICAgIC8vIGNoZWNrLCBidXQgd2UgY2FuIG9mZmVyIGEgbW9yZSBwcmVjaXNlIGVycm9yIG1lc3NhZ2UgaGVyZSByYXRoZXIgdGhhblxuICAgICAgICAvLyAnb2YgdHlwZSBgb2JqZWN0YCcuXG4gICAgICAgIHZhciBwcmVjaXNlVHlwZSA9IGdldFByZWNpc2VUeXBlKHByb3BWYWx1ZSk7XG5cbiAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBvZiB0eXBlICcgKyAoJ2AnICsgcHJlY2lzZVR5cGUgKyAnYCBzdXBwbGllZCB0byBgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgZXhwZWN0ZWQgJykgKyAoJ2AnICsgZXhwZWN0ZWRUeXBlICsgJ2AuJykpO1xuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVBbnlUeXBlQ2hlY2tlcigpIHtcbiAgICByZXR1cm4gY3JlYXRlQ2hhaW5hYmxlVHlwZUNoZWNrZXIoZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc051bGwpO1xuICB9XG5cbiAgZnVuY3Rpb24gY3JlYXRlQXJyYXlPZlR5cGVDaGVja2VyKHR5cGVDaGVja2VyKSB7XG4gICAgZnVuY3Rpb24gdmFsaWRhdGUocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lKSB7XG4gICAgICBpZiAodHlwZW9mIHR5cGVDaGVja2VyICE9PSAnZnVuY3Rpb24nKSB7XG4gICAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignUHJvcGVydHkgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBvZiBjb21wb25lbnQgYCcgKyBjb21wb25lbnROYW1lICsgJ2AgaGFzIGludmFsaWQgUHJvcFR5cGUgbm90YXRpb24gaW5zaWRlIGFycmF5T2YuJyk7XG4gICAgICB9XG4gICAgICB2YXIgcHJvcFZhbHVlID0gcHJvcHNbcHJvcE5hbWVdO1xuICAgICAgaWYgKCFBcnJheS5pc0FycmF5KHByb3BWYWx1ZSkpIHtcbiAgICAgICAgdmFyIHByb3BUeXBlID0gZ2V0UHJvcFR5cGUocHJvcFZhbHVlKTtcbiAgICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBvZiB0eXBlICcgKyAoJ2AnICsgcHJvcFR5cGUgKyAnYCBzdXBwbGllZCB0byBgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgZXhwZWN0ZWQgYW4gYXJyYXkuJykpO1xuICAgICAgfVxuICAgICAgZm9yICh2YXIgaSA9IDA7IGkgPCBwcm9wVmFsdWUubGVuZ3RoOyBpKyspIHtcbiAgICAgICAgdmFyIGVycm9yID0gdHlwZUNoZWNrZXIocHJvcFZhbHVlLCBpLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lICsgJ1snICsgaSArICddJywgUmVhY3RQcm9wVHlwZXNTZWNyZXQpO1xuICAgICAgICBpZiAoZXJyb3IgaW5zdGFuY2VvZiBFcnJvcikge1xuICAgICAgICAgIHJldHVybiBlcnJvcjtcbiAgICAgICAgfVxuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVFbGVtZW50VHlwZUNoZWNrZXIoKSB7XG4gICAgZnVuY3Rpb24gdmFsaWRhdGUocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lKSB7XG4gICAgICB2YXIgcHJvcFZhbHVlID0gcHJvcHNbcHJvcE5hbWVdO1xuICAgICAgaWYgKCFpc1ZhbGlkRWxlbWVudChwcm9wVmFsdWUpKSB7XG4gICAgICAgIHZhciBwcm9wVHlwZSA9IGdldFByb3BUeXBlKHByb3BWYWx1ZSk7XG4gICAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignSW52YWxpZCAnICsgbG9jYXRpb24gKyAnIGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Agb2YgdHlwZSAnICsgKCdgJyArIHByb3BUeXBlICsgJ2Agc3VwcGxpZWQgdG8gYCcgKyBjb21wb25lbnROYW1lICsgJ2AsIGV4cGVjdGVkIGEgc2luZ2xlIFJlYWN0RWxlbWVudC4nKSk7XG4gICAgICB9XG4gICAgICByZXR1cm4gbnVsbDtcbiAgICB9XG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZUluc3RhbmNlVHlwZUNoZWNrZXIoZXhwZWN0ZWRDbGFzcykge1xuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSkge1xuICAgICAgaWYgKCEocHJvcHNbcHJvcE5hbWVdIGluc3RhbmNlb2YgZXhwZWN0ZWRDbGFzcykpIHtcbiAgICAgICAgdmFyIGV4cGVjdGVkQ2xhc3NOYW1lID0gZXhwZWN0ZWRDbGFzcy5uYW1lIHx8IEFOT05ZTU9VUztcbiAgICAgICAgdmFyIGFjdHVhbENsYXNzTmFtZSA9IGdldENsYXNzTmFtZShwcm9wc1twcm9wTmFtZV0pO1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIG9mIHR5cGUgJyArICgnYCcgKyBhY3R1YWxDbGFzc05hbWUgKyAnYCBzdXBwbGllZCB0byBgJyArIGNvbXBvbmVudE5hbWUgKyAnYCwgZXhwZWN0ZWQgJykgKyAoJ2luc3RhbmNlIG9mIGAnICsgZXhwZWN0ZWRDbGFzc05hbWUgKyAnYC4nKSk7XG4gICAgICB9XG4gICAgICByZXR1cm4gbnVsbDtcbiAgICB9XG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZUVudW1UeXBlQ2hlY2tlcihleHBlY3RlZFZhbHVlcykge1xuICAgIGlmICghQXJyYXkuaXNBcnJheShleHBlY3RlZFZhbHVlcykpIHtcbiAgICAgIHByb2Nlc3MuZW52Lk5PREVfRU5WICE9PSAncHJvZHVjdGlvbicgPyB3YXJuaW5nKGZhbHNlLCAnSW52YWxpZCBhcmd1bWVudCBzdXBwbGllZCB0byBvbmVPZiwgZXhwZWN0ZWQgYW4gaW5zdGFuY2Ugb2YgYXJyYXkuJykgOiB2b2lkIDA7XG4gICAgICByZXR1cm4gZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc051bGw7XG4gICAgfVxuXG4gICAgZnVuY3Rpb24gdmFsaWRhdGUocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lKSB7XG4gICAgICB2YXIgcHJvcFZhbHVlID0gcHJvcHNbcHJvcE5hbWVdO1xuICAgICAgZm9yICh2YXIgaSA9IDA7IGkgPCBleHBlY3RlZFZhbHVlcy5sZW5ndGg7IGkrKykge1xuICAgICAgICBpZiAoaXMocHJvcFZhbHVlLCBleHBlY3RlZFZhbHVlc1tpXSkpIHtcbiAgICAgICAgICByZXR1cm4gbnVsbDtcbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICB2YXIgdmFsdWVzU3RyaW5nID0gSlNPTi5zdHJpbmdpZnkoZXhwZWN0ZWRWYWx1ZXMpO1xuICAgICAgcmV0dXJuIG5ldyBQcm9wVHlwZUVycm9yKCdJbnZhbGlkICcgKyBsb2NhdGlvbiArICcgYCcgKyBwcm9wRnVsbE5hbWUgKyAnYCBvZiB2YWx1ZSBgJyArIHByb3BWYWx1ZSArICdgICcgKyAoJ3N1cHBsaWVkIHRvIGAnICsgY29tcG9uZW50TmFtZSArICdgLCBleHBlY3RlZCBvbmUgb2YgJyArIHZhbHVlc1N0cmluZyArICcuJykpO1xuICAgIH1cbiAgICByZXR1cm4gY3JlYXRlQ2hhaW5hYmxlVHlwZUNoZWNrZXIodmFsaWRhdGUpO1xuICB9XG5cbiAgZnVuY3Rpb24gY3JlYXRlT2JqZWN0T2ZUeXBlQ2hlY2tlcih0eXBlQ2hlY2tlcikge1xuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSkge1xuICAgICAgaWYgKHR5cGVvZiB0eXBlQ2hlY2tlciAhPT0gJ2Z1bmN0aW9uJykge1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ1Byb3BlcnR5IGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Agb2YgY29tcG9uZW50IGAnICsgY29tcG9uZW50TmFtZSArICdgIGhhcyBpbnZhbGlkIFByb3BUeXBlIG5vdGF0aW9uIGluc2lkZSBvYmplY3RPZi4nKTtcbiAgICAgIH1cbiAgICAgIHZhciBwcm9wVmFsdWUgPSBwcm9wc1twcm9wTmFtZV07XG4gICAgICB2YXIgcHJvcFR5cGUgPSBnZXRQcm9wVHlwZShwcm9wVmFsdWUpO1xuICAgICAgaWYgKHByb3BUeXBlICE9PSAnb2JqZWN0Jykge1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIG9mIHR5cGUgJyArICgnYCcgKyBwcm9wVHlwZSArICdgIHN1cHBsaWVkIHRvIGAnICsgY29tcG9uZW50TmFtZSArICdgLCBleHBlY3RlZCBhbiBvYmplY3QuJykpO1xuICAgICAgfVxuICAgICAgZm9yICh2YXIga2V5IGluIHByb3BWYWx1ZSkge1xuICAgICAgICBpZiAocHJvcFZhbHVlLmhhc093blByb3BlcnR5KGtleSkpIHtcbiAgICAgICAgICB2YXIgZXJyb3IgPSB0eXBlQ2hlY2tlcihwcm9wVmFsdWUsIGtleSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSArICcuJyArIGtleSwgUmVhY3RQcm9wVHlwZXNTZWNyZXQpO1xuICAgICAgICAgIGlmIChlcnJvciBpbnN0YW5jZW9mIEVycm9yKSB7XG4gICAgICAgICAgICByZXR1cm4gZXJyb3I7XG4gICAgICAgICAgfVxuICAgICAgICB9XG4gICAgICB9XG4gICAgICByZXR1cm4gbnVsbDtcbiAgICB9XG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZVVuaW9uVHlwZUNoZWNrZXIoYXJyYXlPZlR5cGVDaGVja2Vycykge1xuICAgIGlmICghQXJyYXkuaXNBcnJheShhcnJheU9mVHlwZUNoZWNrZXJzKSkge1xuICAgICAgcHJvY2Vzcy5lbnYuTk9ERV9FTlYgIT09ICdwcm9kdWN0aW9uJyA/IHdhcm5pbmcoZmFsc2UsICdJbnZhbGlkIGFyZ3VtZW50IHN1cHBsaWVkIHRvIG9uZU9mVHlwZSwgZXhwZWN0ZWQgYW4gaW5zdGFuY2Ugb2YgYXJyYXkuJykgOiB2b2lkIDA7XG4gICAgICByZXR1cm4gZW1wdHlGdW5jdGlvbi50aGF0UmV0dXJuc051bGw7XG4gICAgfVxuXG4gICAgZm9yICh2YXIgaSA9IDA7IGkgPCBhcnJheU9mVHlwZUNoZWNrZXJzLmxlbmd0aDsgaSsrKSB7XG4gICAgICB2YXIgY2hlY2tlciA9IGFycmF5T2ZUeXBlQ2hlY2tlcnNbaV07XG4gICAgICBpZiAodHlwZW9mIGNoZWNrZXIgIT09ICdmdW5jdGlvbicpIHtcbiAgICAgICAgd2FybmluZyhcbiAgICAgICAgICBmYWxzZSxcbiAgICAgICAgICAnSW52YWxpZCBhcmd1bWVudCBzdXBwbGllZCB0byBvbmVPZlR5cGUuIEV4cGVjdGVkIGFuIGFycmF5IG9mIGNoZWNrIGZ1bmN0aW9ucywgYnV0ICcgK1xuICAgICAgICAgICdyZWNlaXZlZCAlcyBhdCBpbmRleCAlcy4nLFxuICAgICAgICAgIGdldFBvc3RmaXhGb3JUeXBlV2FybmluZyhjaGVja2VyKSxcbiAgICAgICAgICBpXG4gICAgICAgICk7XG4gICAgICAgIHJldHVybiBlbXB0eUZ1bmN0aW9uLnRoYXRSZXR1cm5zTnVsbDtcbiAgICAgIH1cbiAgICB9XG5cbiAgICBmdW5jdGlvbiB2YWxpZGF0ZShwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUpIHtcbiAgICAgIGZvciAodmFyIGkgPSAwOyBpIDwgYXJyYXlPZlR5cGVDaGVja2Vycy5sZW5ndGg7IGkrKykge1xuICAgICAgICB2YXIgY2hlY2tlciA9IGFycmF5T2ZUeXBlQ2hlY2tlcnNbaV07XG4gICAgICAgIGlmIChjaGVja2VyKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSwgUmVhY3RQcm9wVHlwZXNTZWNyZXQpID09IG51bGwpIHtcbiAgICAgICAgICByZXR1cm4gbnVsbDtcbiAgICAgICAgfVxuICAgICAgfVxuXG4gICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIHN1cHBsaWVkIHRvICcgKyAoJ2AnICsgY29tcG9uZW50TmFtZSArICdgLicpKTtcbiAgICB9XG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZU5vZGVDaGVja2VyKCkge1xuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSkge1xuICAgICAgaWYgKCFpc05vZGUocHJvcHNbcHJvcE5hbWVdKSkge1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIHN1cHBsaWVkIHRvICcgKyAoJ2AnICsgY29tcG9uZW50TmFtZSArICdgLCBleHBlY3RlZCBhIFJlYWN0Tm9kZS4nKSk7XG4gICAgICB9XG4gICAgICByZXR1cm4gbnVsbDtcbiAgICB9XG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGNyZWF0ZVNoYXBlVHlwZUNoZWNrZXIoc2hhcGVUeXBlcykge1xuICAgIGZ1bmN0aW9uIHZhbGlkYXRlKHByb3BzLCBwcm9wTmFtZSwgY29tcG9uZW50TmFtZSwgbG9jYXRpb24sIHByb3BGdWxsTmFtZSkge1xuICAgICAgdmFyIHByb3BWYWx1ZSA9IHByb3BzW3Byb3BOYW1lXTtcbiAgICAgIHZhciBwcm9wVHlwZSA9IGdldFByb3BUeXBlKHByb3BWYWx1ZSk7XG4gICAgICBpZiAocHJvcFR5cGUgIT09ICdvYmplY3QnKSB7XG4gICAgICAgIHJldHVybiBuZXcgUHJvcFR5cGVFcnJvcignSW52YWxpZCAnICsgbG9jYXRpb24gKyAnIGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Agb2YgdHlwZSBgJyArIHByb3BUeXBlICsgJ2AgJyArICgnc3VwcGxpZWQgdG8gYCcgKyBjb21wb25lbnROYW1lICsgJ2AsIGV4cGVjdGVkIGBvYmplY3RgLicpKTtcbiAgICAgIH1cbiAgICAgIGZvciAodmFyIGtleSBpbiBzaGFwZVR5cGVzKSB7XG4gICAgICAgIHZhciBjaGVja2VyID0gc2hhcGVUeXBlc1trZXldO1xuICAgICAgICBpZiAoIWNoZWNrZXIpIHtcbiAgICAgICAgICBjb250aW51ZTtcbiAgICAgICAgfVxuICAgICAgICB2YXIgZXJyb3IgPSBjaGVja2VyKHByb3BWYWx1ZSwga2V5LCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lICsgJy4nICsga2V5LCBSZWFjdFByb3BUeXBlc1NlY3JldCk7XG4gICAgICAgIGlmIChlcnJvcikge1xuICAgICAgICAgIHJldHVybiBlcnJvcjtcbiAgICAgICAgfVxuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuICAgIHJldHVybiBjcmVhdGVDaGFpbmFibGVUeXBlQ2hlY2tlcih2YWxpZGF0ZSk7XG4gIH1cblxuICBmdW5jdGlvbiBjcmVhdGVTdHJpY3RTaGFwZVR5cGVDaGVja2VyKHNoYXBlVHlwZXMpIHtcbiAgICBmdW5jdGlvbiB2YWxpZGF0ZShwcm9wcywgcHJvcE5hbWUsIGNvbXBvbmVudE5hbWUsIGxvY2F0aW9uLCBwcm9wRnVsbE5hbWUpIHtcbiAgICAgIHZhciBwcm9wVmFsdWUgPSBwcm9wc1twcm9wTmFtZV07XG4gICAgICB2YXIgcHJvcFR5cGUgPSBnZXRQcm9wVHlwZShwcm9wVmFsdWUpO1xuICAgICAgaWYgKHByb3BUeXBlICE9PSAnb2JqZWN0Jykge1xuICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoJ0ludmFsaWQgJyArIGxvY2F0aW9uICsgJyBgJyArIHByb3BGdWxsTmFtZSArICdgIG9mIHR5cGUgYCcgKyBwcm9wVHlwZSArICdgICcgKyAoJ3N1cHBsaWVkIHRvIGAnICsgY29tcG9uZW50TmFtZSArICdgLCBleHBlY3RlZCBgb2JqZWN0YC4nKSk7XG4gICAgICB9XG4gICAgICAvLyBXZSBuZWVkIHRvIGNoZWNrIGFsbCBrZXlzIGluIGNhc2Ugc29tZSBhcmUgcmVxdWlyZWQgYnV0IG1pc3NpbmcgZnJvbVxuICAgICAgLy8gcHJvcHMuXG4gICAgICB2YXIgYWxsS2V5cyA9IGFzc2lnbih7fSwgcHJvcHNbcHJvcE5hbWVdLCBzaGFwZVR5cGVzKTtcbiAgICAgIGZvciAodmFyIGtleSBpbiBhbGxLZXlzKSB7XG4gICAgICAgIHZhciBjaGVja2VyID0gc2hhcGVUeXBlc1trZXldO1xuICAgICAgICBpZiAoIWNoZWNrZXIpIHtcbiAgICAgICAgICByZXR1cm4gbmV3IFByb3BUeXBlRXJyb3IoXG4gICAgICAgICAgICAnSW52YWxpZCAnICsgbG9jYXRpb24gKyAnIGAnICsgcHJvcEZ1bGxOYW1lICsgJ2Aga2V5IGAnICsga2V5ICsgJ2Agc3VwcGxpZWQgdG8gYCcgKyBjb21wb25lbnROYW1lICsgJ2AuJyArXG4gICAgICAgICAgICAnXFxuQmFkIG9iamVjdDogJyArIEpTT04uc3RyaW5naWZ5KHByb3BzW3Byb3BOYW1lXSwgbnVsbCwgJyAgJykgK1xuICAgICAgICAgICAgJ1xcblZhbGlkIGtleXM6ICcgKyAgSlNPTi5zdHJpbmdpZnkoT2JqZWN0LmtleXMoc2hhcGVUeXBlcyksIG51bGwsICcgICcpXG4gICAgICAgICAgKTtcbiAgICAgICAgfVxuICAgICAgICB2YXIgZXJyb3IgPSBjaGVja2VyKHByb3BWYWx1ZSwga2V5LCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lICsgJy4nICsga2V5LCBSZWFjdFByb3BUeXBlc1NlY3JldCk7XG4gICAgICAgIGlmIChlcnJvcikge1xuICAgICAgICAgIHJldHVybiBlcnJvcjtcbiAgICAgICAgfVxuICAgICAgfVxuICAgICAgcmV0dXJuIG51bGw7XG4gICAgfVxuXG4gICAgcmV0dXJuIGNyZWF0ZUNoYWluYWJsZVR5cGVDaGVja2VyKHZhbGlkYXRlKTtcbiAgfVxuXG4gIGZ1bmN0aW9uIGlzTm9kZShwcm9wVmFsdWUpIHtcbiAgICBzd2l0Y2ggKHR5cGVvZiBwcm9wVmFsdWUpIHtcbiAgICAgIGNhc2UgJ251bWJlcic6XG4gICAgICBjYXNlICdzdHJpbmcnOlxuICAgICAgY2FzZSAndW5kZWZpbmVkJzpcbiAgICAgICAgcmV0dXJuIHRydWU7XG4gICAgICBjYXNlICdib29sZWFuJzpcbiAgICAgICAgcmV0dXJuICFwcm9wVmFsdWU7XG4gICAgICBjYXNlICdvYmplY3QnOlxuICAgICAgICBpZiAoQXJyYXkuaXNBcnJheShwcm9wVmFsdWUpKSB7XG4gICAgICAgICAgcmV0dXJuIHByb3BWYWx1ZS5ldmVyeShpc05vZGUpO1xuICAgICAgICB9XG4gICAgICAgIGlmIChwcm9wVmFsdWUgPT09IG51bGwgfHwgaXNWYWxpZEVsZW1lbnQocHJvcFZhbHVlKSkge1xuICAgICAgICAgIHJldHVybiB0cnVlO1xuICAgICAgICB9XG5cbiAgICAgICAgdmFyIGl0ZXJhdG9yRm4gPSBnZXRJdGVyYXRvckZuKHByb3BWYWx1ZSk7XG4gICAgICAgIGlmIChpdGVyYXRvckZuKSB7XG4gICAgICAgICAgdmFyIGl0ZXJhdG9yID0gaXRlcmF0b3JGbi5jYWxsKHByb3BWYWx1ZSk7XG4gICAgICAgICAgdmFyIHN0ZXA7XG4gICAgICAgICAgaWYgKGl0ZXJhdG9yRm4gIT09IHByb3BWYWx1ZS5lbnRyaWVzKSB7XG4gICAgICAgICAgICB3aGlsZSAoIShzdGVwID0gaXRlcmF0b3IubmV4dCgpKS5kb25lKSB7XG4gICAgICAgICAgICAgIGlmICghaXNOb2RlKHN0ZXAudmFsdWUpKSB7XG4gICAgICAgICAgICAgICAgcmV0dXJuIGZhbHNlO1xuICAgICAgICAgICAgICB9XG4gICAgICAgICAgICB9XG4gICAgICAgICAgfSBlbHNlIHtcbiAgICAgICAgICAgIC8vIEl0ZXJhdG9yIHdpbGwgcHJvdmlkZSBlbnRyeSBbayx2XSB0dXBsZXMgcmF0aGVyIHRoYW4gdmFsdWVzLlxuICAgICAgICAgICAgd2hpbGUgKCEoc3RlcCA9IGl0ZXJhdG9yLm5leHQoKSkuZG9uZSkge1xuICAgICAgICAgICAgICB2YXIgZW50cnkgPSBzdGVwLnZhbHVlO1xuICAgICAgICAgICAgICBpZiAoZW50cnkpIHtcbiAgICAgICAgICAgICAgICBpZiAoIWlzTm9kZShlbnRyeVsxXSkpIHtcbiAgICAgICAgICAgICAgICAgIHJldHVybiBmYWxzZTtcbiAgICAgICAgICAgICAgICB9XG4gICAgICAgICAgICAgIH1cbiAgICAgICAgICAgIH1cbiAgICAgICAgICB9XG4gICAgICAgIH0gZWxzZSB7XG4gICAgICAgICAgcmV0dXJuIGZhbHNlO1xuICAgICAgICB9XG5cbiAgICAgICAgcmV0dXJuIHRydWU7XG4gICAgICBkZWZhdWx0OlxuICAgICAgICByZXR1cm4gZmFsc2U7XG4gICAgfVxuICB9XG5cbiAgZnVuY3Rpb24gaXNTeW1ib2wocHJvcFR5cGUsIHByb3BWYWx1ZSkge1xuICAgIC8vIE5hdGl2ZSBTeW1ib2wuXG4gICAgaWYgKHByb3BUeXBlID09PSAnc3ltYm9sJykge1xuICAgICAgcmV0dXJuIHRydWU7XG4gICAgfVxuXG4gICAgLy8gMTkuNC4zLjUgU3ltYm9sLnByb3RvdHlwZVtAQHRvU3RyaW5nVGFnXSA9PT0gJ1N5bWJvbCdcbiAgICBpZiAocHJvcFZhbHVlWydAQHRvU3RyaW5nVGFnJ10gPT09ICdTeW1ib2wnKSB7XG4gICAgICByZXR1cm4gdHJ1ZTtcbiAgICB9XG5cbiAgICAvLyBGYWxsYmFjayBmb3Igbm9uLXNwZWMgY29tcGxpYW50IFN5bWJvbHMgd2hpY2ggYXJlIHBvbHlmaWxsZWQuXG4gICAgaWYgKHR5cGVvZiBTeW1ib2wgPT09ICdmdW5jdGlvbicgJiYgcHJvcFZhbHVlIGluc3RhbmNlb2YgU3ltYm9sKSB7XG4gICAgICByZXR1cm4gdHJ1ZTtcbiAgICB9XG5cbiAgICByZXR1cm4gZmFsc2U7XG4gIH1cblxuICAvLyBFcXVpdmFsZW50IG9mIGB0eXBlb2ZgIGJ1dCB3aXRoIHNwZWNpYWwgaGFuZGxpbmcgZm9yIGFycmF5IGFuZCByZWdleHAuXG4gIGZ1bmN0aW9uIGdldFByb3BUeXBlKHByb3BWYWx1ZSkge1xuICAgIHZhciBwcm9wVHlwZSA9IHR5cGVvZiBwcm9wVmFsdWU7XG4gICAgaWYgKEFycmF5LmlzQXJyYXkocHJvcFZhbHVlKSkge1xuICAgICAgcmV0dXJuICdhcnJheSc7XG4gICAgfVxuICAgIGlmIChwcm9wVmFsdWUgaW5zdGFuY2VvZiBSZWdFeHApIHtcbiAgICAgIC8vIE9sZCB3ZWJraXRzIChhdCBsZWFzdCB1bnRpbCBBbmRyb2lkIDQuMCkgcmV0dXJuICdmdW5jdGlvbicgcmF0aGVyIHRoYW5cbiAgICAgIC8vICdvYmplY3QnIGZvciB0eXBlb2YgYSBSZWdFeHAuIFdlJ2xsIG5vcm1hbGl6ZSB0aGlzIGhlcmUgc28gdGhhdCAvYmxhL1xuICAgICAgLy8gcGFzc2VzIFByb3BUeXBlcy5vYmplY3QuXG4gICAgICByZXR1cm4gJ29iamVjdCc7XG4gICAgfVxuICAgIGlmIChpc1N5bWJvbChwcm9wVHlwZSwgcHJvcFZhbHVlKSkge1xuICAgICAgcmV0dXJuICdzeW1ib2wnO1xuICAgIH1cbiAgICByZXR1cm4gcHJvcFR5cGU7XG4gIH1cblxuICAvLyBUaGlzIGhhbmRsZXMgbW9yZSB0eXBlcyB0aGFuIGBnZXRQcm9wVHlwZWAuIE9ubHkgdXNlZCBmb3IgZXJyb3IgbWVzc2FnZXMuXG4gIC8vIFNlZSBgY3JlYXRlUHJpbWl0aXZlVHlwZUNoZWNrZXJgLlxuICBmdW5jdGlvbiBnZXRQcmVjaXNlVHlwZShwcm9wVmFsdWUpIHtcbiAgICBpZiAodHlwZW9mIHByb3BWYWx1ZSA9PT0gJ3VuZGVmaW5lZCcgfHwgcHJvcFZhbHVlID09PSBudWxsKSB7XG4gICAgICByZXR1cm4gJycgKyBwcm9wVmFsdWU7XG4gICAgfVxuICAgIHZhciBwcm9wVHlwZSA9IGdldFByb3BUeXBlKHByb3BWYWx1ZSk7XG4gICAgaWYgKHByb3BUeXBlID09PSAnb2JqZWN0Jykge1xuICAgICAgaWYgKHByb3BWYWx1ZSBpbnN0YW5jZW9mIERhdGUpIHtcbiAgICAgICAgcmV0dXJuICdkYXRlJztcbiAgICAgIH0gZWxzZSBpZiAocHJvcFZhbHVlIGluc3RhbmNlb2YgUmVnRXhwKSB7XG4gICAgICAgIHJldHVybiAncmVnZXhwJztcbiAgICAgIH1cbiAgICB9XG4gICAgcmV0dXJuIHByb3BUeXBlO1xuICB9XG5cbiAgLy8gUmV0dXJucyBhIHN0cmluZyB0aGF0IGlzIHBvc3RmaXhlZCB0byBhIHdhcm5pbmcgYWJvdXQgYW4gaW52YWxpZCB0eXBlLlxuICAvLyBGb3IgZXhhbXBsZSwgXCJ1bmRlZmluZWRcIiBvciBcIm9mIHR5cGUgYXJyYXlcIlxuICBmdW5jdGlvbiBnZXRQb3N0Zml4Rm9yVHlwZVdhcm5pbmcodmFsdWUpIHtcbiAgICB2YXIgdHlwZSA9IGdldFByZWNpc2VUeXBlKHZhbHVlKTtcbiAgICBzd2l0Y2ggKHR5cGUpIHtcbiAgICAgIGNhc2UgJ2FycmF5JzpcbiAgICAgIGNhc2UgJ29iamVjdCc6XG4gICAgICAgIHJldHVybiAnYW4gJyArIHR5cGU7XG4gICAgICBjYXNlICdib29sZWFuJzpcbiAgICAgIGNhc2UgJ2RhdGUnOlxuICAgICAgY2FzZSAncmVnZXhwJzpcbiAgICAgICAgcmV0dXJuICdhICcgKyB0eXBlO1xuICAgICAgZGVmYXVsdDpcbiAgICAgICAgcmV0dXJuIHR5cGU7XG4gICAgfVxuICB9XG5cbiAgLy8gUmV0dXJucyBjbGFzcyBuYW1lIG9mIHRoZSBvYmplY3QsIGlmIGFueS5cbiAgZnVuY3Rpb24gZ2V0Q2xhc3NOYW1lKHByb3BWYWx1ZSkge1xuICAgIGlmICghcHJvcFZhbHVlLmNvbnN0cnVjdG9yIHx8ICFwcm9wVmFsdWUuY29uc3RydWN0b3IubmFtZSkge1xuICAgICAgcmV0dXJuIEFOT05ZTU9VUztcbiAgICB9XG4gICAgcmV0dXJuIHByb3BWYWx1ZS5jb25zdHJ1Y3Rvci5uYW1lO1xuICB9XG5cbiAgUmVhY3RQcm9wVHlwZXMuY2hlY2tQcm9wVHlwZXMgPSBjaGVja1Byb3BUeXBlcztcbiAgUmVhY3RQcm9wVHlwZXMuUHJvcFR5cGVzID0gUmVhY3RQcm9wVHlwZXM7XG5cbiAgcmV0dXJuIFJlYWN0UHJvcFR5cGVzO1xufTtcblxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbm9kZV9tb2R1bGVzL3Byb3AtdHlwZXMvZmFjdG9yeVdpdGhUeXBlQ2hlY2tlcnMuanNcbi8vIG1vZHVsZSBpZCA9IDEyXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIi8qKlxuICogQ29weXJpZ2h0IChjKSAyMDEzLXByZXNlbnQsIEZhY2Vib29rLCBJbmMuXG4gKlxuICogVGhpcyBzb3VyY2UgY29kZSBpcyBsaWNlbnNlZCB1bmRlciB0aGUgTUlUIGxpY2Vuc2UgZm91bmQgaW4gdGhlXG4gKiBMSUNFTlNFIGZpbGUgaW4gdGhlIHJvb3QgZGlyZWN0b3J5IG9mIHRoaXMgc291cmNlIHRyZWUuXG4gKi9cblxuJ3VzZSBzdHJpY3QnO1xuXG52YXIgZW1wdHlGdW5jdGlvbiA9IHJlcXVpcmUoJ2ZianMvbGliL2VtcHR5RnVuY3Rpb24nKTtcbnZhciBpbnZhcmlhbnQgPSByZXF1aXJlKCdmYmpzL2xpYi9pbnZhcmlhbnQnKTtcbnZhciBSZWFjdFByb3BUeXBlc1NlY3JldCA9IHJlcXVpcmUoJy4vbGliL1JlYWN0UHJvcFR5cGVzU2VjcmV0Jyk7XG5cbm1vZHVsZS5leHBvcnRzID0gZnVuY3Rpb24oKSB7XG4gIGZ1bmN0aW9uIHNoaW0ocHJvcHMsIHByb3BOYW1lLCBjb21wb25lbnROYW1lLCBsb2NhdGlvbiwgcHJvcEZ1bGxOYW1lLCBzZWNyZXQpIHtcbiAgICBpZiAoc2VjcmV0ID09PSBSZWFjdFByb3BUeXBlc1NlY3JldCkge1xuICAgICAgLy8gSXQgaXMgc3RpbGwgc2FmZSB3aGVuIGNhbGxlZCBmcm9tIFJlYWN0LlxuICAgICAgcmV0dXJuO1xuICAgIH1cbiAgICBpbnZhcmlhbnQoXG4gICAgICBmYWxzZSxcbiAgICAgICdDYWxsaW5nIFByb3BUeXBlcyB2YWxpZGF0b3JzIGRpcmVjdGx5IGlzIG5vdCBzdXBwb3J0ZWQgYnkgdGhlIGBwcm9wLXR5cGVzYCBwYWNrYWdlLiAnICtcbiAgICAgICdVc2UgUHJvcFR5cGVzLmNoZWNrUHJvcFR5cGVzKCkgdG8gY2FsbCB0aGVtLiAnICtcbiAgICAgICdSZWFkIG1vcmUgYXQgaHR0cDovL2ZiLm1lL3VzZS1jaGVjay1wcm9wLXR5cGVzJ1xuICAgICk7XG4gIH07XG4gIHNoaW0uaXNSZXF1aXJlZCA9IHNoaW07XG4gIGZ1bmN0aW9uIGdldFNoaW0oKSB7XG4gICAgcmV0dXJuIHNoaW07XG4gIH07XG4gIC8vIEltcG9ydGFudCFcbiAgLy8gS2VlcCB0aGlzIGxpc3QgaW4gc3luYyB3aXRoIHByb2R1Y3Rpb24gdmVyc2lvbiBpbiBgLi9mYWN0b3J5V2l0aFR5cGVDaGVja2Vycy5qc2AuXG4gIHZhciBSZWFjdFByb3BUeXBlcyA9IHtcbiAgICBhcnJheTogc2hpbSxcbiAgICBib29sOiBzaGltLFxuICAgIGZ1bmM6IHNoaW0sXG4gICAgbnVtYmVyOiBzaGltLFxuICAgIG9iamVjdDogc2hpbSxcbiAgICBzdHJpbmc6IHNoaW0sXG4gICAgc3ltYm9sOiBzaGltLFxuXG4gICAgYW55OiBzaGltLFxuICAgIGFycmF5T2Y6IGdldFNoaW0sXG4gICAgZWxlbWVudDogc2hpbSxcbiAgICBpbnN0YW5jZU9mOiBnZXRTaGltLFxuICAgIG5vZGU6IHNoaW0sXG4gICAgb2JqZWN0T2Y6IGdldFNoaW0sXG4gICAgb25lT2Y6IGdldFNoaW0sXG4gICAgb25lT2ZUeXBlOiBnZXRTaGltLFxuICAgIHNoYXBlOiBnZXRTaGltLFxuICAgIGV4YWN0OiBnZXRTaGltXG4gIH07XG5cbiAgUmVhY3RQcm9wVHlwZXMuY2hlY2tQcm9wVHlwZXMgPSBlbXB0eUZ1bmN0aW9uO1xuICBSZWFjdFByb3BUeXBlcy5Qcm9wVHlwZXMgPSBSZWFjdFByb3BUeXBlcztcblxuICByZXR1cm4gUmVhY3RQcm9wVHlwZXM7XG59O1xuXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9ub2RlX21vZHVsZXMvcHJvcC10eXBlcy9mYWN0b3J5V2l0aFRocm93aW5nU2hpbXMuanNcbi8vIG1vZHVsZSBpZCA9IDEzXG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsImV4cG9ydCB7IGRlZmF1bHQgYXMgYmxhbmsgfSBmcm9tICcuL2JsYW5rLnN2Zyc7XG5leHBvcnQgeyBkZWZhdWx0IGFzIGJhbGxzIH0gZnJvbSAnLi9sb2FkaW5nLWJhbGxzLnN2Zyc7XG5leHBvcnQgeyBkZWZhdWx0IGFzIGJhcnMgfSBmcm9tICcuL2xvYWRpbmctYmFycy5zdmcnO1xuZXhwb3J0IHsgZGVmYXVsdCBhcyBidWJibGVzIH0gZnJvbSAnLi9sb2FkaW5nLWJ1YmJsZXMuc3ZnJztcbmV4cG9ydCB7IGRlZmF1bHQgYXMgY3ViZXMgfSBmcm9tICcuL2xvYWRpbmctY3ViZXMuc3ZnJztcbmV4cG9ydCB7IGRlZmF1bHQgYXMgY3lsb24gfSBmcm9tICcuL2xvYWRpbmctY3lsb24uc3ZnJztcbmV4cG9ydCB7IGRlZmF1bHQgYXMgc3BpbiB9IGZyb20gJy4vbG9hZGluZy1zcGluLnN2Zyc7XG5leHBvcnQgeyBkZWZhdWx0IGFzIHNwaW5uaW5nQnViYmxlcyB9IGZyb20gJy4vbG9hZGluZy1zcGlubmluZy1idWJibGVzLnN2Zyc7XG5leHBvcnQgeyBkZWZhdWx0IGFzIHNwb2tlcyB9IGZyb20gJy4vbG9hZGluZy1zcG9rZXMuc3ZnJztcblxuXG5cbi8vIFdFQlBBQ0sgRk9PVEVSIC8vXG4vLyAuL2xpYi9zdmcvaW5kZXguanMiLCJtb2R1bGUuZXhwb3J0cyA9IFwiPHN2ZyBjbGFzcz1cXFwiaWNvbi1ibGFua1xcXCIgeG1sbnM9XFxcImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXFxcIiB2aWV3Qm94PVxcXCIwIDAgMzIgMzJcXFwiPjwvc3ZnPlxcblwiXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9saWIvc3ZnL2JsYW5rLnN2Z1xuLy8gbW9kdWxlIGlkID0gMTVcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgY2xhc3M9XFxcImljb24tbG9hZGluZ1xcXCIgeG1sbnM9XFxcImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXFxcIiB2aWV3Qm94PVxcXCIwIDAgMzIgMzJcXFwiPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoLTggMClcXFwiIGQ9XFxcIk00IDEyIEE0IDQgMCAwIDAgNCAyMCBBNCA0IDAgMCAwIDQgMTJcXFwiPiBcXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiLTggMDsgMiAwOyAyIDA7XFxcIiBkdXI9XFxcIjAuOHNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCIga2V5dGltZXM9XFxcIjA7LjI1OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiICAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMiAwKVxcXCIgZD1cXFwiTTQgMTIgQTQgNCAwIDAgMCA0IDIwIEE0IDQgMCAwIDAgNCAxMlxcXCI+IFxcbiAgICA8YW5pbWF0ZVRyYW5zZm9ybSBhdHRyaWJ1dGVOYW1lPVxcXCJ0cmFuc2Zvcm1cXFwiIHR5cGU9XFxcInRyYW5zbGF0ZVxcXCIgdmFsdWVzPVxcXCIyIDA7IDEyIDA7IDEyIDA7XFxcIiBkdXI9XFxcIjAuOHNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCIga2V5dGltZXM9XFxcIjA7LjM1OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiICAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMTIgMClcXFwiIGQ9XFxcIk00IDEyIEE0IDQgMCAwIDAgNCAyMCBBNCA0IDAgMCAwIDQgMTJcXFwiPiBcXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiMTIgMDsgMjIgMDsgMjIgMDtcXFwiIGR1cj1cXFwiMC44c1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIiBrZXl0aW1lcz1cXFwiMDsuNDU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgyNCAwKVxcXCIgZD1cXFwiTTQgMTIgQTQgNCAwIDAgMCA0IDIwIEE0IDQgMCAwIDAgNCAxMlxcXCI+IFxcbiAgICA8YW5pbWF0ZVRyYW5zZm9ybSBhdHRyaWJ1dGVOYW1lPVxcXCJ0cmFuc2Zvcm1cXFwiIHR5cGU9XFxcInRyYW5zbGF0ZVxcXCIgdmFsdWVzPVxcXCIyMiAwOyAzMiAwOyAzMiAwO1xcXCIgZHVyPVxcXCIwLjhzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiIGtleXRpbWVzPVxcXCIwOy41NTsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAgLz5cXG4gIDwvcGF0aD5cXG48L3N2Zz5cXG5cIlxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbGliL3N2Zy9sb2FkaW5nLWJhbGxzLnN2Z1xuLy8gbW9kdWxlIGlkID0gMTZcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgeG1sbnM9XFxcImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXFxcIiB2aWV3Qm94PVxcXCIwIDAgMzIgMzJcXFwiPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMilcXFwiIGQ9XFxcIk0wIDEyIFYyMCBINCBWMTJ6XFxcIj4gXFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcImRcXFwiIHZhbHVlcz1cXFwiTTAgMTIgVjIwIEg0IFYxMno7IE0wIDQgVjI4IEg0IFY0ejsgTTAgMTIgVjIwIEg0IFYxMno7IE0wIDEyIFYyMCBINCBWMTJ6XFxcIiBkdXI9XFxcIjEuMnNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCIga2V5dGltZXM9XFxcIjA7LjI7LjU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuODswLjIgMC44IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiICAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoOClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBINCBWMTJ6XFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiZFxcXCIgdmFsdWVzPVxcXCJNMCAxMiBWMjAgSDQgVjEyejsgTTAgNCBWMjggSDQgVjR6OyBNMCAxMiBWMjAgSDQgVjEyejsgTTAgMTIgVjIwIEg0IFYxMnpcXFwiIGR1cj1cXFwiMS4yc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjJcXFwiIGtleXRpbWVzPVxcXCIwOy4yOy41OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjg7MC4yIDAuOCAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAgLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDE0KVxcXCIgZD1cXFwiTTAgMTIgVjIwIEg0IFYxMnpcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJkXFxcIiB2YWx1ZXM9XFxcIk0wIDEyIFYyMCBINCBWMTJ6OyBNMCA0IFYyOCBINCBWNHo7IE0wIDEyIFYyMCBINCBWMTJ6OyBNMCAxMiBWMjAgSDQgVjEyelxcXCIgZHVyPVxcXCIxLjJzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuNFxcXCIga2V5dGltZXM9XFxcIjA7LjI7LjU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuODswLjIgMC44IDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgyMClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBINCBWMTJ6XFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiZFxcXCIgdmFsdWVzPVxcXCJNMCAxMiBWMjAgSDQgVjEyejsgTTAgNCBWMjggSDQgVjR6OyBNMCAxMiBWMjAgSDQgVjEyejsgTTAgMTIgVjIwIEg0IFYxMnpcXFwiIGR1cj1cXFwiMS4yc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjZcXFwiIGtleXRpbWVzPVxcXCIwOy4yOy41OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjg7MC4yIDAuOCAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoMjYpXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDQgVjEyelxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcImRcXFwiIHZhbHVlcz1cXFwiTTAgMTIgVjIwIEg0IFYxMno7IE0wIDQgVjI4IEg0IFY0ejsgTTAgMTIgVjIwIEg0IFYxMno7IE0wIDEyIFYyMCBINCBWMTJ6XFxcIiBkdXI9XFxcIjEuMnNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC44XFxcIiBrZXl0aW1lcz1cXFwiMDsuMjsuNTsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44OzAuMiAwLjggMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvcGF0aD5cXG48L3N2Zz5cXG5cIlxuXG5cbi8vLy8vLy8vLy8vLy8vLy8vL1xuLy8gV0VCUEFDSyBGT09URVJcbi8vIC4vbGliL3N2Zy9sb2FkaW5nLWJhcnMuc3ZnXG4vLyBtb2R1bGUgaWQgPSAxN1xuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCJtb2R1bGUuZXhwb3J0cyA9IFwiPHN2ZyB4bWxucz1cXFwiaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmdcXFwiIHZpZXdCb3g9XFxcIjAgMCAzMiAzMlxcXCI+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDggMClcXFwiIGN4PVxcXCIwXFxcIiBjeT1cXFwiMTZcXFwiIHI9XFxcIjBcXFwiPiBcXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiclxcXCIgdmFsdWVzPVxcXCIwOyA0OyAwOyAwXFxcIiBkdXI9XFxcIjEuMnNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMFxcXCJcXG4gICAgICBrZXl0aW1lcz1cXFwiMDswLjI7MC43OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDE2IDApXFxcIiBjeD1cXFwiMFxcXCIgY3k9XFxcIjE2XFxcIiByPVxcXCIwXFxcIj4gXFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDsgNDsgMDsgMFxcXCIgZHVyPVxcXCIxLjJzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuM1xcXCJcXG4gICAgICBrZXl0aW1lcz1cXFwiMDswLjI7MC43OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDI0IDApXFxcIiBjeD1cXFwiMFxcXCIgY3k9XFxcIjE2XFxcIiByPVxcXCIwXFxcIj4gXFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDsgNDsgMDsgMFxcXCIgZHVyPVxcXCIxLjJzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuNlxcXCJcXG4gICAgICBrZXl0aW1lcz1cXFwiMDswLjI7MC43OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC42IDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuPC9zdmc+XFxuXCJcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL2xpYi9zdmcvbG9hZGluZy1idWJibGVzLnN2Z1xuLy8gbW9kdWxlIGlkID0gMThcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgeG1sbnM9XFxcImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXFxcIiB2aWV3Qm94PVxcXCIwIDAgMzIgMzJcXFwiPlxcbiAgPHBhdGggdHJhbnNmb3JtPVxcXCJ0cmFuc2xhdGUoLTggMClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBIOCBWMTJ6XFxcIj4gXFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIi04IDA7IDIgMDsgMiAwO1xcXCIgZHVyPVxcXCIwLjhzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiIGtleXRpbWVzPVxcXCIwOy4yNTsxXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuNiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAgLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDIgMClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBIOCBWMTJ6XFxcIj4gXFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIjIgMDsgMTIgMDsgMTIgMDtcXFwiIGR1cj1cXFwiMC44c1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIiBrZXl0aW1lcz1cXFwiMDsuMzU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgxMiAwKVxcXCIgZD1cXFwiTTAgMTIgVjIwIEg4IFYxMnpcXFwiPiBcXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiMTIgMDsgMjIgMDsgMjIgMDtcXFwiIGR1cj1cXFwiMC44c1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIiBrZXl0aW1lcz1cXFwiMDsuNDU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgyNCAwKVxcXCIgZD1cXFwiTTAgMTIgVjIwIEg4IFYxMnpcXFwiPiBcXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiMjIgMDsgMzIgMDsgMzIgMDtcXFwiIGR1cj1cXFwiMC44c1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwXFxcIiBrZXl0aW1lcz1cXFwiMDsuNTU7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjYgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgIC8+XFxuICA8L3BhdGg+XFxuPC9zdmc+XFxuXCJcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL2xpYi9zdmcvbG9hZGluZy1jdWJlcy5zdmdcbi8vIG1vZHVsZSBpZCA9IDE5XG4vLyBtb2R1bGUgY2h1bmtzID0gMCIsIm1vZHVsZS5leHBvcnRzID0gXCI8c3ZnIHhtbG5zPVxcXCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1xcXCIgdmlld0JveD1cXFwiMCAwIDMyIDMyXFxcIj5cXG4gIDxwYXRoIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDAgMClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBINCBWMTJ6XFxcIj5cXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiMCAwOyAyOCAwOyAwIDA7IDAgMFxcXCIgZHVyPVxcXCIxLjVzXFxcIiBiZWdpbj1cXFwiMFxcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGtleXRpbWVzPVxcXCIwOzAuMzswLjY7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIwLjVcXFwiIHRyYW5zZm9ybT1cXFwidHJhbnNsYXRlKDAgMClcXFwiIGQ9XFxcIk0wIDEyIFYyMCBINCBWMTJ6XFxcIj5cXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJ0cmFuc2xhdGVcXFwiIHZhbHVlcz1cXFwiMCAwOyAyOCAwOyAwIDA7IDAgMFxcXCIgZHVyPVxcXCIxLjVzXFxcIiBiZWdpbj1cXFwiMC4xc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGtleXRpbWVzPVxcXCIwOzAuMzswLjY7MVxcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiIC8+XFxuICA8L3BhdGg+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIwLjI1XFxcIiB0cmFuc2Zvcm09XFxcInRyYW5zbGF0ZSgwIDApXFxcIiBkPVxcXCJNMCAxMiBWMjAgSDQgVjEyelxcXCI+XFxuICAgIDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9XFxcInRyYW5zZm9ybVxcXCIgdHlwZT1cXFwidHJhbnNsYXRlXFxcIiB2YWx1ZXM9XFxcIjAgMDsgMjggMDsgMCAwOyAwIDBcXFwiIGR1cj1cXFwiMS41c1xcXCIgYmVnaW49XFxcIjAuMnNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBrZXl0aW1lcz1cXFwiMDswLjM7MC42OzFcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9wYXRoPlxcbjwvc3ZnPlxcblwiXG5cblxuLy8vLy8vLy8vLy8vLy8vLy8vXG4vLyBXRUJQQUNLIEZPT1RFUlxuLy8gLi9saWIvc3ZnL2xvYWRpbmctY3lsb24uc3ZnXG4vLyBtb2R1bGUgaWQgPSAyMFxuLy8gbW9kdWxlIGNodW5rcyA9IDAiLCJtb2R1bGUuZXhwb3J0cyA9IFwiPHN2ZyB4bWxucz1cXFwiaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmdcXFwiIHZpZXdCb3g9XFxcIjAgMCAzMiAzMlxcXCI+XFxuICA8cGF0aCBvcGFjaXR5PVxcXCIuMjVcXFwiIGQ9XFxcIk0xNiAwIEExNiAxNiAwIDAgMCAxNiAzMiBBMTYgMTYgMCAwIDAgMTYgMCBNMTYgNCBBMTIgMTIgMCAwIDEgMTYgMjggQTEyIDEyIDAgMCAxIDE2IDRcXFwiLz5cXG4gIDxwYXRoIGQ9XFxcIk0xNiAwIEExNiAxNiAwIDAgMSAzMiAxNiBMMjggMTYgQTEyIDEyIDAgMCAwIDE2IDR6XFxcIj5cXG4gICAgPGFuaW1hdGVUcmFuc2Zvcm0gYXR0cmlidXRlTmFtZT1cXFwidHJhbnNmb3JtXFxcIiB0eXBlPVxcXCJyb3RhdGVcXFwiIGZyb209XFxcIjAgMTYgMTZcXFwiIHRvPVxcXCIzNjAgMTYgMTZcXFwiIGR1cj1cXFwiMC44c1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIC8+XFxuICA8L3BhdGg+XFxuPC9zdmc+XFxuXCJcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL2xpYi9zdmcvbG9hZGluZy1zcGluLnN2Z1xuLy8gbW9kdWxlIGlkID0gMjFcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgeG1sbnM9XFxcImh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnXFxcIiB2aWV3Qm94PVxcXCIwIDAgMzIgMzJcXFwiPlxcbiAgPGNpcmNsZSBjeD1cXFwiMTZcXFwiIGN5PVxcXCIzXFxcIiByPVxcXCIwXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiclxcXCIgdmFsdWVzPVxcXCIwOzM7MDswXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwicm90YXRlKDQ1IDE2IDE2KVxcXCIgY3g9XFxcIjE2XFxcIiBjeT1cXFwiM1xcXCIgcj1cXFwiMFxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDszOzA7MFxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjEyNXNcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwicm90YXRlKDkwIDE2IDE2KVxcXCIgY3g9XFxcIjE2XFxcIiBjeT1cXFwiM1xcXCIgcj1cXFwiMFxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDszOzA7MFxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjI1c1xcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiIC8+XFxuICA8L2NpcmNsZT5cXG4gIDxjaXJjbGUgdHJhbnNmb3JtPVxcXCJyb3RhdGUoMTM1IDE2IDE2KVxcXCIgY3g9XFxcIjE2XFxcIiBjeT1cXFwiM1xcXCIgcj1cXFwiMFxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDszOzA7MFxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjM3NXNcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwicm90YXRlKDE4MCAxNiAxNilcXFwiIGN4PVxcXCIxNlxcXCIgY3k9XFxcIjNcXFwiIHI9XFxcIjBcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7MzswOzBcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC41c1xcXCIga2V5U3BsaW5lcz1cXFwiMC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjhcXFwiIGNhbGNNb2RlPVxcXCJzcGxpbmVcXFwiIC8+XFxuICA8L2NpcmNsZT5cXG4gIDxjaXJjbGUgdHJhbnNmb3JtPVxcXCJyb3RhdGUoMjI1IDE2IDE2KVxcXCIgY3g9XFxcIjE2XFxcIiBjeT1cXFwiM1xcXCIgcj1cXFwiMFxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcInJcXFwiIHZhbHVlcz1cXFwiMDszOzA7MFxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjYyNXNcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwicm90YXRlKDI3MCAxNiAxNilcXFwiIGN4PVxcXCIxNlxcXCIgY3k9XFxcIjNcXFwiIHI9XFxcIjBcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7MzswOzBcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC43NXNcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuICA8Y2lyY2xlIHRyYW5zZm9ybT1cXFwicm90YXRlKDMxNSAxNiAxNilcXFwiIGN4PVxcXCIxNlxcXCIgY3k9XFxcIjNcXFwiIHI9XFxcIjBcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJyXFxcIiB2YWx1ZXM9XFxcIjA7MzswOzBcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC44NzVzXFxcIiBrZXlTcGxpbmVzPVxcXCIwLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44OzAuMiAwLjIgMC40IDAuOFxcXCIgY2FsY01vZGU9XFxcInNwbGluZVxcXCIgLz5cXG4gIDwvY2lyY2xlPlxcbiAgPGNpcmNsZSB0cmFuc2Zvcm09XFxcInJvdGF0ZSgxODAgMTYgMTYpXFxcIiBjeD1cXFwiMTZcXFwiIGN5PVxcXCIzXFxcIiByPVxcXCIwXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwiclxcXCIgdmFsdWVzPVxcXCIwOzM7MDswXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjAuNXNcXFwiIGtleVNwbGluZXM9XFxcIjAuMiAwLjIgMC40IDAuODswLjIgMC4yIDAuNCAwLjg7MC4yIDAuMiAwLjQgMC44XFxcIiBjYWxjTW9kZT1cXFwic3BsaW5lXFxcIiAvPlxcbiAgPC9jaXJjbGU+XFxuPC9zdmc+XFxuXCJcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL2xpYi9zdmcvbG9hZGluZy1zcGlubmluZy1idWJibGVzLnN2Z1xuLy8gbW9kdWxlIGlkID0gMjJcbi8vIG1vZHVsZSBjaHVua3MgPSAwIiwibW9kdWxlLmV4cG9ydHMgPSBcIjxzdmcgaWQ9XFxcImxvYWRpbmdcXFwiIHhtbG5zPVxcXCJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z1xcXCIgdmlld0JveD1cXFwiMCAwIDMyIDMyXFxcIj5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDAgMTYgMTYpXFxcIj5cXG4gICAgPGFuaW1hdGUgYXR0cmlidXRlTmFtZT1cXFwib3BhY2l0eVxcXCIgZnJvbT1cXFwiMVxcXCIgdG89XFxcIi4xXFxcIiBkdXI9XFxcIjFzXFxcIiByZXBlYXRDb3VudD1cXFwiaW5kZWZpbml0ZVxcXCIgYmVnaW49XFxcIjBcXFwiLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDQ1IDE2IDE2KVxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcIm9wYWNpdHlcXFwiIGZyb209XFxcIjFcXFwiIHRvPVxcXCIuMVxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjEyNXNcXFwiLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDkwIDE2IDE2KVxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcIm9wYWNpdHlcXFwiIGZyb209XFxcIjFcXFwiIHRvPVxcXCIuMVxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjI1c1xcXCIvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggb3BhY2l0eT1cXFwiLjFcXFwiIGQ9XFxcIk0xNCAwIEgxOCBWOCBIMTQgelxcXCIgdHJhbnNmb3JtPVxcXCJyb3RhdGUoMTM1IDE2IDE2KVxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcIm9wYWNpdHlcXFwiIGZyb209XFxcIjFcXFwiIHRvPVxcXCIuMVxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjM3NXNcXFwiLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDE4MCAxNiAxNilcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJvcGFjaXR5XFxcIiBmcm9tPVxcXCIxXFxcIiB0bz1cXFwiLjFcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC41c1xcXCIvPlxcbiAgPC9wYXRoPlxcbiAgPHBhdGggb3BhY2l0eT1cXFwiLjFcXFwiIGQ9XFxcIk0xNCAwIEgxOCBWOCBIMTQgelxcXCIgdHJhbnNmb3JtPVxcXCJyb3RhdGUoMjI1IDE2IDE2KVxcXCI+XFxuICAgIDxhbmltYXRlIGF0dHJpYnV0ZU5hbWU9XFxcIm9wYWNpdHlcXFwiIGZyb209XFxcIjFcXFwiIHRvPVxcXCIuMVxcXCIgZHVyPVxcXCIxc1xcXCIgcmVwZWF0Q291bnQ9XFxcImluZGVmaW5pdGVcXFwiIGJlZ2luPVxcXCIwLjY3NXNcXFwiLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDI3MCAxNiAxNilcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJvcGFjaXR5XFxcIiBmcm9tPVxcXCIxXFxcIiB0bz1cXFwiLjFcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC43NXNcXFwiLz5cXG4gIDwvcGF0aD5cXG4gIDxwYXRoIG9wYWNpdHk9XFxcIi4xXFxcIiBkPVxcXCJNMTQgMCBIMTggVjggSDE0IHpcXFwiIHRyYW5zZm9ybT1cXFwicm90YXRlKDMxNSAxNiAxNilcXFwiPlxcbiAgICA8YW5pbWF0ZSBhdHRyaWJ1dGVOYW1lPVxcXCJvcGFjaXR5XFxcIiBmcm9tPVxcXCIxXFxcIiB0bz1cXFwiLjFcXFwiIGR1cj1cXFwiMXNcXFwiIHJlcGVhdENvdW50PVxcXCJpbmRlZmluaXRlXFxcIiBiZWdpbj1cXFwiMC44NzVzXFxcIi8+XFxuICA8L3BhdGg+XFxuPC9zdmc+XFxuXCJcblxuXG4vLy8vLy8vLy8vLy8vLy8vLy9cbi8vIFdFQlBBQ0sgRk9PVEVSXG4vLyAuL2xpYi9zdmcvbG9hZGluZy1zcG9rZXMuc3ZnXG4vLyBtb2R1bGUgaWQgPSAyM1xuLy8gbW9kdWxlIGNodW5rcyA9IDAiXSwic291cmNlUm9vdCI6IiJ9
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 271 */
+/* 274 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -45969,7 +46002,7 @@ var KeyEscapeUtils = {
 module.exports = KeyEscapeUtils;
 
 /***/ }),
-/* 272 */
+/* 275 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -45984,7 +46017,7 @@ module.exports = KeyEscapeUtils;
 
 
 
-var _prodInvariant = __webpack_require__(27);
+var _prodInvariant = __webpack_require__(28);
 
 var invariant = __webpack_require__(2);
 
@@ -46085,7 +46118,7 @@ module.exports = PooledClass;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 273 */
+/* 276 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46099,11 +46132,11 @@ module.exports = PooledClass;
 
 
 
-var PooledClass = __webpack_require__(272);
-var ReactElement = __webpack_require__(24);
+var PooledClass = __webpack_require__(275);
+var ReactElement = __webpack_require__(25);
 
 var emptyFunction = __webpack_require__(12);
-var traverseAllChildren = __webpack_require__(283);
+var traverseAllChildren = __webpack_require__(286);
 
 var twoArgumentPooler = PooledClass.twoArgumentPooler;
 var fourArgumentPooler = PooledClass.fourArgumentPooler;
@@ -46279,7 +46312,7 @@ var ReactChildren = {
 module.exports = ReactChildren;
 
 /***/ }),
-/* 274 */
+/* 277 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46293,7 +46326,7 @@ module.exports = ReactChildren;
 
 
 
-var ReactElement = __webpack_require__(24);
+var ReactElement = __webpack_require__(25);
 
 /**
  * Create a factory that creates HTML tag elements.
@@ -46302,7 +46335,7 @@ var ReactElement = __webpack_require__(24);
  */
 var createDOMFactory = ReactElement.createFactory;
 if (process.env.NODE_ENV !== 'production') {
-  var ReactElementValidator = __webpack_require__(110);
+  var ReactElementValidator = __webpack_require__(111);
   createDOMFactory = ReactElementValidator.createFactory;
 }
 
@@ -46452,7 +46485,7 @@ module.exports = ReactDOMFactories;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 275 */
+/* 278 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46481,7 +46514,7 @@ module.exports = ReactPropTypeLocationNames;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 276 */
+/* 279 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46495,15 +46528,15 @@ module.exports = ReactPropTypeLocationNames;
 
 
 
-var _require = __webpack_require__(24),
+var _require = __webpack_require__(25),
     isValidElement = _require.isValidElement;
 
-var factory = __webpack_require__(84);
+var factory = __webpack_require__(85);
 
 module.exports = factory(isValidElement);
 
 /***/ }),
-/* 277 */
+/* 280 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46523,7 +46556,7 @@ var ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
 module.exports = ReactPropTypesSecret;
 
 /***/ }),
-/* 278 */
+/* 281 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46540,7 +46573,7 @@ module.exports = ReactPropTypesSecret;
 module.exports = '15.6.2';
 
 /***/ }),
-/* 279 */
+/* 282 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46554,10 +46587,10 @@ module.exports = '15.6.2';
 
 
 
-var _prodInvariant = __webpack_require__(27);
+var _prodInvariant = __webpack_require__(28);
 
-var ReactPropTypeLocationNames = __webpack_require__(275);
-var ReactPropTypesSecret = __webpack_require__(277);
+var ReactPropTypeLocationNames = __webpack_require__(278);
+var ReactPropTypesSecret = __webpack_require__(280);
 
 var invariant = __webpack_require__(2);
 var warning = __webpack_require__(3);
@@ -46631,7 +46664,7 @@ module.exports = checkReactTypeSpec;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 280 */
+/* 283 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46645,19 +46678,19 @@ module.exports = checkReactTypeSpec;
 
 
 
-var _require = __webpack_require__(108),
+var _require = __webpack_require__(109),
     Component = _require.Component;
 
-var _require2 = __webpack_require__(24),
+var _require2 = __webpack_require__(25),
     isValidElement = _require2.isValidElement;
 
-var ReactNoopUpdateQueue = __webpack_require__(111);
-var factory = __webpack_require__(182);
+var ReactNoopUpdateQueue = __webpack_require__(112);
+var factory = __webpack_require__(185);
 
 module.exports = factory(Component, isValidElement, ReactNoopUpdateQueue);
 
 /***/ }),
-/* 281 */
+/* 284 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46681,7 +46714,7 @@ function getNextDebugID() {
 module.exports = getNextDebugID;
 
 /***/ }),
-/* 282 */
+/* 285 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46694,9 +46727,9 @@ module.exports = getNextDebugID;
  */
 
 
-var _prodInvariant = __webpack_require__(27);
+var _prodInvariant = __webpack_require__(28);
 
-var ReactElement = __webpack_require__(24);
+var ReactElement = __webpack_require__(25);
 
 var invariant = __webpack_require__(2);
 
@@ -46723,7 +46756,7 @@ module.exports = onlyChild;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 283 */
+/* 286 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -46737,14 +46770,14 @@ module.exports = onlyChild;
 
 
 
-var _prodInvariant = __webpack_require__(27);
+var _prodInvariant = __webpack_require__(28);
 
 var ReactCurrentOwner = __webpack_require__(15);
-var REACT_ELEMENT_TYPE = __webpack_require__(109);
+var REACT_ELEMENT_TYPE = __webpack_require__(110);
 
-var getIteratorFn = __webpack_require__(112);
+var getIteratorFn = __webpack_require__(113);
 var invariant = __webpack_require__(2);
-var KeyEscapeUtils = __webpack_require__(271);
+var KeyEscapeUtils = __webpack_require__(274);
 var warning = __webpack_require__(3);
 
 var SEPARATOR = '.';
@@ -46903,13 +46936,13 @@ module.exports = traverseAllChildren;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(0)))
 
 /***/ }),
-/* 284 */
+/* 287 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var CancelablePromise = __webpack_require__(73);
+var CancelablePromise = __webpack_require__(75);
 
 /**
  * Create a {@link CancelablePromise<Room>}.
@@ -46958,29 +46991,29 @@ module.exports = createCancelableRoomPromise;
 
 
 /***/ }),
-/* 285 */
+/* 288 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var CancelablePromise = __webpack_require__(73);
-var createCancelableRoomPromise = __webpack_require__(284);
-var createLocalTracks = __webpack_require__(67);
-var ConstantIceServerSource = __webpack_require__(290);
+var CancelablePromise = __webpack_require__(75);
+var createCancelableRoomPromise = __webpack_require__(287);
+var createLocalTracks = __webpack_require__(69);
+var ConstantIceServerSource = __webpack_require__(293);
 var constants = __webpack_require__(9);
-var Room = __webpack_require__(302);
+var Room = __webpack_require__(307);
 var E = __webpack_require__(9).typeErrors;
-var EncodingParametersImpl = __webpack_require__(289);
+var EncodingParametersImpl = __webpack_require__(292);
 var guessBrowser = __webpack_require__(5).guessBrowser;
 var LocalAudioTrack = __webpack_require__(44);
 var LocalDataTrack = __webpack_require__(45);
-var LocalParticipant = __webpack_require__(292);
+var LocalParticipant = __webpack_require__(295);
 var LocalVideoTrack = __webpack_require__(46);
-var Log = __webpack_require__(19);
-var MediaStreamTrack = __webpack_require__(22).MediaStreamTrack;
-var NTSIceServerSource = __webpack_require__(291);
-var SignalingV2 = __webpack_require__(309);
+var Log = __webpack_require__(17);
+var MediaStreamTrack = __webpack_require__(19).MediaStreamTrack;
+var NTSIceServerSource = __webpack_require__(294);
+var SignalingV2 = __webpack_require__(314);
 var util = __webpack_require__(5);
 
 // This is used to make out which connect() call a particular Log statement
@@ -47077,6 +47110,13 @@ var didPrintSafariWarning = false;
  * });
  */
 function connect(token, options) {
+  if (typeof options === 'undefined') {
+    options = {};
+  }
+  if (typeof options !== 'object' || Array.isArray(options)) {
+    return CancelablePromise.reject(new E.INVALID_TYPE('options', 'object'));
+  }
+
   options = Object.assign({
     createLocalTracks: createLocalTracks,
     environment: constants.DEFAULT_ENVIRONMENT,
@@ -47094,7 +47134,7 @@ function connect(token, options) {
     preferredVideoCodecs: [],
     realm: constants.DEFAULT_REALM,
     signaling: SignalingV2
-  }, options);
+  }, util.filterObject(options));
 
   /* eslint new-cap:0 */
   options = Object.assign({
@@ -47173,7 +47213,7 @@ function connect(token, options) {
 
   var preferredCodecs = {
     audio: options.preferredAudioCodecs,
-    video: options.preferredVideoCodecs
+    video: options.preferredVideoCodecs.map(normalizeVideoCodecSettings)
   };
 
   // Create a CancelableRoomPromise<Room> that resolves after these steps:
@@ -47230,10 +47270,11 @@ function connect(token, options) {
  * @property {?string} [name=null] - Set to connect to a {@link Room} by name
  * @property {Array<AudioCodec>} [preferredAudioCodecs=[]] - Preferred audio codecs;
  *  An empty array preserves the current audio codec preference order.
- * @property {Array<VideoCodec>} [preferredVideoCodecs=[]] - Preferred video codecs;
- *  An empty array preserves the current video codec preference order. If you
- *  want to set a preferred video codec on a Group Room, you will need to create
- *  the Room using the REST API and set the <code>VideoCodecs</code> property.
+ * @property {Array<VideoCodec|VideoCodecSettings>} [preferredVideoCodecs=[]] -
+ *  Preferred video codecs; An empty array preserves the current video codec
+ *  preference order. If you want to set a preferred video codec on a Group Room,
+ *  you will need to create the Room using the REST API and set the
+ *  <code>VideoCodecs</code> property.
  *  See <a href="https://www.twilio.com/docs/api/video/rooms-resource#create-room">
  *  here</a> for more information.
  * @property {LogLevel|LogLevels} [logLevel='warn'] - Set the log verbosity
@@ -47258,6 +47299,21 @@ function connect(token, options) {
  * @property {LogLevel} [media='warn'] - Log level for 'media' modules.
  * @property {LogLevel} [signaling='warn'] - Log level for 'signaling' modules.
  * @property {LogLevel} [webrtc='warn'] - Log level for 'webrtc' modules.
+ */
+
+/**
+ * Video codec settings.
+ * @typedef {object} VideoCodecSettings
+ * @property {VideoCodec} codec - Video codec name
+ */
+
+/**
+ * VP8 codec settings.
+ * @typedef {VideoCodecSettings} VP8CodecSettings
+ * @property {VideoCodec} name - "VP8"
+ * @property {boolean} [simulcast=false] - Enable/disable VP8 simulcast; if
+ *   enabled, Twilio's Video SDK will send three video streams of different
+ *   qualities
  */
 
 /**
@@ -47370,18 +47426,32 @@ function getLocalTracks(options, handleLocalTracks) {
   });
 }
 
+function normalizeVideoCodecSettings(nameOrSettings) {
+  var settings = typeof nameOrSettings === 'string'
+    ? { codec: nameOrSettings }
+    : nameOrSettings;
+  switch (settings.codec.toLowerCase()) {
+    case 'vp8': {
+      return Object.assign({ simulcast: false }, settings);
+    }
+    default: {
+      return settings;
+    }
+  }
+}
+
 module.exports = connect;
 
 
 /***/ }),
-/* 286 */
+/* 289 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var DataTrackTransceiver = __webpack_require__(114);
+var DataTrackTransceiver = __webpack_require__(115);
 
 /**
  * Construct an {@link DataTrackReceiver}.
@@ -47402,6 +47472,12 @@ function DataTrackReceiver(dataChannel) {
     dataChannel.maxPacketLifeTime,
     dataChannel.maxRetransmits,
     dataChannel.ordered);
+
+  // NOTE(mmalavalli): In Firefox, the default value for "binaryType" is "blob".
+  // So, we set it to "arraybuffer" to ensure that it is consistent with Chrome
+  // and Safari.
+  dataChannel.binaryType = 'arraybuffer';
+
   var self = this;
   dataChannel.addEventListener('message', function(event) {
     self.emit('message', event.data);
@@ -47419,14 +47495,14 @@ module.exports = DataTrackReceiver;
 
 
 /***/ }),
-/* 287 */
+/* 290 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var DataTrackTransceiver = __webpack_require__(114);
+var DataTrackTransceiver = __webpack_require__(115);
 var makeUUID = __webpack_require__(5).makeUUID;
 
 /**
@@ -47496,15 +47572,15 @@ module.exports = DataTrackSender;
 
 
 /***/ }),
-/* 288 */
+/* 291 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var request = __webpack_require__(301);
-var createTwilioError = __webpack_require__(20).createTwilioError;
-var ConfigurationAcquireFailedError = __webpack_require__(20).ConfigurationAcquireFailedError;
+var request = __webpack_require__(306);
+var createTwilioError = __webpack_require__(18).createTwilioError;
+var ConfigurationAcquireFailedError = __webpack_require__(18).ConfigurationAcquireFailedError;
 
 var CONFIG_URL = 'https://ecs.us1.twilio.com/v1/Configuration';
 
@@ -47571,7 +47647,7 @@ module.exports.getConfiguration = getConfiguration;
 
 
 /***/ }),
-/* 289 */
+/* 292 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -47665,7 +47741,7 @@ module.exports = EncodingParametersImpl;
 
 
 /***/ }),
-/* 290 */
+/* 293 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -47727,20 +47803,20 @@ module.exports = ConstantIceServerSource;
 
 
 /***/ }),
-/* 291 */
+/* 294 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var constants = __webpack_require__(9);
-var ECS = __webpack_require__(288);
+var ECS = __webpack_require__(291);
 var EventEmitter = __webpack_require__(10).EventEmitter;
 var inherits = __webpack_require__(1).inherits;
-var Log = __webpack_require__(19);
-var TimeoutPromise = __webpack_require__(328);
+var Log = __webpack_require__(17);
+var TimeoutPromise = __webpack_require__(338);
 var util = __webpack_require__(5);
-var version = __webpack_require__(75).version;
+var version = __webpack_require__(76).version;
 
 var instances = 0;
 
@@ -47913,7 +47989,7 @@ function poll(client) {
   client._log.debug('Getting ECS configuration');
 
   var options = {
-    configUrl: client._ecsServer + '/v1/Configuration',
+    configUrl: client._ecsServer + '/v2/Configuration',
     body: {
       service: 'video',
       /* eslint-disable camelcase */
@@ -47974,7 +48050,7 @@ module.exports = NTSIceServerSource;
 
 
 /***/ }),
-/* 292 */
+/* 295 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -47986,11 +48062,11 @@ var E = __webpack_require__(9).typeErrors;
 var LocalAudioTrack = __webpack_require__(44);
 var LocalDataTrack = __webpack_require__(45);
 var LocalVideoTrack = __webpack_require__(46);
-var MediaStreamTrack = __webpack_require__(22).MediaStreamTrack;
-var Participant = __webpack_require__(119);
-var LocalAudioTrackPublication = __webpack_require__(293);
-var LocalDataTrackPublication = __webpack_require__(294);
-var LocalVideoTrackPublication = __webpack_require__(295);
+var MediaStreamTrack = __webpack_require__(19).MediaStreamTrack;
+var Participant = __webpack_require__(122);
+var LocalAudioTrackPublication = __webpack_require__(296);
+var LocalDataTrackPublication = __webpack_require__(297);
+var LocalVideoTrackPublication = __webpack_require__(298);
 
 /**
  * Construct a {@link LocalParticipant}.
@@ -48123,8 +48199,7 @@ LocalParticipant.prototype._handleTrackSignalingEvents = function _handleTrackSi
   var signaling = this._signaling;
 
   function localTrackAdded(localTrack) {
-    var mediaStreamTrackOrDataTrackSender = localTrack._dataTrackSender || localTrack.mediaStreamTrack;
-    signaling.addTrack(mediaStreamTrackOrDataTrackSender, localTrack.name);
+    signaling.addTrack(localTrack._trackSender, localTrack.name);
     log.info('Added a new ' + util.trackClass(localTrack, true) + ':', localTrack.id);
     log.debug(util.trackClass(localTrack, true) + ':', localTrack);
   }
@@ -48142,7 +48217,7 @@ LocalParticipant.prototype._handleTrackSignalingEvents = function _handleTrackSi
   }
 
   function localTrackRemoved(localTrack) {
-    signaling.removeTrack(localTrack._dataTrackSender || localTrack.mediaStreamTrack);
+    signaling.removeTrack(localTrack._trackSender);
     log.info('Removed a ' + util.trackClass(localTrack, true) + ':', localTrack.id);
     log.debug(util.trackClass(localTrack, true) + ':', localTrack);
   }
@@ -48203,7 +48278,7 @@ LocalParticipant.prototype._getOrCreateLocalTrackPublication = function _getOrCr
       var error = trackSignaling.error;
       if (error) {
         trackSignaling.removeListener('updated', updated);
-        log.warn('Failed to publish the ' + util.trackClass(localTrack, true) + ':', error);
+        log.warn('Failed to publish the ' + util.trackClass(localTrack, true) + ': ' + error.message);
         self._removeTrack(localTrack);
         setTimeout(function() {
           self.emit('trackPublicationFailed', error, localTrack);
@@ -48639,14 +48714,14 @@ module.exports = LocalParticipant;
 
 
 /***/ }),
-/* 293 */
+/* 296 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var LocalTrackPublication = __webpack_require__(69);
+var LocalTrackPublication = __webpack_require__(71);
 
 /**
  * Construct a {@link LocalAudioTrackPublication}.
@@ -48679,14 +48754,14 @@ module.exports = LocalAudioTrackPublication;
 
 
 /***/ }),
-/* 294 */
+/* 297 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var LocalTrackPublication = __webpack_require__(69);
+var LocalTrackPublication = __webpack_require__(71);
 
 /**
  * Construct a {@link LocalDataTrackPublication}.
@@ -48719,14 +48794,14 @@ module.exports = LocalDataTrackPublication;
 
 
 /***/ }),
-/* 295 */
+/* 298 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var LocalTrackPublication = __webpack_require__(69);
+var LocalTrackPublication = __webpack_require__(71);
 
 /**
  * Construct a {@link LocalVideoTrackPublication}.
@@ -48759,23 +48834,52 @@ module.exports = LocalVideoTrackPublication;
 
 
 /***/ }),
-/* 296 */
+/* 299 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var AudioTrack = __webpack_require__(115);
-var RemoteMediaTrack = __webpack_require__(117);
+var MediaTrackTransceiver = __webpack_require__(120);
 
 /**
- * Construct a {@link RemoteAudioTrack} from a MediaStreamTrack.
+ * Construct a {@link MediaTrackReceiver}.
+ * @class
+ * @classdesc A {@link MediaTrackReceiver} represents a remote MediaStreamTrack.
+ * @param {Track.ID} id - The MediaStreamTrack ID signaled through RSP/SDP
+ * @param {MediaStreamTrack} mediaStreamTrack - The remote MediaStreamTrack
+ */
+function MediaTrackReceiver(id, mediaStreamTrack) {
+  if (!(this instanceof MediaTrackReceiver)) {
+    return new MediaTrackReceiver(id, mediaStreamTrack);
+  }
+  MediaTrackTransceiver.call(this, id, mediaStreamTrack);
+}
+
+inherits(MediaTrackReceiver, MediaTrackTransceiver);
+
+module.exports = MediaTrackReceiver;
+
+
+/***/ }),
+/* 300 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var inherits = __webpack_require__(1).inherits;
+var AudioTrack = __webpack_require__(116);
+var RemoteMediaTrack = __webpack_require__(118);
+
+/**
+ * Construct a {@link RemoteAudioTrack}.
  * @class
  * @classdesc A {@link RemoteAudioTrack} represents an {@link AudioTrack}
  *   published to a {@link Room} by a {@link RemoteParticipant}.
  * @extends {AudioTrack}
- * @param {MediaStreamTrack} mediaStreamTrack - An audio MediaStreamTrack
+ * @param {MediaTrackReceiver} mediaTrackReceiver - An audio MediaStreamTrack container
  * @param {RemoteTrackSignaling} signaling - The {@link Track} signaling
  * @param {{log: Log}} options - The {@link RemoteTrack} options
  * @property {boolean} isSubscribed - Whether the {@link RemoteAudioTrack} is
@@ -48786,11 +48890,11 @@ var RemoteMediaTrack = __webpack_require__(117);
  * @fires RemoteAudioTrack#started
  * @fires RemoteAudioTrack#unsubscribed
  */
-function RemoteAudioTrack(mediaStreamTrack, signaling, options) {
+function RemoteAudioTrack(mediaTrackReceiver, signaling, options) {
   if (!(this instanceof RemoteAudioTrack)) {
-    return new RemoteAudioTrack(mediaStreamTrack, signaling, options);
+    return new RemoteAudioTrack(mediaTrackReceiver, signaling, options);
   }
-  RemoteMediaTrack.call(this, AudioTrack, mediaStreamTrack, signaling, options);
+  RemoteMediaTrack.call(this, AudioTrack, mediaTrackReceiver, signaling, options);
 }
 
 inherits(RemoteAudioTrack, AudioTrack);
@@ -48833,7 +48937,7 @@ module.exports = RemoteAudioTrack;
 
 
 /***/ }),
-/* 297 */
+/* 301 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -48842,8 +48946,8 @@ module.exports = RemoteAudioTrack;
 var inherits = __webpack_require__(1).inherits;
 var buildLogLevels = __webpack_require__(5).buildLogLevels;
 var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
-var Log = __webpack_require__(19);
-var Track = __webpack_require__(68);
+var Log = __webpack_require__(17);
+var Track = __webpack_require__(70);
 
 /**
  * Construct a {@link RemoteDataTrack} from a {@link DataTrackReceiver}.
@@ -48965,23 +49069,98 @@ module.exports = RemoteDataTrack;
 
 
 /***/ }),
-/* 298 */
+/* 302 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var buildLogLevels = __webpack_require__(5).buildLogLevels;
+var Log = __webpack_require__(17);
+var DEFAULT_LOG_LEVEL = __webpack_require__(9).DEFAULT_LOG_LEVEL;
+var nInstances = 0;
+
+/**
+ * Construct a {@link RemoteTrackPublication}.
+ * @class
+ * @classdesc A {@link RemoteTrackPublication} represents a {@link RemoteTrack}
+ *   that has been published to a {@link Room}.
+ * @param {Track.Kind} kind - the {@link RemoteTrack}'s kind
+ * @param {Track.SID} trackSid - the {@link RemoteTrack}'s SID
+ * @param {string} trackName - the {@link RemoteTrack}'s name
+ * @param {RemoteTrackPublicationOptions} options - {@link RemoteTrackPublication}
+ *   options
+ * @property {Track.Kind} kind - kind of the published {@link RemoteTrack}
+ * @property {?RemoteTrack} track - unless you have subscribed to the
+ *   {@link RemoteTrack}, this property is null
+ * @property {string} trackName - the {@link RemoteTrack}'s name
+ * @property {Track.SID} trackSid - the {@link RemoteTrack}'s SID
+ */
+function RemoteTrackPublication(kind, trackSid, trackName, options) {
+  options = Object.assign({
+    logLevel: DEFAULT_LOG_LEVEL
+  }, options);
+
+  var logLevels = buildLogLevels(options.logLevel);
+
+  Object.defineProperties(this, {
+    _instanceId: {
+      value: nInstances++
+    },
+    _log: {
+      value: options.log || new Log('default', this, logLevels)
+    },
+    kind: {
+      enumerable: true,
+      value: kind
+    },
+    track: {
+      enumerable: true,
+      value: null
+    },
+    trackName: {
+      enumerable: true,
+      value: trackName
+    },
+    trackSid: {
+      enumerable: true,
+      value: trackSid
+    }
+  });
+}
+
+RemoteTrackPublication.prototype.toString = function toString() {
+  return '[RemoteTrackPublication #' + this._instanceId + ': ' + this.trackSid + ']';
+};
+
+/**
+/**
+ * {@link RemoteTrackPublication} options
+ * @typedef {object} RemoteTrackPublicationOptions
+ * @property {LogLevel|LogLevels} logLevel - Log level for 'media' modules
+ */
+
+module.exports = RemoteTrackPublication;
+
+
+/***/ }),
+/* 303 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var RemoteMediaTrack = __webpack_require__(117);
-var VideoTrack = __webpack_require__(118);
+var RemoteMediaTrack = __webpack_require__(118);
+var VideoTrack = __webpack_require__(121);
 
 /**
- * Construct a {@link RemoteVideoTrack} from a MediaStreamTrack.
+ * Construct a {@link RemoteVideoTrack}.
  * @class
  * @classdesc A {@link RemoteVideoTrack} represents a {@link VideoTrack}
  *   published to a {@link Room} by a {@link RemoteParticipant}.
  * @extends {VideoTrack}
- * @param {MediaStreamTrack} mediaStreamTrack - A video MediaStreamTrack
+ * @param {MediaTrackReceiver} mediaTrackReceiver - A video MediaStreamTrack container
  * @param {RemoteTrackSignaling} signaling - The {@link Track} signaling
  * @param {{log: Log}} options - The {@link RemoteTrack} options
  * @property {boolean} isSubscribed - Whether the {@link RemoteVideoTrack} is
@@ -48992,11 +49171,11 @@ var VideoTrack = __webpack_require__(118);
  * @fires RemoteVideoTrack#started
  * @fires RemoteVideoTrack#unsubscribed
  */
-function RemoteVideoTrack(mediaStreamTrack, signaling, options) {
+function RemoteVideoTrack(mediaTrackReceiver, signaling, options) {
   if (!(this instanceof RemoteVideoTrack)) {
-    return new RemoteVideoTrack(mediaStreamTrack, signaling, options);
+    return new RemoteVideoTrack(mediaTrackReceiver, signaling, options);
   }
-  RemoteMediaTrack.call(this, VideoTrack, mediaStreamTrack, signaling, options);
+  RemoteMediaTrack.call(this, VideoTrack, mediaTrackReceiver, signaling, options);
 }
 
 inherits(RemoteVideoTrack, VideoTrack);
@@ -49039,7 +49218,7 @@ module.exports = RemoteVideoTrack;
 
 
 /***/ }),
-/* 299 */
+/* 304 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -49113,14 +49292,14 @@ module.exports = QueueingEventEmitter;
 
 
 /***/ }),
-/* 300 */
+/* 305 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var Participant = __webpack_require__(119);
+var Participant = __webpack_require__(122);
 
 /**
  * Construct a {@link RemoteParticipant}.
@@ -49146,6 +49325,7 @@ var Participant = __webpack_require__(119);
  * @fires RemoteParticipant#trackRemoved
  * @fires RemoteParticipant#trackStarted
  * @fires RemoteParticipant#trackSubscribed
+ * @fires RemoteParticipant#trackSubscriptionFailed
  * @fires RemoteParticipant#trackUnsubscribed
  */
 function RemoteParticipant(signaling, options) {
@@ -49251,6 +49431,13 @@ RemoteParticipant.prototype._removeTrack = function _removeTrack(remoteTrack) {
  */
 
 /**
+ * A {@link RemoteParticipant}'s {@link RemoteTrack} could not be subscribed to.
+ * @param {TwilioError} error - The reason the {@link RemoteTrack} could not be
+ *   subscribed to
+ * @event RemoteParticipant#trackSubscriptionFailed
+ */
+
+/**
  * A {@link RemoteParticipant}'s {@link RemoteTrack} was unsubscribed from.
  * @param {RemoteTrack} track - The {@link RemoteTrack} that was unsubscribed from
  * @event RemoteParticipant#trackUnsubscribed
@@ -49260,13 +49447,13 @@ module.exports = RemoteParticipant;
 
 
 /***/ }),
-/* 301 */
+/* 306 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var XHR = __webpack_require__(330).XMLHttpRequest;
+var XHR = __webpack_require__(341).XMLHttpRequest;
 
 /**
  * Make a network request.
@@ -49317,7 +49504,7 @@ module.exports = request;
 
 
 /***/ }),
-/* 302 */
+/* 307 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -49325,7 +49512,7 @@ module.exports = request;
 
 var EventEmitter = __webpack_require__(10).EventEmitter;
 var inherits = __webpack_require__(1).inherits;
-var RemoteParticipant = __webpack_require__(300);
+var RemoteParticipant = __webpack_require__(305);
 var nInstances = 0;
 
 /**
@@ -49627,6 +49814,7 @@ function connectParticipant(room, participantSignaling) {
     'trackRemoved',
     'trackStarted',
     'trackSubscribed',
+    'trackSubscriptionFailed',
     'trackUnsubscribed'
   ].map(function(event) {
     function reemit() {
@@ -49683,7 +49871,7 @@ module.exports = Room;
 
 
 /***/ }),
-/* 303 */
+/* 308 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -49691,9 +49879,9 @@ module.exports = Room;
 
 
 var inherits = __webpack_require__(1).inherits;
-var ParticipantSignaling = __webpack_require__(71);
-var RoomSignaling = __webpack_require__(121);
-var StateMachine = __webpack_require__(33);
+var ParticipantSignaling = __webpack_require__(73);
+var RoomSignaling = __webpack_require__(124);
+var StateMachine = __webpack_require__(34);
 
 /*
 Signaling States
@@ -49845,34 +50033,30 @@ module.exports = Signaling;
 
 
 /***/ }),
-/* 304 */
+/* 309 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var TrackSignaling = __webpack_require__(122);
+var TrackSignaling = __webpack_require__(125);
 
 /**
  * Construct a {@link LocalTrackPublicationSignaling}.
  * @class
  * @classdesc A {@link LocalTrackPublication} implementation
  * @extends TrackSignaling
- * @param {MediaStreamTrack|DataTrackSender} mediaStreamTrackOrDataTrackSender
+ * @param {DataTrackSender|MediaTrackSender} trackSender
  * @param {string} name
  * @property {?Error} error - non-null if publication failed
  */
-function LocalTrackPublicationSignaling(mediaStreamTrackOrDataTrackSender, name) {
-  var enabled = mediaStreamTrackOrDataTrackSender.kind === 'data'
+function LocalTrackPublicationSignaling(trackSender, name) {
+  var enabled = trackSender.kind === 'data'
     ? true
-    : mediaStreamTrackOrDataTrackSender.enabled;
-  TrackSignaling.call(this,
-    name,
-    mediaStreamTrackOrDataTrackSender.id,
-    mediaStreamTrackOrDataTrackSender.kind,
-    enabled);
-  this.setMediaStreamTrackOrDataTrackTransceiver(mediaStreamTrackOrDataTrackSender);
+    : trackSender.track.enabled;
+  TrackSignaling.call(this, name, trackSender.id, trackSender.kind, enabled);
+  this.setTrackTransceiver(trackSender);
   Object.defineProperties(this, {
     _error: {
       value: null,
@@ -49918,7 +50102,6 @@ function setError(publication, error) {
     return false;
   }
   publication._error = error;
-  publication._sidDeferred.reject(error);
   return true;
 }
 
@@ -49926,14 +50109,14 @@ module.exports = LocalTrackPublicationSignaling;
 
 
 /***/ }),
-/* 305 */
+/* 310 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var ParticipantSignaling = __webpack_require__(71);
+var ParticipantSignaling = __webpack_require__(73);
 
 /**
  * Construct a {@link RemoteParticipantSignaling}.
@@ -49956,14 +50139,14 @@ module.exports = RemoteParticipantSignaling;
 
 
 /***/ }),
-/* 306 */
+/* 311 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var TrackSignaling = __webpack_require__(122);
+var TrackSignaling = __webpack_require__(125);
 
 /**
  * Construct a {@link RemoteTrackSignaling}.
@@ -49976,14 +50159,25 @@ var TrackSignaling = __webpack_require__(122);
  * @param {Track.Kind} kind
  * @param {boolean} isEnabled
  * @property {boolean} isSubscribed
+ * @property {?Error} error - non-null if subscription failed
  */
 function RemoteTrackSignaling(sid, name, id, kind, isEnabled) {
   TrackSignaling.call(this, name, id, kind, isEnabled);
   Object.defineProperties(this, {
+    _error: {
+      value: null,
+      writable: true
+    },
+    error: {
+      enumerable: true,
+      get: function() {
+        return this._error;
+      }
+    },
     isSubscribed: {
       enumerable: true,
       get: function() {
-        return !!this._mediaStreamTrackOrDataTrackTransceiver;
+        return !!this._trackTransceiver;
       }
     }
   });
@@ -49992,22 +50186,34 @@ function RemoteTrackSignaling(sid, name, id, kind, isEnabled) {
 
 inherits(RemoteTrackSignaling, TrackSignaling);
 
+/**
+ * @param {Error} error
+ * @returns {this}
+ */
+RemoteTrackSignaling.prototype.subscribeFailed = function subscribeFailed(error) {
+  if (!this._error) {
+    this._error = error;
+    this.emit('updated');
+  }
+  return this;
+};
+
 module.exports = RemoteTrackSignaling;
 
 
 /***/ }),
-/* 307 */
+/* 312 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var CancelablePromise = __webpack_require__(73);
-var DefaultPeerConnectionManager = __webpack_require__(313);
-var DefaultRoomV2 = __webpack_require__(317);
-var DefaultTransport = __webpack_require__(318);
-var SignalingConnectionDisconnectedError = __webpack_require__(20).SignalingConnectionDisconnectedError;
-var SignalingIncomingMessageInvalidError = __webpack_require__(20).SignalingIncomingMessageInvalidError;
+var CancelablePromise = __webpack_require__(75);
+var DefaultPeerConnectionManager = __webpack_require__(318);
+var DefaultRoomV2 = __webpack_require__(322);
+var DefaultTransport = __webpack_require__(323);
+var SignalingConnectionDisconnectedError = __webpack_require__(18).SignalingConnectionDisconnectedError;
+var SignalingIncomingMessageInvalidError = __webpack_require__(18).SignalingIncomingMessageInvalidError;
 var flatMap = __webpack_require__(5).flatMap;
 
 function createCancelableRoomSignalingPromise(token, ua, localParticipant, iceServerSource, encodingParameters, preferredCodecs, options) {
@@ -50022,14 +50228,14 @@ function createCancelableRoomSignalingPromise(token, ua, localParticipant, iceSe
   var PeerConnectionManager = options.PeerConnectionManager;
   var RoomV2 = options.RoomV2;
 
-  var peerConnectionManager = new PeerConnectionManager(iceServerSource, encodingParameters, preferredCodecs);
+  var peerConnectionManager = new PeerConnectionManager(iceServerSource, encodingParameters, preferredCodecs, options);
 
-  var mediaStreamTracksAndDataTrackSenders = flatMap(localParticipant.tracks, function(track) {
-    return [track.mediaStreamTrackOrDataTrackTransceiver];
+  var trackSenders = flatMap(localParticipant.tracks, function(trackV2) {
+    return [trackV2.trackTransceiver];
   });
 
   peerConnectionManager.setConfiguration(options);
-  peerConnectionManager.setMediaStreamTracksAndDataTrackSenders(mediaStreamTracksAndDataTrackSenders);
+  peerConnectionManager.setTrackSenders(trackSenders);
 
   var cancelationError = new Error('Canceled');
 
@@ -50125,13 +50331,13 @@ module.exports = createCancelableRoomSignalingPromise;
 
 
 /***/ }),
-/* 308 */
+/* 313 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var Filter = __webpack_require__(324);
+var Filter = __webpack_require__(329);
 
 /**
  * Construct an {@link IceBox}.
@@ -50203,19 +50409,19 @@ module.exports = IceBox;
 
 
 /***/ }),
-/* 309 */
+/* 314 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var constants = __webpack_require__(9);
-var defaultCreateCancelableRoomSignalingPromise = __webpack_require__(307);
+var defaultCreateCancelableRoomSignalingPromise = __webpack_require__(312);
 var inherits = __webpack_require__(1).inherits;
-var LocalParticipantV2 = __webpack_require__(310);
-var Signaling = __webpack_require__(303);
-var SIP = __webpack_require__(72);
-var SIPJSMediaHandler = __webpack_require__(123);
+var LocalParticipantV2 = __webpack_require__(315);
+var Signaling = __webpack_require__(308);
+var SIP = __webpack_require__(74);
+var SIPJSMediaHandler = __webpack_require__(126);
 var util = __webpack_require__(5);
 
 /**
@@ -50324,15 +50530,15 @@ module.exports = SignalingV2;
 
 
 /***/ }),
-/* 310 */
+/* 315 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var ParticipantSignaling = __webpack_require__(71);
-var LocalTrackPublicationV2 = __webpack_require__(311);
+var ParticipantSignaling = __webpack_require__(73);
+var LocalTrackPublicationV2 = __webpack_require__(316);
 
 /**
  * Construct a {@link LocalParticipantV2}.
@@ -50349,7 +50555,7 @@ function LocalParticipantV2(encodingParameters, options) {
 
   options = Object.assign({
     LocalTrackPublicationV2: LocalTrackPublicationV2
-  });
+  }, options);
 
   ParticipantSignaling.call(this);
   Object.defineProperties(this, {
@@ -50411,14 +50617,14 @@ LocalParticipantV2.prototype.update = function update(published) {
 };
 
 /**
- * Add a {@link LocalTrackPublicationV2} for the given MediaStreamTrack or
- * {@link DataTrackSender} to the {@link LocalParticipantV2}.
- * @param {MediaStreamTrack|DataTrackSender} mediaStreamTrackOrDataTrackSender
+ * Add a {@link LocalTrackPublicationV2} for the given {@link DataTrackSender}
+ * or {@link MediaTrackSender} to the {@link LocalParticipantV2}.
+ * @param {DataTrackSender|MediaTrackSender} trackSender
  * @param {string} name
  * @returns {this}
  */
-LocalParticipantV2.prototype.addTrack = function addTrack(mediaStreamTrackOrDataTrackSender, name) {
-  var localTrackPublicationV2 = new this._LocalTrackPublicationV2(mediaStreamTrackOrDataTrackSender, name);
+LocalParticipantV2.prototype.addTrack = function addTrack(trackSender, name) {
+  var localTrackPublicationV2 = new this._LocalTrackPublicationV2(trackSender, name);
   return ParticipantSignaling.prototype.addTrack.call(this, localTrackPublicationV2);
 };
 
@@ -50445,13 +50651,13 @@ LocalParticipantV2.prototype.incrementRevision = function incrementRevision() {
 };
 
 /**
- * Remove the {@link LocalTrackPublicationV2} for the given MediaStreamTrack or
- * {@link DataTrackSender} from the {@link LocalParticipantV2}.
- * @param {MediaStreamTrack|DataTrackSender} mediaStreamTrackOrDataTrackSender
+ * Remove the {@link LocalTrackPublicationV2} for the given {@link DataTrackSender}
+ * or {@link MediaTrackSender} from the {@link LocalParticipantV2}.
+ * @param {DataTrackSender|MediaTrackSender} trackSender
  * @returns {boolean}
  */
-LocalParticipantV2.prototype.removeTrack = function removeTrack(mediaStreamTrackOrDataTrackSender) {
-  var localTrackPublicationV2 = this.tracks.get(mediaStreamTrackOrDataTrackSender.id);
+LocalParticipantV2.prototype.removeTrack = function removeTrack(trackSender) {
+  var localTrackPublicationV2 = this.tracks.get(trackSender.id);
   if (!localTrackPublicationV2) {
     return false;
   }
@@ -50498,30 +50704,28 @@ module.exports = LocalParticipantV2;
 
 
 /***/ }),
-/* 311 */
+/* 316 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var LocalTrackPublicationSignaling = __webpack_require__(304);
-var createTwilioError = __webpack_require__(20).createTwilioError;
+var LocalTrackPublicationSignaling = __webpack_require__(309);
+var createTwilioError = __webpack_require__(18).createTwilioError;
 
 /**
  * Construct a {@link LocalTrackPublicationV2}.
  * @class
  * @extends LocalTrackPublicationSignaling
- * @param {MediaStreamTrack|DataTrackSender} mediaStreamTrackOrDataTrackSender
+ * @param {DataTrackSender|MediaTrackSender} trackSender
  * @param {string} name
  */
-function LocalTrackPublicationV2(mediaStreamTrackOrDataTrackSender, name) {
+function LocalTrackPublicationV2(trackSender, name) {
   if (!(this instanceof LocalTrackPublicationV2)) {
-    return new LocalTrackPublicationV2(mediaStreamTrackOrDataTrackSender, name);
+    return new LocalTrackPublicationV2(trackSender, name);
   }
-  LocalTrackPublicationSignaling.call(this,
-    mediaStreamTrackOrDataTrackSender,
-    name);
+  LocalTrackPublicationSignaling.call(this, trackSender, name);
 }
 
 inherits(LocalTrackPublicationV2, LocalTrackPublicationSignaling);
@@ -50575,42 +50779,40 @@ module.exports = LocalTrackPublicationV2;
 
 
 /***/ }),
-/* 312 */
+/* 317 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var WebRTC = __webpack_require__(22);
+var WebRTC = __webpack_require__(19);
+var DefaultMediaStream = WebRTC.MediaStream;
 var DefaultRTCIceCandidate = WebRTC.RTCIceCandidate;
 var DefaultRTCPeerConnection = WebRTC.RTCPeerConnection;
 var DefaultRTCSessionDescription = WebRTC.RTCSessionDescription;
-var flatMap = __webpack_require__(5).flatMap;
 var getStatistics = WebRTC.getStats;
-var getMediaSections = __webpack_require__(74).getMediaSections;
+var getMediaSections = __webpack_require__(22).getMediaSections;
 var guessBrowser = __webpack_require__(5).guessBrowser;
 var oncePerTick = __webpack_require__(5).oncePerTick;
-var setBitrateParameters = __webpack_require__(74).setBitrateParameters;
-var setCodecPreferences = __webpack_require__(74).setCodecPreferences;
-var IceBox = __webpack_require__(308);
+var setBitrateParameters = __webpack_require__(22).setBitrateParameters;
+var setCodecPreferences = __webpack_require__(22).setCodecPreferences;
+var setSimulcast = __webpack_require__(22).setSimulcast;
+var IceBox = __webpack_require__(313);
 var inherits = __webpack_require__(1).inherits;
-var MediaClientLocalDescFailedError = __webpack_require__(20).MediaClientLocalDescFailedError;
-var MediaClientRemoteDescFailedError = __webpack_require__(20).MediaClientRemoteDescFailedError;
-var DataTrackReceiver = __webpack_require__(286);
-var StateMachine = __webpack_require__(33);
-var StatsReport = __webpack_require__(323);
+var MediaClientLocalDescFailedError = __webpack_require__(18).MediaClientLocalDescFailedError;
+var MediaClientRemoteDescFailedError = __webpack_require__(18).MediaClientRemoteDescFailedError;
+var DataTrackReceiver = __webpack_require__(289);
+var MediaTrackReceiver = __webpack_require__(299);
+var StateMachine = __webpack_require__(34);
+var StatsReport = __webpack_require__(328);
+var IdentityTrackMatcher = __webpack_require__(334);
+var OrderedTrackMatcher = __webpack_require__(336);
+var MIDTrackMatcher = __webpack_require__(335);
+var workaroundIssue8329 = __webpack_require__(332);
 
-var defaults = {
-  iceServers: [],
-  offerOptions: {},
-  setBitrateParameters: setBitrateParameters,
-  setCodecPreferences: setCodecPreferences,
-  RTCIceCandidate: DefaultRTCIceCandidate,
-  RTCPeerConnection: DefaultRTCPeerConnection,
-  RTCSessionDescription: DefaultRTCSessionDescription
-};
-
+var isChrome = guessBrowser() === 'chrome';
 var isFirefox = guessBrowser() === 'firefox';
+var isSafari = guessBrowser() === 'safari';
 
 /*
 PeerConnectionV2 States
@@ -50663,13 +50865,29 @@ function PeerConnectionV2(id, encodingParameters, preferredCodecs, options) {
   }
   StateMachine.call(this, 'open', states);
 
-  options = Object.assign(defaults, options);
-  var configuration = getConfiguration(options);
+  options = Object.assign({
+    iceServers: [],
+    offerOptions: {},
+    setBitrateParameters: setBitrateParameters,
+    setCodecPreferences: setCodecPreferences,
+    setSimulcast: setSimulcast,
+    MediaStream: DefaultMediaStream,
+    RTCIceCandidate: DefaultRTCIceCandidate,
+    RTCPeerConnection: DefaultRTCPeerConnection,
+    RTCSessionDescription: DefaultRTCSessionDescription
+  }, options);
 
+  var configuration = getConfiguration(options);
   var RTCPeerConnection = options.RTCPeerConnection;
   var peerConnection = new RTCPeerConnection(configuration);
 
   Object.defineProperties(this, {
+    _dataChannels: {
+      value: new Map()
+    },
+    _dataTrackReceivers: {
+      value: new Set()
+    },
     _descriptionRevision: {
       writable: true,
       value: 0
@@ -50689,16 +50907,27 @@ function PeerConnectionV2(id, encodingParameters, preferredCodecs, options) {
       writable: true,
       value: 1
     },
-    _dataTrackSenders: {
-      value: new Map()
-    },
     _localDescription: {
       writable: true,
       value: null
     },
+    _localMediaStream: {
+      value: new options.MediaStream()
+    },
     _localUfrag: {
       writable: true,
       value: null
+    },
+    _log: {
+      value: options.log
+        ? options.log.createLog('signaling', this)
+        : null
+    },
+    _rtpSenders: {
+      value: new Map()
+    },
+    _mediaTrackReceivers: {
+      value: new Set()
     },
     _needsInitialAnswer: {
       writable: true,
@@ -50725,9 +50954,6 @@ function PeerConnectionV2(id, encodingParameters, preferredCodecs, options) {
       writable: true,
       value: null
     },
-    _dataTrackReceivers: {
-      value: new Set()
-    },
     _remoteCandidates: {
       writable: true,
       value: new IceBox()
@@ -50737,6 +50963,9 @@ function PeerConnectionV2(id, encodingParameters, preferredCodecs, options) {
     },
     _setCodecPreferences: {
       value: options.setCodecPreferences
+    },
+    _setSimulcast: {
+      value: options.setSimulcast
     },
     _RTCIceCandidate: {
       value: options.RTCIceCandidate
@@ -50750,6 +50979,13 @@ function PeerConnectionV2(id, encodingParameters, preferredCodecs, options) {
     _shouldOffer: {
       writable: true,
       value: false
+    },
+    _trackIdsToAttributes: {
+      value: new Map()
+    },
+    _trackMatcher: {
+      writable: true,
+      value: null
     },
     id: {
       enumerable: true,
@@ -50769,7 +51005,7 @@ function PeerConnectionV2(id, encodingParameters, preferredCodecs, options) {
       return;
     }
     self.removeListener('stateChanged', stateChanged);
-    self._dataTrackSenders.forEach(function(dataChannel, dataTrackSender) {
+    self._dataChannels.forEach(function(dataChannel, dataTrackSender) {
       self.removeDataTrackSender(dataTrackSender);
     });
   });
@@ -50830,11 +51066,16 @@ PeerConnectionV2.prototype._answer = function _answer(offer) {
   }).then(function() {
     return self._peerConnection.createAnswer();
   }).then(function(answer) {
+    if (!isFirefox) {
+      answer = workaroundIssue8329(answer);
+    }
     return self._setLocalDescription(answer);
   }).then(function() {
     return self._checkIceBox(offer);
   }).then(function() {
-    return self._maybeReoffer(offer);
+    return self._peerConnection.localDescription
+      ? self._maybeReoffer(self._peerConnection.localDescription)
+      : Promise.resolve();
   }).catch(function(error) {
     throw error instanceof MediaClientRemoteDescFailedError
       ? error
@@ -50881,8 +51122,7 @@ PeerConnectionV2.prototype._handleDataChannelEvent = function _handleDataChannel
 PeerConnectionV2.prototype._handleGlare = function _handleGlare(offer) {
   var self = this;
   return Promise.resolve().then(function() {
-    var rollback = new self._RTCSessionDescription({ type: 'rollback' });
-    return self._setLocalDescription(rollback);
+    return self._setLocalDescription({ type: 'rollback' });
   }).then(function() {
     return self._answer(offer);
   }).then(function() {
@@ -50931,16 +51171,36 @@ PeerConnectionV2.prototype._handleSignalingStateChange = function _handleSignali
  * @returns {void}
  */
 PeerConnectionV2.prototype._handleTrackEvent = function _handleTrackEvent(event) {
+  var sdp = this._peerConnection.remoteDescription
+    ? this._peerConnection.remoteDescription.sdp
+    : null;
+
+  if (!this._trackMatcher) {
+    this._trackMatcher = event.transceiver && event.transceiver.mid
+      ? new MIDTrackMatcher()
+      : isSafari ? new OrderedTrackMatcher() : new IdentityTrackMatcher();
+  }
+  this._trackMatcher.update(sdp);
+
   var mediaStreamTrack = event.track;
-  this.emit('trackAdded', mediaStreamTrack);
+  var signaledTrackId = this._trackMatcher.match(event) || mediaStreamTrack.id;
+  var mediaTrackReceiver = new MediaTrackReceiver(signaledTrackId, mediaStreamTrack);
+  this._mediaTrackReceivers.add(mediaTrackReceiver);
+
+  var self = this;
+  mediaStreamTrack.addEventListener('ended', function() {
+    self._mediaTrackReceivers.delete(mediaTrackReceiver);
+  });
+
+  this.emit('trackAdded', mediaTrackReceiver);
 };
 
 /**
  * Conditionally re-offer.
- * @param {RTCSessionDescriptionInit} offer
+ * @param {RTCSessionDescriptionInit} localDescription
  * @returns {Promise<void>}
  */
-PeerConnectionV2.prototype._maybeReoffer = function _maybeReoffer(offer) {
+PeerConnectionV2.prototype._maybeReoffer = function _maybeReoffer(localDescription) {
   var shouldReoffer = this._shouldOffer;
 
   // NOTE(mmalavalli): In Firefox, if the remote RTCPeerConnection sends
@@ -50957,9 +51217,11 @@ PeerConnectionV2.prototype._maybeReoffer = function _maybeReoffer(offer) {
   // re-introducing 'offerToReceiveAudio' to the default RTCOfferOptions with a
   // value > 1.
   if (isFirefox) {
-    var senders = this._peerConnection.getSenders();
+    var senders = this._peerConnection.getSenders().filter(function(sender) {
+      return sender.track;
+    });
     shouldReoffer = ['audio', 'video'].reduce(function(shouldOffer, kind) {
-      var mediaSections = getMediaSections(offer.sdp, kind, '(sendrecv|recvonly)');
+      var mediaSections = getMediaSections(localDescription.sdp, kind, '(sendrecv|sendonly)');
       var sendersOfKind = senders.filter(isSenderOfKind.bind(null, kind));
       return shouldOffer || (mediaSections.length < sendersOfKind.length);
     }, shouldReoffer);
@@ -50967,8 +51229,8 @@ PeerConnectionV2.prototype._maybeReoffer = function _maybeReoffer(offer) {
 
   // NOTE(mroberts): We also need to re-offer if we have a DataTrack to share
   // but no m= application section.
-  var hasDataTrack = this._dataTrackSenders.size > 0;
-  var hasApplicationMediaSection = getMediaSections(offer.sdp, 'application').length > 0;
+  var hasDataTrack = this._dataChannels.size > 0;
+  var hasApplicationMediaSection = getMediaSections(localDescription.sdp, 'application').length > 0;
   var needsApplicationMediaSection = hasDataTrack && !hasApplicationMediaSection;
   shouldReoffer = shouldReoffer || needsApplicationMediaSection;
 
@@ -50986,38 +51248,65 @@ PeerConnectionV2.prototype._offer = function _offer() {
   }).catch(function() {
     throw new MediaClientLocalDescFailedError();
   }).then(function(offer) {
+    if (!isFirefox) {
+      offer = workaroundIssue8329(offer);
+    }
+
     var updatedSdp = self._setCodecPreferences(
       offer.sdp,
       self._preferredAudioCodecs,
       self._preferredVideoCodecs);
-    var updatedOffer = new RTCSessionDescription({
-      type: 'offer',
-      sdp: updatedSdp
-    });
+
     self._shouldOffer = false;
     if (!self._negotiationRole) {
       self._negotiationRole = 'offerer';
       self._needsInitialAnswer = true;
     }
-    return self._setLocalDescription(updatedOffer);
+    return self._setLocalDescription({
+      type: 'offer',
+      sdp: updatedSdp
+    });
   });
 };
 
 /**
  * Set a local description on the {@link PeerConnectionV2}.
- * @param {RTCSessionDescriptionInit} description
+ * @param {RTCSessionDescription|RTCSessionDescriptionInit} description
  * @returns {Promise<void>}
  */
 PeerConnectionV2.prototype._setLocalDescription = function _setLocalDescription(description) {
   var revision = description.revision;
   var self = this;
+  var vp8SimulcastRequested = this._preferredVideoCodecs.some(function(codecSettings) {
+    return codecSettings.codec.toLowerCase() === 'vp8' && codecSettings.simulcast;
+  });
+
   return Promise.resolve().then(function() {
+    if (description.sdp) {
+      // NOTE(mmalavalli): We do not directly modify "description.sdp" here as
+      // "description" might be an RTCSessionDescription, in which case its
+      // properties are immutable.
+      description = {
+        type: description.type,
+        sdp: isChrome && vp8SimulcastRequested
+          ? self._setSimulcast(description.sdp, self._trackIdsToAttributes)
+          : description.sdp
+      };
+    }
     description = new self._RTCSessionDescription(description);
     if (description.type === 'answer') {
       self._lastStableDescriptionRevision = revision;
     }
     return self._peerConnection.setLocalDescription(description);
-  }).catch(function() {
+  }).catch(function(error) {
+    if (self._log) {
+      self._log.warn('Calling setLocalDescription with an RTCSessionDescription ' +
+        'of type "' + description.type + '" failed with the error "' +
+        error.message + '".');
+      if (description.sdp) {
+        self._log.warn('The SDP was ' + description.sdp);
+      }
+    }
     throw new MediaClientLocalDescFailedError();
   }).then(function setLocalDescriptionSucceeded() {
     if (description.type !== 'rollback') {
@@ -51041,7 +51330,7 @@ PeerConnectionV2.prototype._setRemoteDescription = function _setRemoteDescriptio
   if (description.sdp) {
     description.sdp = this._setBitrateParameters(
       description.sdp,
-      guessBrowser() === 'firefox' ? 'TIAS' : 'AS',
+      isFirefox ? 'TIAS' : 'AS',
       this._encodingParameters.maxAudioBitrate,
       this._encodingParameters.maxVideoBitrate);
     description.sdp = this._setCodecPreferences(
@@ -51050,7 +51339,18 @@ PeerConnectionV2.prototype._setRemoteDescription = function _setRemoteDescriptio
       this._preferredVideoCodecs);
   }
   description = new this._RTCSessionDescription(description);
-  return this._peerConnection.setRemoteDescription(description);
+  var self = this;
+  return this._peerConnection.setRemoteDescription(description).catch(function(error) {
+    if (self._log) {
+      self._log.warn('Calling setRemoteDescription with an RTCSessionDescription ' +
+        'of type "' + description.type + '" failed with the error "' +
+        error.message + '".');
+      if (description.sdp) {
+        self._log.warn('The SDP was ' + description.sdp);
+      }
+    }
+    throw error;
+  });
 };
 
 /**
@@ -51117,15 +51417,9 @@ PeerConnectionV2.prototype._updateDescription = function _updateDescription(desc
     return self._queuedDescription && self._updateDescription(self._queuedDescription);
   }).then(function() {
     self._queuedDescription = null;
-    var offer = self._peerConnection.localDescription && self._peerConnection.localDescription.type === 'offer'
-      ? self._peerConnection.localDescription
-      : self._peerConnection.remoteDescription && self._peerConnection.remoteDescription.type === 'offer'
-        ? self._peerConnection.remoteDescription
-        : null;
-    if (offer) {
-      return self._maybeReoffer(offer);
-    }
-    return Promise.resolve();
+    return self._peerConnection.localDescription
+      ? self._maybeReoffer(self._peerConnection.localDescription)
+      : Promise.resolve();
   });
 };
 
@@ -51145,7 +51439,7 @@ PeerConnectionV2.prototype._updateIce = function _updateIce(iceState) {
  * @returns {void}
  */
 PeerConnectionV2.prototype.addDataTrackSender = function addDataTrackSender(dataTrackSender) {
-  if (this._dataTrackSenders.has(dataTrackSender)) {
+  if (this._dataChannels.has(dataTrackSender)) {
     return;
   }
   try {
@@ -51160,21 +51454,25 @@ PeerConnectionV2.prototype.addDataTrackSender = function addDataTrackSender(data
     }
     var dataChannel = this._peerConnection.createDataChannel(dataTrackSender.id, dataChannelDict);
     dataTrackSender.addDataChannel(dataChannel);
-    this._dataTrackSenders.set(dataTrackSender, dataChannel);
+    this._dataChannels.set(dataTrackSender, dataChannel);
   } catch (error) {
     // Do nothing.
   }
 };
 
 /**
- * Add a local MediaStream to the {@link PeerConnectionV2}.
- * @param {MediaStream} mediaStream
+ * Add the {@link MediaTrackSender} to the {@link PeerConnectionV2}.
+ * @param {MediaTrackSender} mediaTrackSender
  * @returns {void}
  */
-PeerConnectionV2.prototype.addMediaStream = function addMediaStream(mediaStream) {
-  if (this._peerConnection.signalingState !== 'closed') {
-    this._peerConnection.addStream(mediaStream);
+PeerConnectionV2.prototype.addMediaTrackSender = function addMediaTrackSender(mediaTrackSender) {
+  if (this._peerConnection.signalingState === 'closed' || this._rtpSenders.has(mediaTrackSender)) {
+    return;
   }
+  this._localMediaStream.addTrack(mediaTrackSender.track);
+  var sender = this._peerConnection.addTrack(mediaTrackSender.track, this._localMediaStream);
+  mediaTrackSender.addSender(sender);
+  this._rtpSenders.set(mediaTrackSender, sender);
 };
 
 /**
@@ -51190,37 +51488,12 @@ PeerConnectionV2.prototype.close = function close() {
 };
 
 /**
- * Get the {@link DataTrackReceivers} on the {@link PeerConnectionV2}.
- * @returns {Array<DataTrackReceiver>} dataTrackReceivers
- */
-PeerConnectionV2.prototype.getDataTrackReceivers = function getDataTrackReceivers() {
-  return Array.from(this._dataTrackReceivers);
-};
-
-/**
- * Get the remote MediaStreamTracks and {@link DataTrackReceiver}s on the
+ * Get the {@link DataTrackReceiver}s and the {@link MediaTrackReceivers} on the
  * {@link PeerConnectionV2}.
- * @returns {Array<MediaStreamTrack|DataTrackReceiver>} mediaStreamTracksAndDataTrackReceivers
+ * @returns {Array<DataTrackReceiver|MediaTrackReceiver>} trackReceivers
  */
-PeerConnectionV2.prototype.getRemoteMediaStreamTracksAndDataTrackReceivers = function getRemoteMediaStreamTracksAndDataTrackReceivers() {
-  return this.getRemoteMediaStreamTracks().concat(this.getDataTrackReceivers());
-};
-
-/**
- * Get the remote MediaStreamTracks on the {@link PeerConnectionV2}.
- * @returns {Array<MediaStreamTrack>} mediaStreamTracks
- */
-PeerConnectionV2.prototype.getRemoteMediaStreamTracks = function getRemoteMediaStreamTracks() {
-  if (this._peerConnection.getReceivers) {
-    return this._peerConnection.getReceivers().map(function(receiver) {
-      return receiver.track;
-    }).filter(function(track) {
-      return track;
-    });
-  }
-  return flatMap(this._peerConnection.getRemoteStreams(), function(mediaStream) {
-    return mediaStream.getTracks();
-  });
+PeerConnectionV2.prototype.getTrackReceivers = function getTrackReceivers() {
+  return Array.from(this._dataTrackReceivers).concat(Array.from(this._mediaTrackReceivers));
 };
 
 /**
@@ -51272,22 +51545,28 @@ PeerConnectionV2.prototype.offer = function offer() {
  * @returns {void}
  */
 PeerConnectionV2.prototype.removeDataTrackSender = function removeDataTrackSender(dataTrackSender) {
-  var dataChannel = this._dataTrackSenders.get(dataTrackSender);
+  var dataChannel = this._dataChannels.get(dataTrackSender);
   if (dataChannel) {
     dataTrackSender.removeDataChannel(dataChannel);
-    this._dataTrackSenders.delete(dataTrackSender);
+    this._dataChannels.delete(dataTrackSender);
+    dataChannel.close();
   }
 };
 
 /**
- * Remove a local MediaStream from the {@link PeerConnectionV2}.
- * @param {MediaStream} mediaStream
+ * Remove the {@link MediaTrackSender} from the {@link PeerConnectionV2}.
+ * @param {MediaTrackSender} mediaTrackSender
  * @returns {void}
  */
-PeerConnectionV2.prototype.removeMediaStream = function removeMediaStream(mediaStream) {
-  if (this._peerConnection.signalingState !== 'closed') {
-    this._peerConnection.removeStream(mediaStream);
+PeerConnectionV2.prototype.removeMediaTrackSender = function removeMediaTrackSender(mediaTrackSender) {
+  if (this._peerConnection.signalingState === 'closed' || !this._rtpSenders.has(mediaTrackSender)) {
+    return;
   }
+  var sender = this._rtpSenders.get(mediaTrackSender);
+  this._peerConnection.removeTrack(sender);
+  this._localMediaStream.removeTrack(mediaTrackSender.track);
+  mediaTrackSender.removeSender(sender);
+  this._rtpSenders.delete(mediaTrackSender);
 };
 
 /**
@@ -51357,7 +51636,7 @@ PeerConnectionV2.prototype.getStats = function getStats() {
 
 /**
  * @event PeerConnectionV2#trackAdded
- * @param {MediaStreamTrack|DataTrackReceiver} mediaStreamTrackOrDataTrackReceiver
+ * @param {DataTrackReceiver|MediaTrackReceiver} trackReceiver
  */
 
 function getUfrag(description) {
@@ -51401,19 +51680,19 @@ module.exports = PeerConnectionV2;
 
 
 /***/ }),
-/* 313 */
+/* 318 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var PeerConnectionV2 = __webpack_require__(312);
-var MediaStream = __webpack_require__(22).MediaStream;
-var QueueingEventEmitter = __webpack_require__(299);
+var PeerConnectionV2 = __webpack_require__(317);
+var MediaTrackSender = __webpack_require__(119);
+var QueueingEventEmitter = __webpack_require__(304);
 var util = __webpack_require__(5);
 
-// var isFirefox = util.guessBrowser() === 'firefox';
+var isFirefox = util.guessBrowser() === 'firefox';
 
 /**
  * Construct {@link PeerConnectionManager}.
@@ -51435,18 +51714,9 @@ function PeerConnectionManager(iceServerSource, encodingParameters, preferredCod
   QueueingEventEmitter.call(this);
 
   options = Object.assign({
-    // NOTE(mroberts): We're not quite ready to release the workaround for the
-    // Firefox/Chrome BUNDLE issue, so we'll leave this disabled for now. In the
-    // future, it should look something like
-    //
-    //   audioContextFactory: isFirefox
-    //     ? require('../../webaudio/audiocontext')
-    //     : null,
-    //
-    // We'll need to delay the require call since the singleton exported depends
-    // on Set, which fails our UMD tests.
-    audioContextFactory: null,
-    MediaStream: MediaStream,
+    audioContextFactory: isFirefox
+      ? __webpack_require__(340)
+      : null,
     PeerConnectionV2: PeerConnectionV2
   }, options);
 
@@ -51475,9 +51745,9 @@ function PeerConnectionManager(iceServerSource, encodingParameters, preferredCod
       writable: true,
       value: util.defer()
     },
-    _dummyAudioMediaStreamTrack: {
+    _dummyAudioTrackSender: {
       value: audioContext
-        ? createDummyAudioMediaStreamTrack(audioContext)
+        ? new MediaTrackSender(createDummyAudioMediaStreamTrack(audioContext))
         : null
     },
     _encodingParameters: {
@@ -51490,8 +51760,9 @@ function PeerConnectionManager(iceServerSource, encodingParameters, preferredCod
       writable: true,
       value: new Set()
     },
-    _localMediaStream: {
-      value: new options.MediaStream()
+    _mediaTrackSenders: {
+      writable: true,
+      value: new Set()
     },
     _offerOptions: {
       value: offerOptions
@@ -51506,10 +51777,6 @@ function PeerConnectionManager(iceServerSource, encodingParameters, preferredCod
       value: options.PeerConnectionV2
     }
   });
-
-  if (this._dummyAudioMediaStreamTrack) {
-    this._localMediaStream.addTrack(this._dummyAudioMediaStreamTrack);
-  }
 }
 
 inherits(PeerConnectionManager, QueueingEventEmitter);
@@ -51550,8 +51817,9 @@ PeerConnectionManager.prototype._getOrCreate = function _getOrCreate(id, configu
         self._closedPeerConnectionIds.add(peerConnection.id);
       }
     });
-    peerConnection.addMediaStream(this._localMediaStream);
+
     this._dataTrackSenders.forEach(peerConnection.addDataTrackSender, peerConnection);
+    this._mediaTrackSenders.forEach(peerConnection.addMediaTrackSender, peerConnection);
   }
   return peerConnection;
 };
@@ -51567,8 +51835,8 @@ PeerConnectionManager.prototype.close = function close() {
   this._peerConnections.forEach(function(peerConnection) {
     peerConnection.close();
   });
-  if (this._dummyAudioMediaStreamTrack) {
-    this._dummyAudioMediaStreamTrack.stop();
+  if (this._dummyAudioTrackSender) {
+    this._dummyAudioTrackSender.track.stop();
   }
   if (this._audioContextFactory) {
     this._audioContextFactory.release(this);
@@ -51598,13 +51866,13 @@ PeerConnectionManager.prototype.createAndOffer = function createAndOffer() {
 };
 
 /**
- * Get the remote MediaStreamTracks and {@link DataTrackReceiver}s of all
+ * Get the {@link DataTrackReceiver}s and {@link MediaTrackReceiver}s of all
  * the {@link PeerConnectionV2}s.
- * @returns {Array<MediaStreamTrack|DataTrackReceiver>} mediaStreamTracksAndDataTrackReceivers
+ * @returns {Array<DataTrackReceiver|MediaTrackReceiver>} trackReceivers
  */
-PeerConnectionManager.prototype.getRemoteMediaStreamTracksAndDataTrackReceivers = function getRemoteMediaStreamTracksAndDataTrackReceivers() {
+PeerConnectionManager.prototype.getTrackReceivers = function getTrackReceivers() {
   return util.flatMap(this._peerConnections, function(peerConnection) {
-    return peerConnection.getRemoteMediaStreamTracksAndDataTrackReceivers();
+    return peerConnection.getTrackReceivers();
   });
 };
 
@@ -51641,31 +51909,27 @@ PeerConnectionManager.prototype.setConfiguration = function setConfiguration(con
 };
 
 /**
- * Set the local MediaStreamTracks and {@link DataTrackSender}s on the
+ * Set the {@link DataTrackSender}s and {@link MediaTrackSenders} on the
  * {@link PeerConnectionManager}'s underlying {@link PeerConnectionV2}s.
- * @param {Array<MediaStreamTrack|DataTrackSender>} mediaStreamTracksAndDataTrackSenders
+ * @param {Array<DataTrackSender|MediaTrackSender>} trackSenders
  * @returns {this}
  */
-PeerConnectionManager.prototype.setMediaStreamTracksAndDataTrackSenders = function setMediaStreamTracksAndDataTrackSenders(mediaStreamTracksAndDataTrackSenders) {
-  var mediaStreamTracks = new Set();
-  var dataTrackSenders = new Set();
-  mediaStreamTracksAndDataTrackSenders.forEach(function(mediaStreamTrackOrDataTrackSender) {
-    if (mediaStreamTrackOrDataTrackSender.kind === 'data') {
-      dataTrackSenders.add(mediaStreamTrackOrDataTrackSender);
-    } else {
-      mediaStreamTracks.add(mediaStreamTrackOrDataTrackSender);
-    }
-  });
+PeerConnectionManager.prototype.setTrackSenders = function setTrackSenders(trackSenders) {
+  var dataTrackSenders = new Set(trackSenders.filter(function(trackSender) {
+    return trackSender.kind === 'data';
+  }));
+  var mediaTrackSenders = new Set(trackSenders.filter(function(trackSender) {
+    return trackSender.kind === 'audio' || trackSender.kind === 'video';
+  }));
 
-  if (this._dummyAudioMediaStreamTrack) {
-    mediaStreamTracks.add(this._dummyAudioMediaStreamTrack);
+  if (this._dummyAudioTrackSender) {
+    mediaTrackSenders.add(this._dummyAudioTrackSender);
   }
 
-  var changes = getMediaStreamTrackAndDataTrackSenderChanges(this, dataTrackSenders, mediaStreamTracks);
-
+  var changes = getTrackSenderChanges(this, dataTrackSenders, mediaTrackSenders);
   this._dataTrackSenders = dataTrackSenders;
-
-  applyMediaStreamTrackAndDataTrackSenderChanges(this, changes);
+  this._mediaTrackSenders = mediaTrackSenders;
+  applyTrackSenderChanges(this, changes);
 
   return this;
 };
@@ -51728,28 +51992,23 @@ function createDummyAudioMediaStreamTrack(audioContext) {
  */
 
 /**
- * Apply {@link MediaStreamTrackAndDataTrackSenderChanges}.
+ * Apply {@link TrackSenderChanges}.
  * @param {PeerConnectionManager} peerConnectionManager
- * @param {MediaStreamTrackAndDataTrackSenderChanges} changes
+ * @param {TrackSenderChanges} changes
  * @returns {void}
  */
-function applyMediaStreamTrackAndDataTrackSenderChanges(peerConnectionManager, changes) {
+function applyTrackSenderChanges(peerConnectionManager, changes) {
   if (changes.data.add.size
     || changes.data.remove.size
     || changes.media.add.size
     || changes.media.remove.size) {
-    changes.media.remove.forEach(peerConnectionManager._localMediaStream.removeTrack, peerConnectionManager._localMediaStream);
-    changes.media.add.forEach(peerConnectionManager._localMediaStream.addTrack, peerConnectionManager._localMediaStream);
-
     peerConnectionManager._peerConnections.forEach(function(peerConnection) {
-      peerConnection.removeMediaStream(this._localMediaStream);
-      peerConnection.addMediaStream(this._localMediaStream);
-
       changes.data.remove.forEach(peerConnection.removeDataTrackSender, peerConnection);
+      changes.media.remove.forEach(peerConnection.removeMediaTrackSender, peerConnection);
       changes.data.add.forEach(peerConnection.addDataTrackSender, peerConnection);
-
+      changes.media.add.forEach(peerConnection.addMediaTrackSender, peerConnection);
       peerConnection.offer();
-    }, peerConnectionManager);
+    });
   }
 }
 
@@ -51760,14 +52019,14 @@ function applyMediaStreamTrackAndDataTrackSenderChanges(peerConnectionManager, c
  */
 
 /**
- * Get {@Link DataTrackSender} changes.
+ * Get the {@Link DataTrackSender} changes.
  * @param {PeerConnectionManager} peerConnectionManager
  * @param {Array<DataTrackSender>} dataTrackSenders
  * @returns {DataTrackSenderChanges} changes
  */
 function getDataTrackSenderChanges(peerConnectionManager, dataTrackSenders) {
-  var dataTrackSendersToRemove = util.difference(peerConnectionManager._dataTrackSenders, dataTrackSenders);
   var dataTrackSendersToAdd = util.difference(dataTrackSenders, peerConnectionManager._dataTrackSenders);
+  var dataTrackSendersToRemove = util.difference(peerConnectionManager._dataTrackSenders, dataTrackSenders);
   return {
     add: dataTrackSendersToAdd,
     remove: dataTrackSendersToRemove
@@ -51775,43 +52034,43 @@ function getDataTrackSenderChanges(peerConnectionManager, dataTrackSenders) {
 }
 
 /**
- * @interface MediaStreamTrackAndDataTrackSenderChanges
+ * @interface TrackSenderChanges
  * @property {DataTrackSenderChanges} data
- * @property {MediaStreamTrackChanges} media
+ * @property {MediaTrackSenderChanges} media
  */
 
 /**
- * Get {@link DataTrackSender} and MediaStreamTrack changes.
+ * Get {@link DataTrackSender} and {@link MediaTrackSender} changes.
  * @param {PeerConnectionManager} peerConnectionManager
  * @param {Array<DataTrackSender>} dataTrackSenders
- * @param {Array<MediaStreamTrack>} mediaStreamTracks
- * @returns {MediaStreamTrackAndDataTrackSenderChanges} changes
+ * @param {Array<MediaTrackSender>} mediaTrackSenders
+ * @returns {TrackSenderChanges} changes
  */
-function getMediaStreamTrackAndDataTrackSenderChanges(peerConnectionManager, dataTrackSenders, mediaStreamTracks) {
+function getTrackSenderChanges(peerConnectionManager, dataTrackSenders, mediaTrackSenders) {
   return {
     data: getDataTrackSenderChanges(peerConnectionManager, dataTrackSenders),
-    media: getMediaStreamTrackChanges(peerConnectionManager, mediaStreamTracks)
+    media: getMediaTrackSenderChanges(peerConnectionManager, mediaTrackSenders)
   };
 }
 
 /**
- * @interface MediaStreamTrackChanges
- * @property {Set<MediaStreamTrack>} add
- * @property {Set<MediaStreamTrack>} remove
+ * @interface MediaTrackSenderChanges
+ * @property {Set<MediaTrackSender>} add
+ * @property {Set<MediaTrackSender>} remove
  */
 
 /**
- * Get MediaStreamTrack changes.
+ * Get the {@link MediaTrackSender} changes.
  * @param {PeerConnectionManager} peerConnectionManager
- * @param {Array<MediaStreamTrack>} mediaStreamTracks
- * @returns {MediaStreamTrackChanges} changes
+ * @param {Array<MediaTrackSender>} mediaTrackSenders
+ * @returns {MediaTrackSenderChanges} changes
  */
-function getMediaStreamTrackChanges(peerConnectionManager, mediaStreamTracks) {
-  var mediaStreamTracksToRemove = util.difference(peerConnectionManager._localMediaStream.getTracks(), mediaStreamTracks);
-  var mediaStreamTracksToAdd = util.difference(mediaStreamTracks, peerConnectionManager._localMediaStream.getTracks());
+function getMediaTrackSenderChanges(peerConnectionManager, mediaTrackSenders) {
+  var mediaTrackSendersToAdd = util.difference(mediaTrackSenders, peerConnectionManager._mediaTrackSenders);
+  var mediaTrackSendersToRemove = util.difference(peerConnectionManager._mediaTrackSenders, mediaTrackSenders);
   return {
-    add: mediaStreamTracksToAdd,
-    remove: mediaStreamTracksToRemove
+    add: mediaTrackSendersToAdd,
+    remove: mediaTrackSendersToRemove
   };
 }
 
@@ -51819,14 +52078,14 @@ module.exports = PeerConnectionManager;
 
 
 /***/ }),
-/* 314 */
+/* 319 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var RecordingSignaling = __webpack_require__(120);
+var RecordingSignaling = __webpack_require__(123);
 
 /**
  * Construct a {@link RecordingV2}.
@@ -51871,28 +52130,28 @@ module.exports = RecordingV2;
 
 
 /***/ }),
-/* 315 */
+/* 320 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var RemoteParticipantSignaling = __webpack_require__(305);
-var RemoteTrackV2 = __webpack_require__(316);
+var RemoteParticipantSignaling = __webpack_require__(310);
+var RemoteTrackV2 = __webpack_require__(321);
 
 /**
  * Construct a {@link RemoteParticipantV2}.
  * @class
  * @extends RemoteParticipantSignaling
  * @param {object} participantState
- * @param {function(string): Promise<MediaStreamTrack|DataTrackReceiver>} getMediaStreamTrackOrDataTrackTransceiver
+ * @param {function(string): Promise<DataTrackReceiver|MediaTrackReceiver>} getTrackReceiver
  * @param {object} [options]
  * @property {?number} revision
  */
-function RemoteParticipantV2(participantState, getMediaStreamTrackOrDataTrackTransceiver, options) {
+function RemoteParticipantV2(participantState, getTrackReceiver, options) {
   if (!(this instanceof RemoteParticipantV2)) {
-    return new RemoteParticipantV2(participantState, getMediaStreamTrackOrDataTrackTransceiver, options);
+    return new RemoteParticipantV2(participantState, getTrackReceiver, options);
   }
 
   RemoteParticipantSignaling.call(this, participantState.sid, participantState.identity);
@@ -51909,8 +52168,8 @@ function RemoteParticipantV2(participantState, getMediaStreamTrackOrDataTrackTra
     _RemoteTrackV2: {
       value: options.RemoteTrackV2
     },
-    _getMediaStreamTrackOrDataTrackTransceiver: {
-      value: getMediaStreamTrackOrDataTrackTransceiver
+    _getTrackReceiver: {
+      value: getTrackReceiver
     },
     revision: {
       enumerable: true,
@@ -51974,11 +52233,7 @@ RemoteParticipantV2.prototype.update = function update(participantState) {
  */
 RemoteParticipantV2.prototype.addTrack = function addTrack(track) {
   RemoteParticipantSignaling.prototype.addTrack.call(this, track);
-
-  this._getMediaStreamTrackOrDataTrackTransceiver(track.id).then(function(mediaStreamTrackOrTrackReceiver) {
-    track.setMediaStreamTrackOrDataTrackTransceiver(mediaStreamTrackOrTrackReceiver);
-  });
-
+  this._getTrackReceiver(track.id).then(track.setTrackTransceiver.bind(track));
   return this;
 };
 
@@ -51986,14 +52241,14 @@ module.exports = RemoteParticipantV2;
 
 
 /***/ }),
-/* 316 */
+/* 321 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var RemoteTrackSignaling = __webpack_require__(306);
+var RemoteTrackSignaling = __webpack_require__(311);
 
 /**
  * Construct a {@link RemoteTrackV2}.
@@ -52037,17 +52292,18 @@ module.exports = RemoteTrackV2;
 
 
 /***/ }),
-/* 317 */
+/* 322 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var RecordingV2 = __webpack_require__(314);
-var RoomSignaling = __webpack_require__(121);
-var RemoteParticipantV2 = __webpack_require__(315);
+var RecordingV2 = __webpack_require__(319);
+var RoomSignaling = __webpack_require__(124);
+var RemoteParticipantV2 = __webpack_require__(320);
 var util = __webpack_require__(5);
+var createTwilioError = __webpack_require__(18).createTwilioError;
 
 var STATS_PUBLISH_INTERVAL_MS = 1000;
 
@@ -52070,16 +52326,30 @@ function RoomV2(localParticipant, initialState, transport, peerConnectionManager
     _peerConnectionManager: {
       value: peerConnectionManager
     },
+    _published: {
+      value: new Map()
+    },
+    _publishedRevision: {
+      value: 0,
+      writable: true
+    },
     _RemoteParticipantV2: {
       value: options.RemoteParticipantV2
+    },
+    _subscribed: {
+      value: new Map()
+    },
+    _subscribedRevision: {
+      value: 0,
+      writable: true
+    },
+    _subscriptionFailures: {
+      value: new Map()
     },
     _transport: {
       value: transport
     },
-    _trackIdToParticipants: {
-      value: new Map()
-    },
-    _mediaStreamTrackAndDataTrackReceiverDeferreds: {
+    _trackReceiverDeferreds: {
       value: new Map()
     }
   });
@@ -52094,36 +52364,36 @@ function RoomV2(localParticipant, initialState, transport, peerConnectionManager
 
 inherits(RoomV2, RoomSignaling);
 
-RoomV2.prototype._deleteMediaStreamTrackOrDataTrackReceiverDeferred = function _deleteMediaStreamTrackOrDataTrackReceiverDeferred(id) {
-  return this._mediaStreamTrackAndDataTrackReceiverDeferreds.delete(id);
+RoomV2.prototype._deleteTrackReceiverDeferred = function _deleteTrackReceiverDeferred(id) {
+  return this._trackReceiverDeferreds.delete(id);
 };
 
-RoomV2.prototype._getOrCreateMediaStreamTrackOrDataTrackReceiverDeferred = function _getOrCreateMediaStreamTrackOrDataTrackReceiverDeferred(id) {
-  var deferred = this._mediaStreamTrackAndDataTrackReceiverDeferreds.get(id) || util.defer();
-  var mediaStreamTracksAndDataTrackReceivers = this._peerConnectionManager.getRemoteMediaStreamTracksAndDataTrackReceivers();
+RoomV2.prototype._getOrCreateTrackReceiverDeferred = function _getOrCreateTrackReceiverDeferred(id) {
+  var deferred = this._trackReceiverDeferreds.get(id) || util.defer();
+  var trackReceivers = this._peerConnectionManager.getTrackReceivers();
 
   // NOTE(mmalavalli): In Firefox, there can be instances where a MediaStreamTrack
   // for the given Track ID already exists, for example, when a Track is removed
   // and added back. If that is the case, then we should resolve 'deferred'.
-  var mediaStreamTrackOrDataTrackReceiver = mediaStreamTracksAndDataTrackReceivers.find(function(track) {
-    return track.id === id && track.readyState !== 'ended';
+  var trackReceiver = trackReceivers.find(function(trackReceiver) {
+    return trackReceiver.id === id && trackReceiver.readyState !== 'ended';
   });
 
-  if (mediaStreamTrackOrDataTrackReceiver) {
-    deferred.resolve(mediaStreamTrackOrDataTrackReceiver);
+  if (trackReceiver) {
+    deferred.resolve(trackReceiver);
   } else {
     // NOTE(mmalavalli): Only add the 'deferred' to the map if it's not
     // resolved. This will prevent old copies of the MediaStreamTrack from
     // being used when the remote peer removes and re-adds a MediaStreamTrack.
-    this._mediaStreamTrackAndDataTrackReceiverDeferreds.set(id, deferred);
+    this._trackReceiverDeferreds.set(id, deferred);
   }
 
   return deferred;
 };
 
-RoomV2.prototype._addMediaStreamTrackOrDataTrackReceiver = function _addMediaStreamTrackOrDataTrackReceiver(mediaStreamTrackOrDataTrackReceiver) {
-  var deferred = this._getOrCreateMediaStreamTrackOrDataTrackReceiverDeferred(mediaStreamTrackOrDataTrackReceiver.id);
-  deferred.resolve(mediaStreamTrackOrDataTrackReceiver);
+RoomV2.prototype._addTrackReceiver = function _addTrackReceiver(trackReceiver) {
+  var deferred = this._getOrCreateTrackReceiverDeferred(trackReceiver.id);
+  deferred.resolve(trackReceiver);
   return this;
 };
 
@@ -52141,11 +52411,11 @@ RoomV2.prototype._disconnect = function _disconnect(error) {
   return didDisconnect;
 };
 
-RoomV2.prototype._getMediaStreamTrackOrDataTrackReceiver = function _getMediaStreamTrackOrDataTrackReceiver(id) {
+RoomV2.prototype._getTrackReceiver = function _getTrackReceiver(id) {
   var self = this;
-  return this._getOrCreateMediaStreamTrackOrDataTrackReceiverDeferred(id).promise.then(function(mediaStreamTrackOrDataTrackReceiver) {
-    self._deleteMediaStreamTrackOrDataTrackReceiverDeferred(id);
-    return mediaStreamTrackOrDataTrackReceiver;
+  return this._getOrCreateTrackReceiverDeferred(id).promise.then(function(trackReceiver) {
+    self._deleteTrackReceiverDeferred(id);
+    return trackReceiver;
   });
 };
 
@@ -52154,7 +52424,7 @@ RoomV2.prototype._getOrCreateRemoteParticipant = function _getOrCreateRemotePart
   var participant = this.participants.get(participantState.sid);
   var self = this;
   if (!participant) {
-    participant = new RemoteParticipantV2(participantState, this._getMediaStreamTrackOrDataTrackReceiver.bind(this));
+    participant = new RemoteParticipantV2(participantState, this._getTrackReceiver.bind(this));
     participant.on('stateChanged', function stateChanged(state) {
       if (state === 'disconnected') {
         participant.removeListener('stateChanged', stateChanged);
@@ -52188,6 +52458,18 @@ RoomV2.prototype._publishPeerConnectionState = function _publishPeerConnectionSt
 RoomV2.prototype._update = function _update(roomState) {
   var participantsToKeep = new Set();
 
+  if (roomState.subscribed && roomState.subscribed.revision > this._subscribedRevision) {
+    this._subscribedRevision = roomState.subscribed.revision;
+    roomState.subscribed.tracks.forEach(function(trackState) {
+      if (trackState.id) {
+        this._subscriptionFailures.delete(trackState.sid);
+        this._subscribed.set(trackState.id, trackState.sid);
+      } else if (trackState.error && !this._subscriptionFailures.has(trackState.sid)) {
+        this._subscriptionFailures.set(trackState.sid, trackState.error);
+      }
+    }, this);
+  }
+
   // TODO(mroberts): Remove me once the Server is fixed.
   (roomState.participants || []).forEach(function(participantState) {
     if (participantState.sid === this.localParticipant.sid ||
@@ -52199,6 +52481,8 @@ RoomV2.prototype._update = function _update(roomState) {
     participantsToKeep.add(participant);
   }, this);
 
+  handleSubscriptionFailures(this);
+
   // TODO(mroberts): Remove me once the Server is fixed.
   /* eslint camelcase:0 */
   if (roomState.peer_connections) {
@@ -52209,7 +52493,13 @@ RoomV2.prototype._update = function _update(roomState) {
     this.recording.update(roomState.recording);
   }
 
-  if (roomState.published) {
+  if (roomState.published && roomState.published.revision > this._publishedRevision) {
+    this._publishedRevision = roomState.published.revision;
+    roomState.published.tracks.forEach(function(track) {
+      if (track.sid) {
+        this._published.set(track.id, track.sid);
+      }
+    }, this);
     this.localParticipant.update(roomState.published);
   }
 
@@ -52227,7 +52517,26 @@ RoomV2.prototype._update = function _update(roomState) {
  * @returns {Promise.<Array<StatsReport>>}
  */
 RoomV2.prototype.getStats = function getStats() {
-  return this._peerConnectionManager.getStats();
+  var self = this;
+
+  function filterLocalTrackStats(trackStats) {
+    return self._published.has(trackStats.trackId);
+  }
+
+  function filterRemoteTrackStats(trackStats) {
+    return self._subscribed.has(trackStats.trackId);
+  }
+
+  return this._peerConnectionManager.getStats().then(function(reports) {
+    return reports.map(function(report) {
+      return Object.assign({}, report, {
+        localAudioTrackStats: report.localAudioTrackStats.filter(filterLocalTrackStats),
+        localVideoTrackStats: report.localVideoTrackStats.filter(filterLocalTrackStats),
+        remoteAudioTrackStats: report.remoteAudioTrackStats.filter(filterRemoteTrackStats),
+        remoteVideoTrackStats: report.remoteVideoTrackStats.filter(filterRemoteTrackStats),
+      });
+    });
+  });
 };
 
 /**
@@ -52250,15 +52559,25 @@ function handleLocalParticipantEvents(roomV2, localParticipant) {
   });
 
   function renegotiate() {
-    var mediaStreamTracksAndDataTrackSenders = util.flatMap(localParticipant.tracks, function(track) {
-      return track.mediaStreamTrackOrDataTrackTransceiver;
+    var trackSenders = util.flatMap(localParticipant.tracks, function(trackV2) {
+      return trackV2.trackTransceiver;
     });
-    peerConnectionManager.setMediaStreamTracksAndDataTrackSenders(mediaStreamTracksAndDataTrackSenders);
+    peerConnectionManager.setTrackSenders(trackSenders);
   }
 
   function addListener(track) {
+    var trackSid = track.sid;
+
     function updated() {
-      roomV2._publishNewLocalParticipantState();
+      // NOTE(mmalavalli): The LocalParticipantV2's state is only published if
+      // the "updated" event is emitted due to LocalTrackPublicationV2's
+      // .isEnabled being toggled. We do not publish if it is fired due to the
+      // LocalTrackPublicationV2's .sid being set.
+      if (trackSid === track.sid) {
+        roomV2._publishNewLocalParticipantState();
+      } else {
+        trackSid = track.sid;
+      }
     }
 
     track.on('updated', updated);
@@ -52310,12 +52629,9 @@ function handlePeerConnectionEvents(roomV2, peerConnectionManager) {
   });
   peerConnectionManager.dequeue('candidates');
 
-  peerConnectionManager.on('trackAdded', roomV2._addMediaStreamTrackOrDataTrackReceiver.bind(roomV2));
+  peerConnectionManager.on('trackAdded', roomV2._addTrackReceiver.bind(roomV2));
   peerConnectionManager.dequeue('trackAdded');
-
-  peerConnectionManager.getRemoteMediaStreamTracksAndDataTrackReceivers().forEach(function(mediaStreamTrackOrDataTrackReceiver) {
-    roomV2._addMediaStreamTrackOrDataTrackReceiver(mediaStreamTrackOrDataTrackReceiver);
-  });
+  peerConnectionManager.getTrackReceivers().forEach(roomV2._addTrackReceiver, roomV2);
 }
 
 function handleTransportEvents(roomV2, transport) {
@@ -52365,11 +52681,26 @@ function periodicallyPublishStats(roomV2, localParticipant, transport, intervalM
   });
 }
 
+function handleSubscriptionFailures(room) {
+  var remoteTracks = new Map(util.flatMap(room.participants, function(participant) {
+    return Array.from(participant.tracks.values()).map(function(track) {
+      return [track.sid, track];
+    });
+  }));
+
+  room._subscriptionFailures.forEach(function(error, trackSid) {
+    var remoteTrack = remoteTracks.get(trackSid);
+    if (remoteTrack) {
+      room._subscriptionFailures.delete(trackSid);
+      remoteTrack.subscribeFailed(createTwilioError(error.code, error.message));
+    }
+  });
+}
 module.exports = RoomV2;
 
 
 /***/ }),
-/* 318 */
+/* 323 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -52377,14 +52708,14 @@ module.exports = RoomV2;
 
 var constants = __webpack_require__(9);
 var inherits = __webpack_require__(1).inherits;
-var packageInfo = __webpack_require__(75);
-var InsightsPublisher = __webpack_require__(325);
-var NullInsightsPublisher = __webpack_require__(326);
-var SIP = __webpack_require__(72);
-var DefaultSIPJSMediaHandler = __webpack_require__(123);
-var StateMachine = __webpack_require__(33);
+var packageInfo = __webpack_require__(76);
+var InsightsPublisher = __webpack_require__(330);
+var NullInsightsPublisher = __webpack_require__(331);
+var SIP = __webpack_require__(74);
+var DefaultSIPJSMediaHandler = __webpack_require__(126);
+var StateMachine = __webpack_require__(34);
 var util = __webpack_require__(5);
-var TwilioErrors = __webpack_require__(20);
+var TwilioErrors = __webpack_require__(18);
 var createTwilioError = TwilioErrors.createTwilioError;
 var SignalingConnectionError = TwilioErrors.SignalingConnectionError;
 var SignalingConnectionTimeoutError = TwilioErrors.SignalingConnectionTimeoutError;
@@ -52952,14 +53283,14 @@ module.exports = Transport;
 
 
 /***/ }),
-/* 319 */
+/* 324 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var LocalTrackStats = __webpack_require__(124);
+var LocalTrackStats = __webpack_require__(127);
 
 /**
  * Statistics for a {@link LocalAudioTrack}.
@@ -53001,14 +53332,14 @@ module.exports = LocalAudioTrackStats;
 
 
 /***/ }),
-/* 320 */
+/* 325 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var LocalTrackStats = __webpack_require__(124);
+var LocalTrackStats = __webpack_require__(127);
 
 /**
  * Statistics for a {@link LocalVideoTrack}.
@@ -53088,14 +53419,14 @@ module.exports = LocalVideoTrackStats;
 
 
 /***/ }),
-/* 321 */
+/* 326 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var RemoteTrackStats = __webpack_require__(125);
+var RemoteTrackStats = __webpack_require__(128);
 
 /**
  * Statistics for an {@link AudioTrack}.
@@ -53131,14 +53462,14 @@ module.exports = RemoteAudioTrackStats;
 
 
 /***/ }),
-/* 322 */
+/* 327 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
 var inherits = __webpack_require__(1).inherits;
-var RemoteTrackStats = __webpack_require__(125);
+var RemoteTrackStats = __webpack_require__(128);
 
 /**
  * Statistics for a {@link VideoTrack}.
@@ -53189,16 +53520,16 @@ module.exports = RemoteVideoTrackStats;
 
 
 /***/ }),
-/* 323 */
+/* 328 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-var LocalAudioTrackStats = __webpack_require__(319);
-var LocalVideoTrackStats = __webpack_require__(320);
-var RemoteAudioTrackStats = __webpack_require__(321);
-var RemoteVideoTrackStats = __webpack_require__(322);
+var LocalAudioTrackStats = __webpack_require__(324);
+var LocalVideoTrackStats = __webpack_require__(325);
+var RemoteAudioTrackStats = __webpack_require__(326);
+var RemoteVideoTrackStats = __webpack_require__(327);
 
 /**
  * Statistics report for an RTCPeerConnection.
@@ -53251,7 +53582,7 @@ module.exports = StatsReport;
 
 
 /***/ }),
-/* 324 */
+/* 329 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -53305,7 +53636,7 @@ module.exports = Filter;
 
 
 /***/ }),
-/* 325 */
+/* 330 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -53319,7 +53650,7 @@ var RECONNECT_INTERVAL_MS = 50;
 var WS_CLOSE_NORMAL = 1000;
 
 var toplevel = global.window || global;
-var WebSocket = toplevel.WebSocket ? toplevel.WebSocket : __webpack_require__(127);
+var WebSocket = toplevel.WebSocket ? toplevel.WebSocket : __webpack_require__(131);
 
 /**
  * Publish events to the Insights gateway.
@@ -53575,7 +53906,7 @@ module.exports = InsightsPublisher;
 /* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(47)))
 
 /***/ }),
-/* 326 */
+/* 331 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -53621,7 +53952,703 @@ module.exports = InsightsPublisher;
 
 
 /***/ }),
-/* 327 */
+/* 332 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var RTCSessionDescription = __webpack_require__(19).RTCSessionDescription;
+
+var createPtToCodecName = __webpack_require__(22).createPtToCodecName;
+var getMediaSections = __webpack_require__(22).getMediaSections;
+
+/**
+ * An RTX payload type
+ * @typedef {PT} RtxPT
+ */
+
+/**
+ * A non-RTX payload type
+ * @typedef {PT} NonRtxPT
+ */
+
+/**
+ * A Set with at least one element
+ * @typedef {Set} NonEmptySet
+ */
+
+/**
+ * Apply the workaround for Issue 8329 to an RTCSessionDescriptionInit.
+ * @param {RTCSessionDescriptionInit} description
+ * @returns {RTCSessionDescription} newDescription
+ */
+function workaround(description) {
+  var descriptionInit = { type: description.type };
+  if (description.type !== 'rollback') {
+    descriptionInit.sdp = sdpWorkaround(description.sdp);
+  }
+  return new RTCSessionDescription(descriptionInit);
+}
+
+/**
+ * @param {string} sdp
+ * @returns {string} newSdp
+ */
+function sdpWorkaround(sdp) {
+  var mediaSections = getMediaSections(sdp);
+  var session = sdp.split('\r\nm=')[0];
+  return [session]
+    .concat(mediaSections.map(mediaSectionWorkaround))
+    .join('\r\n');
+}
+
+/**
+ * @param {string} mediaSection
+ * @returns {string} newMediaSection
+ */
+function mediaSectionWorkaround(mediaSection) {
+  var ptToCodecName = createPtToCodecName(mediaSection);
+  var codecNameToPts = createCodecNameToPts(ptToCodecName);
+  var rtxPts = codecNameToPts.get('rtx') || new Set();
+
+  var invalidRtxPts = new Set();
+  var rtxPtToAssociatedPt = createRtxPtToAssociatedPt(
+    mediaSection, ptToCodecName, rtxPts, invalidRtxPts);
+  var associatedPtToRtxPt = createAssociatedPtToRtxPt(
+    rtxPtToAssociatedPt, invalidRtxPts);
+
+  var unassociatedRtxPts = Array.from(invalidRtxPts);
+
+  // NOTE(mroberts): We normalize to lowercase.
+  var knownCodecNames = ['h264', 'vp8', 'vp9'];
+  var unassociatedPts = knownCodecNames.reduce(function(unassociatedPts, codecName) {
+    var pts = codecNameToPts.get(codecName) || new Set();
+    return Array.from(pts).reduce(function(unassociatedPts, pt) {
+      return associatedPtToRtxPt.has(pt)
+        ? unassociatedPts
+        : unassociatedPts.add(pt);
+    }, unassociatedPts);
+  }, new Set());
+
+  unassociatedPts.forEach(function(pt) {
+    if (unassociatedRtxPts.length) {
+      var rtxPt = unassociatedRtxPts.shift();
+      mediaSection = deleteFmtpAttributesForRtxPt(mediaSection, rtxPt);
+      mediaSection = addFmtpAttributeForRtxPt(mediaSection, rtxPt, pt);
+    }
+  });
+
+  unassociatedRtxPts.forEach(function(rtxPt) {
+    mediaSection = deleteFmtpAttributesForRtxPt(mediaSection, rtxPt);
+    mediaSection = deleteRtpmapAttributesForRtxPt(mediaSection, rtxPt);
+  });
+
+  return mediaSection;
+}
+
+/**
+ * @param {Map<PT, Codec>} ptToCodecName
+ * @returns {Map<string, NonEmptySet<PT>>} codecNameToPts
+ */
+function createCodecNameToPts(ptToCodecName) {
+  var codecNameToPts = new Map();
+  ptToCodecName.forEach(function(codecName, pt) {
+    var pts = codecNameToPts.get(codecName) || new Set();
+    return codecNameToPts.set(codecName, pts.add(pt));
+  });
+  return codecNameToPts;
+}
+
+/**
+ * @param {string} mediaSection
+ * @param {Map<PT, Codec>} ptToCodecName
+ * @param {Set<RtxPT>} rtxPts
+ * @param {Set<RtxPT>} invalidRtxPts
+ * @returns {Map<RtxPT, NonRtxPT>} rtxPtToAssociatedPt
+ */
+function createRtxPtToAssociatedPt(mediaSection, ptToCodecName, rtxPts, invalidRtxPts) {
+  return Array.from(rtxPts).reduce(function(rtxPtToAssociatedPt, rtxPt) {
+    var fmtpPattern = new RegExp('a=fmtp:' + rtxPt + ' apt=(\\d+)');
+    var matches = mediaSection.match(fmtpPattern);
+    if (!matches) {
+      invalidRtxPts.add(rtxPt);
+      return rtxPtToAssociatedPt;
+    }
+
+    var pt = Number.parseInt(matches[1]);
+    if (!ptToCodecName.has(pt)) {
+      // This is Issue 8329.
+      invalidRtxPts.add(rtxPt);
+      return rtxPtToAssociatedPt;
+    }
+
+    var codecName = ptToCodecName.get(pt);
+    if (codecName === 'rtx') {
+      // Strange
+      invalidRtxPts.add(rtxPt);
+      return rtxPtToAssociatedPt;
+    }
+
+    return rtxPtToAssociatedPt.set(rtxPt, pt);
+  }, new Map());
+}
+
+/**
+ * @param {string} mediaSection
+ * @param {Map<RtxPT, NonRtxPT>} rtxPtToAssociatedPt
+ * @param {Set<RtxPT>} invalidRtxPts
+ * @returns {Map<NonRtxPT, RtxPT>} associatedPtToRtxPt
+ */
+function createAssociatedPtToRtxPt(rtxPtToAssociatedPt, invalidRtxPts) {
+  // First, we construct a Map<NonRtxPT, NonEmptySet<RtxPT>>.
+  var associatedPtToRtxPts = Array.from(rtxPtToAssociatedPt).reduce(function(associatedPtToRtxPts, pair) {
+    var rtxPt = pair[0];
+    var pt = pair[1];
+    var rtxPts = associatedPtToRtxPts.get(pt) || new Set();
+    return associatedPtToRtxPts.set(pt, rtxPts.add(rtxPt));
+  }, new Map());
+
+  // Then, we filter down to a Map<NonRtxPT, RtxPt>. Any RtxPTs that map to the
+  // same NonRtxPT are removed and added to invalidRtxPts.
+  return Array.from(associatedPtToRtxPts).reduce(function(associatedPtToRtxPt, pair) {
+    var pt = pair[0];
+    var rtxPts = Array.from(pair[1]);
+    if (rtxPts.length > 1) {
+      rtxPts.forEach(function(rtxPt) {
+        invalidRtxPts.add(rtxPt);
+      });
+      return associatedPtToRtxPt;
+    }
+    return associatedPtToRtxPt.set(pt, rtxPts[0]);
+  }, new Map());
+}
+
+/**
+ * @param {string} mediaSection
+ * @param {RtxPT} rtxPt
+ * @returns {string} newMediaSection
+ */
+function deleteFmtpAttributesForRtxPt(mediaSection, rtxPt) {
+  var pattern = new RegExp('a=fmtp:' + rtxPt + '.*\r\n', 'gm');
+  return mediaSection.replace(pattern, '');
+}
+
+/**
+ * @param {string} mediaSection
+ * @param {RtxPT} rtxPt
+ * @returns {string} newMediaSection
+ */
+function deleteRtpmapAttributesForRtxPt(mediaSection, rtxPt) {
+  var pattern = new RegExp('a=rtpmap:' + rtxPt + '.*\r\n', 'gm');
+  return mediaSection.replace(pattern, '');
+}
+
+/**
+ * @param {string} mediaSection
+ * @param {RtxPT} rtxPt
+ * @param {NonRtxPT} pt
+ * @returns {string} newMediaSection
+ */
+function addFmtpAttributeForRtxPt(mediaSection, rtxPt, pt) {
+  return mediaSection + 'a=fmtp:' + rtxPt + ' apt=' + pt + '\r\n';
+}
+
+module.exports = workaround;
+
+
+/***/ }),
+/* 333 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var difference = __webpack_require__(5).difference;
+var flatMap = __webpack_require__(5).flatMap;
+
+/**
+ * Create a random {@link SSRC}.
+ * @returns {SSRC}
+ */
+function createSSRC() {
+  var ssrcMax = 0xffffffff;
+  return String(Math.floor(Math.random() * ssrcMax));
+}
+
+/**
+ * Construct a {@link MediaStreamTrack} attribute store.
+ * @class
+ * @param {Track.ID} trackId - The MediaStreamTrack ID
+ * @param {string} streamId - The MediaStream ID
+ * @param {string} cName - The MediaStream cname
+ * @property {string} cName
+ * @property {boolean} isSimulcastEnabled
+ * @property {Map<RtxSSRC, PrimarySSRC>} rtxPairs
+ * @property {Set<PrimarySSRC>} primarySSRCs
+ * @property {string} streamId
+ * @property {Track.ID} trackId
+ */
+function TrackAttributes(trackId, streamId, cName) {
+  Object.defineProperties(this, {
+    cName: {
+      enumerable: true,
+      value: cName
+    },
+    isSimulcastEnabled: {
+      enumerable: true,
+      value: false,
+      writable: true
+    },
+    primarySSRCs: {
+      enumerable: true,
+      value: new Set()
+    },
+    rtxPairs: {
+      enumerable: true,
+      value: new Map()
+    },
+    streamId: {
+      enumerable: true,
+      value: streamId
+    },
+    trackId: {
+      enumerable: true,
+      value: trackId
+    }
+  });
+}
+
+/**
+ * Add {@link SimSSRC}s to the {@link TrackAttributes}.
+ * @returns {void}
+ */
+TrackAttributes.prototype.addSimulcastSSRCs = function addSimulcastSSRCs() {
+  if (this.isSimulcastEnabled) {
+    return;
+  }
+  var simulcastSSRCs = [createSSRC(), createSSRC()];
+  simulcastSSRCs.forEach(function(ssrc) {
+    this.primarySSRCs.add(ssrc);
+  }, this);
+
+  if (this.rtxPairs.size) {
+    simulcastSSRCs.forEach(function(ssrc) {
+      this.rtxPairs.set(createSSRC(), ssrc);
+    }, this);
+  }
+};
+
+/**
+ * Add the given {@link PrimarySSRC} or {@link RtxSSRC} to the {@link TrackAttributes}
+ * and update the "isSimulcastEnabled" flag if it is also a {@link SimSSRC}.
+ * @param {SSRC} ssrc - The {@link SSRC} to be added
+ * @param {?PrimarySSRC} primarySSRC - The {@link PrimarySSRC}; if the given
+ *   {@link SSRC} itself is the {@link PrimarySSRC}, then this is set to null
+ * @param {boolean} isSimSSRC - true if the given {@link SSRC} is a
+ *   {@link SimSSRC}; false otherwise
+ * @returns {void}
+ */
+TrackAttributes.prototype.addSSRC = function addSSRC(ssrc, primarySSRC, isSimSSRC) {
+  if (primarySSRC) {
+    this.rtxPairs.set(ssrc, primarySSRC);
+  } else {
+    this.primarySSRCs.add(ssrc);
+  }
+  this.isSimulcastEnabled = this.isSimulcastEnabled || isSimSSRC;
+};
+
+/**
+ * Construct the SDP lines for the {@link TrackAttributes}.
+ * @returns {Array<string>} Array of SDP lines
+ */
+TrackAttributes.prototype.toSdpLines = function toSdpLines() {
+  var rtxPairs = Array.from(this.rtxPairs.entries()).map(function(rtxPair) {
+    return rtxPair.reverse();
+  });
+
+  var simSSRCs = Array.from(this.primarySSRCs.values());
+  var ssrcs = rtxPairs.length ? flatMap(rtxPairs) : simSSRCs;
+  var self = this;
+
+  var attrLines = flatMap(ssrcs, function(ssrc) {
+    return [
+      'a=ssrc:' + ssrc + ' cname:' + self.cName,
+      'a=ssrc:' + ssrc + ' msid:' + self.streamId + ' ' + self.trackId
+    ];
+  });
+  var rtxPairLines = rtxPairs.map(function(rtxPair) {
+    return 'a=ssrc-group:FID ' + rtxPair.join(' ');
+  });
+  var simGroupLines = [
+    'a=ssrc-group:SIM ' + simSSRCs.join(' ')
+  ];
+
+  return rtxPairLines.concat(attrLines).concat(simGroupLines);
+};
+
+/**
+ * Get the matches for a given RegEx pattern.
+ * @param {string} section - SDP media section
+ * @param {string} pattern - RegEx pattern
+ * @returns {Array<Array<string>>} - Array of pattern matches
+ */
+function getMatches(section, pattern) {
+  var matches = section.match(new RegExp(pattern, 'gm')) || [];
+  return matches.map(function(match) {
+    var matches = match.match(new RegExp(pattern)) || [];
+    return matches.slice(1);
+  });
+}
+
+/**
+ * Get the {@link SimSSRC}s that belong to a simulcast group.
+ * @param {string} section - SDP media section
+ * @returns {Set<SimSSRC>} Set of simulcast {@link SSRC}s
+ */
+function getSimulcastSSRCs(section) {
+  var simGroupPattern = '^a=ssrc-group:SIM ([0-9]+) ([0-9]+) ([0-9]+)$';
+  return new Set(flatMap(getMatches(section, simGroupPattern)));
+}
+
+/**
+ * Get the value of the given attribute for an SSRC.
+ * @param {string} section - SDP media section
+ * @param {SSRC} ssrc - {@link SSRC} whose attribute's value is to be determinded
+ * @param {string} attribute - {@link SSRC} attribute name
+ * @param {string} - {@link SSRC} attribute value
+ */
+function getSSRCAttribute(section, ssrc, attribute) {
+  var pattern = 'a=ssrc:' + ssrc + ' ' + attribute + ':(.+)';
+  return section.match(new RegExp(pattern))[1];
+}
+
+/**
+ * Create a Map of {@link PrimarySSRC}s and their {@link RtxSSRC}s.
+ * @param {string} section - SDP media section
+ * @returns {Map<RtxSSRC, PrimarySSRC>} - Map of {@link RtxSSRC}s and their
+ *   corresponding {@link PrimarySSRC}s
+ */
+function getSSRCRtxPairs(section) {
+  var rtxPairPattern = '^a=ssrc-group:FID ([0-9]+) ([0-9]+)$';
+  return new Map(getMatches(section, rtxPairPattern).map(function(pair) {
+    return pair.reverse();
+  }));
+}
+
+/**
+ * Create a Map of MediaStreamTrack IDs and their {@link TrackAttributes}.
+ * @param {string} section - SDP media section
+ * @returns {Map<Track.ID, TrackAttributes>}
+ */
+function createTrackIdsToAttributes(section) {
+  var simSSRCs = getSimulcastSSRCs(section);
+  var ssrcAttrTuples = getMatches(section, '^a=ssrc:([0-9]+) msid:([^\\s]+) ([^\\s]+)$');
+  var rtxPairs = getSSRCRtxPairs(section);
+
+  return ssrcAttrTuples.reduce(function(trackIdsToSSRCs, tuple) {
+    var ssrc = tuple[0];
+    var streamId = tuple[1];
+    var trackId = tuple[2];
+
+    var trackAttributes = trackIdsToSSRCs.get(trackId) || new TrackAttributes(
+      trackId,
+      streamId,
+      getSSRCAttribute(section, ssrc, 'cname'));
+
+    var primarySSRC = rtxPairs.get(ssrc) || null;
+    trackAttributes.addSSRC(ssrc, primarySSRC, simSSRCs.has(ssrc));
+    return trackIdsToSSRCs.set(trackId, trackAttributes);
+  }, new Map());
+}
+
+/**
+ * Apply simulcast settings to the given SDP media section.
+ * @param {string} section - SDP media section
+ * @param {Map<Track.ID, TrackAttributes>} trackIdsToAttributes - Existing
+ *   map which will be updated for new MediaStreamTrack IDs
+ * @returns {string} - The transformed SDP media section
+ */
+function setSimulcastInMediaSection(section, trackIdsToAttributes) {
+  var newTrackIdsToAttributes = createTrackIdsToAttributes(section);
+  var newTrackIds = Array.from(newTrackIdsToAttributes.keys());
+  var trackIds = Array.from(trackIdsToAttributes.keys());
+  var trackIdsToAdd = difference(newTrackIds, trackIds);
+  var trackIdsToIgnore = difference(trackIds, newTrackIds);
+
+  // Update "trackIdsToAttributes" with TrackAttributes for new
+  // MediaStreamTrack IDs.
+  var trackAttributesToAdd = flatMap(trackIdsToAdd, function(trackId) {
+    return newTrackIdsToAttributes.get(trackId);
+  });
+  trackAttributesToAdd.forEach(function(trackAttributes) {
+    trackAttributes.addSimulcastSSRCs();
+    trackIdsToAttributes.set(trackAttributes.trackId, trackAttributes);
+  });
+
+  // Get the SDP lines of the relevant MediaStreamTrack IDs from
+  // "trackIdsToAttributes".
+  trackIds = Array.from(trackIdsToAttributes.keys());
+  var relevantTrackIds = difference(trackIds, trackIdsToIgnore);
+  var relevantTrackAttributes = flatMap(relevantTrackIds, function(trackId) {
+    return trackIdsToAttributes.get(trackId);
+  });
+  var relevantSdpLines = flatMap(relevantTrackAttributes, function(trackAttributes) {
+    return trackAttributes.toSdpLines();
+  });
+
+  // Add the simulcast SSRC SDP lines to the media section. The Set ensures
+  // that the duplicates of the SSRC SDP lines that are in both "section" and
+  // "relevantSdpLines" are removed.
+  var sectionLines = new Set(section.split('\r\n').concat(relevantSdpLines));
+  return flatMap(sectionLines).join('\r\n');
+}
+
+/**
+ * String representing the SSRC of a MediaStreamTrack.
+ * @typedef {string} SSRC
+ */
+
+/**
+ * Primary SSRC.
+ * @typedef {SSRC} PrimarySSRC
+ */
+
+/**
+ * Retransmission SSRC.
+ * @typedef {SSRC} RtxSSRC
+ */
+
+/**
+ * Simulcast SSRC.
+ * @typedef {SSRC} SimSSRC
+ */
+
+module.exports = setSimulcastInMediaSection;
+
+
+/***/ }),
+/* 334 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Construct an {@link IdentityTrackMatcher}.
+ * @class
+ * @classdesc An {@link IdentityTrackMatcher} matches RTCTrackEvents
+ *   with their respective MediaStreamTrack IDs.
+ */
+function IdentityTrackMatcher() {
+  if (!(this instanceof IdentityTrackMatcher)) {
+    return new IdentityTrackMatcher();
+  }
+}
+
+/**
+ * Match a given MediaStreamTrack with its ID.
+ * @param {RTCTrackEvent} event
+ * @returns {Track.ID}
+ */
+IdentityTrackMatcher.prototype.match = function match(event) {
+  return event.track.id;
+};
+
+/**
+ * Update the {@link IdentityTrackMatcher} with a new SDP.
+ * @param {string} sdp
+ */
+IdentityTrackMatcher.prototype.update = function update(/* sdp */) {};
+
+module.exports = IdentityTrackMatcher;
+
+
+/***/ }),
+/* 335 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var getMediaSections = __webpack_require__(22).getMediaSections;
+
+/**
+ * Construct an {@link MIDTrackMatcher}.
+ * @class
+ * @classdesc An {@link MIDTrackMatcher} matches an RTCTrackEvent with a
+ *   MediaStreamTrack ID based on the MID of the underlying RTCRtpTransceiver.
+ */
+function MIDTrackMatcher() {
+  if (!(this instanceof MIDTrackMatcher)) {
+    return new MIDTrackMatcher();
+  }
+  Object.defineProperties(this, {
+    _midsToTrackIds: {
+      value: new Map(),
+      writable: true
+    }
+  });
+}
+
+/**
+ * Match a given MediaStreamTrack with its ID.
+ * @param {RTCTrackEvent} event
+ * @returns {?Track.ID}
+ */
+MIDTrackMatcher.prototype.match = function match(event) {
+  return this._midsToTrackIds.get(event.transceiver.mid) || null;
+};
+
+/**
+ * Update the {@link MIDTrackMatcher} with a new SDP.
+ * @param {string} sdp
+ */
+MIDTrackMatcher.prototype.update = function update(sdp) {
+  var sections = getMediaSections(sdp, '(audio|video)');
+  this._midsToTrackIds = sections.reduce(function(midsToTrackIds, section) {
+    var midMatches = section.match(/^a=mid:(.+)$/m) || [];
+    var trackIdMatches = section.match(/^a=msid:.+ (.+)$/m) || [];
+    var mid = midMatches[1];
+    var trackId = trackIdMatches[1];
+    return mid && trackId ? midsToTrackIds.set(mid, trackId) : midsToTrackIds;
+  }, this._midsToTrackIds);
+};
+
+module.exports = MIDTrackMatcher;
+
+
+/***/ }),
+/* 336 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var util = __webpack_require__(5);
+var getMediaSections = __webpack_require__(22).getMediaSections;
+
+// NOTE(mroberts): OrderedTrackMatcher is meant to solve the problem identified in
+//
+//   https://bugs.webkit.org/show_bug.cgi?id=174519
+//
+// Namely that, without MIDs, we cannot "correctly" identify MediaStreamTracks
+// in Safari's current WebRTC implementation. So, this module tries to hack
+// around this by making a possibly dangerous assumption: "track" events will
+// be raised for MediaStreamTracks of a particular kind in the same order that
+// those kinds' MSIDs appear in the SDP. By calling `update` with an
+// RTCPeerConnection's `remoteDescription` and then invoking `match`, we ought
+// to be able to dequeue MediaStreamTrack IDs in the correct order to be
+// assigned to "track" events.
+
+/**
+ * @interface MatchedAndUnmatched
+ * @property {Set<Track.ID>} matched
+ * @property {Set<Track.ID>} unmatched
+ */
+
+/**
+ * Create a new instance of {@link MatchedAndUnmatched}.
+ * @returns {MatchedAndUnmatched}
+ */
+function create() {
+  return {
+    matched: new Set(),
+    unmatched: new Set()
+  };
+}
+
+/**
+ * Attempt to match a MediaStreamTrack ID.
+ * @param {MatchedAndUnmatched} mAndM
+ * @returns {?Track.ID} id
+ */
+function match(mAndM) {
+  var unmatched = Array.from(mAndM.unmatched);
+  if (!unmatched.length) {
+    return null;
+  }
+  var id = unmatched[0];
+  mAndM.matched.add(id);
+  mAndM.unmatched.delete(id);
+  return id;
+}
+
+/**
+ * Update a {@link MatchedAndUnmatched}'s MediaStreamTrack IDs.
+ * @param {MatchedAndUnmatched} mAndM
+ * @param {Set<Track.ID>} ids
+ * @returns {void}
+ */
+function update(mAndM, ids) {
+  ids = new Set(ids);
+  var removedMatchedIds = util.difference(mAndM.matched, ids);
+  removedMatchedIds.forEach(mAndM.matched.delete, mAndM.matched);
+  mAndM.unmatched = util.difference(ids, mAndM.matched);
+}
+
+/**
+ * Parse MediaStreamTrack IDs of a particular kind from an SDP.
+ * @param {string} kind
+ * @param {string} sdp
+ * @returns {Set<Track.ID>} ids
+ */
+function parse(kind, sdp) {
+  var mediaSections = getMediaSections(sdp, kind);
+  var pattern = 'msid: ?(.+) +(.+) ?$';
+  return new Set(util.flatMap(mediaSections, function(mediaSection) {
+    return mediaSection.match(new RegExp(pattern, 'mg')) || [];
+  }).map(function(msid) {
+    return msid.match(new RegExp(pattern))[2];
+  }));
+}
+
+/**
+ * A {@link OrderedTrackMatcher} is used to match RTCTrackEvents.
+ * @property {MatchedAndUnmatched} audio
+ * @property {MatchedAndUnmatched} video
+ */
+function OrderedTrackMatcher() {
+  if (!(this instanceof OrderedTrackMatcher)) {
+    return new OrderedTrackMatcher();
+  }
+  Object.defineProperties(this, {
+    audio: {
+      enumerable: true,
+      value: create()
+    },
+    video: {
+      enumerable: true,
+      value: create()
+    }
+  });
+}
+
+/**
+ * Attempt to match a new MediaStreamTrack ID.
+ * @param {RTCTrackEvent} event
+ * @returns {?Track.ID} id
+ */
+OrderedTrackMatcher.prototype.match = function(event) {
+  return match(this[event.track.kind]);
+};
+
+/**
+ * Update the {@link OrderedTrackMatcher} with a new SDP.
+ * @param {string} sdp
+ * @returns {void}
+ */
+OrderedTrackMatcher.prototype.update = function(sdp) {
+  ['audio', 'video'].forEach(function(kind) {
+    update(this[kind], parse(kind, sdp));
+  }, this);
+};
+
+module.exports = OrderedTrackMatcher;
+
+
+/***/ }),
+/* 337 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -53665,7 +54692,7 @@ module.exports = isSupported;
 
 
 /***/ }),
-/* 328 */
+/* 338 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -53807,7 +54834,7 @@ module.exports = TimeoutPromise;
 
 
 /***/ }),
-/* 329 */
+/* 339 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -53857,50 +54884,138 @@ module.exports = TwilioError;
 
 
 /***/ }),
-/* 330 */
+/* 340 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* globals webkitAudioContext, AudioContext */
+
+
+var NativeAudioContext = typeof AudioContext !== 'undefined'
+  ? AudioContext
+  : typeof webkitAudioContext !== 'undefined'
+    ? webkitAudioContext
+    : null;
+
+/**
+ * @interface AudioContextFactoryOptions
+ * @property {AudioContext} [AudioContext] - The AudioContext constructor
+ */
+
+/**
+ * {@link AudioContextFactory} ensures we construct at most one AudioContext
+ * at a time, and that it is eventually closed when we no longer need it.
+ * @param {AudioContextFactoryOptions} [options]
+ * @property {AudioContextFactory} AudioContextFactory - The
+ *   {@link AudioContextFactory} constructor
+ */
+function AudioContextFactory(options) {
+  options = Object.assign({
+    AudioContext: NativeAudioContext
+  }, options);
+  Object.defineProperties(this, {
+    _AudioContext: {
+      value: options.AudioContext
+    },
+    _audioContext: {
+      value: null,
+      writable: true
+    },
+    _holders: {
+      value: new Set()
+    },
+    AudioContextFactory: {
+      enumerable: true,
+      value: AudioContextFactory
+    }
+  });
+}
+
+/**
+ * Each call to {@link AudioContextFactory#getOrCreate} should be paired with a
+ * call to {@link AudioContextFactory#release}. Calling this increments an
+ * internal reference count.
+ * @param {*} holder - The object to hold a reference to the AudioContext
+ * @returns {?AudioContext}
+ */
+AudioContextFactory.prototype.getOrCreate = function getOrCreate(holder) {
+  if (!this._holders.has(holder)) {
+    this._holders.add(holder);
+    if (this._AudioContext && !this._audioContext) {
+      try {
+        this._audioContext = new this._AudioContext();
+      } catch (error) {
+        // Do nothing;
+      }
+    }
+  }
+  return this._audioContext;
+};
+
+/**
+ * Decrement the internal reference count. If it reaches zero, close and destroy
+ * the AudioContext.
+ * @param {*} holder - The object that held a reference to the AudioContext
+ * @returns {void}
+ */
+AudioContextFactory.prototype.release = function release(holder) {
+  if (this._holders.has(holder)) {
+    this._holders.delete(holder);
+    if (!this._holders.size && this._audioContext) {
+      this._audioContext.close();
+      this._audioContext = null;
+    }
+  }
+};
+
+module.exports = new AudioContextFactory();
+
+
+/***/ }),
+/* 341 */
 /***/ (function(module, exports) {
 
 exports.XMLHttpRequest = XMLHttpRequest;
 
 
 /***/ }),
-/* 331 */
+/* 342 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,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"
 
 /***/ }),
-/* 332 */
+/* 343 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfhCw0MIAroPb+TAAAByElEQVRo3u2VPUsDURBFT4ISQYOIICZiZRVFFO1ExM6k8CfY+AcsLEMKBUEE7YKIlb1fjfgBFqJgCChoYWEpkohCUGwSja5FosaYt/s22S3EOcN2M+/e3ZnZB4IgCIIgCMJ/x2Mzv4EAAYLFJ0AQSJEmTar4pMm6Y7WfGEneMSzinSQx+p0T9hEmzo2lcHncECeMrzbxCBs825YujWc2iFQnPsJxTdKlccyISqbyEA4yx5iJuSfuvwLavqLZpGafKGc6bx5iXTFqjxwwQ5gWZW0r48xzQlYxnuuEzMUbWSVfsficHrza7fMxpGhGnlUaVWVdXCq7uKct/ol6Ii7pqlQQIWNS5KQBg0z5ZniI8mZa4qwBgzei3wvgZ9NykZw2YGCwiR8gyJVG8q4LBgyuCHqZtlqNYpPcIMQ03Gl5decLGNx6udA67tW2gZxW1raXFQyNxIRtAzsaOQ8sAkxa3vJbNNk20Gk53Pf0fiabWUgxUeUINrGk+LGXyast5Fgo7GrV9HGqI1/ZwjXdNYkX8DDFi7X8bwuHJteuXYZ/LLtC/qeFZeockwfoIGEtDzDAGluMOipeoJ4Jjpil3YWzBUEQBEEQhD/NBx0jGTVuyVfoAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDE3LTExLTEzVDEyOjMyOjEwKzAxOjAwFxkg2gAAACV0RVh0ZGF0ZTptb2RpZnkAMjAxNy0xMS0xM1QxMjozMjoxMCswMTowMGZEmGYAAAAZdEVYdFNvZnR3YXJlAHd3dy5pbmtzY2FwZS5vcmeb7jwaAAAAAElFTkSuQmCC"
 
 /***/ }),
-/* 333 */
+/* 344 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAQAAABpN6lAAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfhCw0HGTFb5zTsAAAJXElEQVR42u2de3AV1R3HP0lANIRHyEMJgrEIDGmYgtBqrSMUlFGmvngUJ2VK7Rhb7IyIHWoRkpk+0KEVlBmLrWDHjjwsrfgalKKFCIJSh5cGKCV0oBluKJFHQXnlsf0jj97s/s7e3bu752ws3zP8Qe5vf+f3/d69Z8/53fM7NwMzGMY4+tOXIvpSRBYnOMEJ9vMhH7Afy1BUGpDFaBZxEMulHWcZo8kwHWr4yKaCT12pJ7dDzKW76ZDDQxblJDyTb2tHmUEX06GHgQns9U2+re1jpOnwgyGTJ9Im39Iu8GjnHRF68GZA+i3tzc45HgxkTyj0LSy20CuKEKO8tQayjTzlqzW8wXYSJEjQTD75fInRjKZUGdMOxnM8wnhDRg/lu1/HXEqU1w1hFc2KK7fRzTQtr8hUfPZPU+nh01zKKwoRXjBNzCvkkX81BZ49jGC96GOGaWpeMEEIvJm5Pr1k8qLg5zzXebj2a7zM5aboZwnTns+4Ow1PmSwVJFiX8rpbOI3Fu2SbEaBcePfToQ+QwRJBgkmu14zn81a7jSZmD9nCnN/vzd8Rix3+5rlY38X5JMtN5OgWYJ4w9AVDBts7+HvKxXYqDbbe36eHTvpZjgXvaR8jvwrjk/w942J3P03CB+Y9nQKMdnRfGYrfv7Z6e9bF5kfi3OEst+sUYJFj1hfOMPRVLCyec5m6/0ScNZxhjE76OJJdwYa/ZPyJpS70fybSP8mNeukPc4RQEtxpKwpc6D8l0q9nuF768IgthAMa+pRnChaJEMX3jIW2IBZG3mOWOF22OMRA/fRhpS2Msoj768ofRfoHGGCCPlTZAhkTaW/deEOkX81VZujDflsogyPsK5t3RPrbyTdFH87YgoluHt6TzSL9rdFkDr3CHk5U6MPfRPob9C99TAhQyG6R/lvmUiA6BejH30X6r3CZafo6BLiWf4r0l5NlmrwOAYZQK9J/nkzT1HUIMIx/i/SfNk1bjwCjOC7Sn2+atB4BbuY/Iv05pinrEeDW9jxvcmtmpmnCegT4Voc8b1tr4gHTdPUIMIWLAv2GyFeaMRFgOo0C/Qvca5qqHgFmxCHPa06AH4vjvvY8rykBKkX62vO8pgRYINKvZ4RpijoEyOBZkb6RPK9+ATL5vUj/sKeNEZ1egC6sEukby/PqFaAbr4n099BXsDaW+41KgGz+ItLfIeZ5C9lrmm64AvTgPZH+B/QWrAuoDnGxFQMBctkm0t8o5nnz+TjExVYMBChgl0j/La4QrPPas8KxQ3oCFLFPpL9GzPP2YWeIi60YCFCsqCBaLtaK5HbYMBU7+BdgEP8S6ct53l58FNpaIxYClFIn0n9GsRtkWxp3WIwFGKmoIZsfkv+YC3ATp0T6j4cmcKwFGMtnIv2ZIfmPuQATOCeQb6I8NIFjIcARhdUkMc/byHdCEzgWAtRwrWgzTZHnnehb4FgLsFuxWH1Q3M58ljt8CxxrAbaSK74+Sxz4zvBN3wLHWoB1ilKVeSL9k3zdp/+YC7BasVXlSZG+vzxvJxBAnsNnCGUvFhYJvuzTf8wFWCD+Va79SifPG3sBJHRhhUjff543xzF4dgJcxhqRvpzndcdgm4/9psmlxhW8LdLfkdZ+3jE2L1Wm6aVCDhtF+nKeNzXKbH5WhhFkdPvrevOO+EV2FbdxKi2Po2z/r4ss9hCQzw7x3X9bzPN6g32P6COmSarRV3F4wpoA+3mHO7z5m0NoxAAOiPRXBDoT6OeOx6gB1HQI4SJ9BJvrOCzSXxpovOnlyB/+ymEz1GZRE74ASzrQl0riSxTnRS0OeFyL80QK5xKqwmbxm/AFuKfdeYO4UW0E9SL9JwL2W8RZxyrCKai9jOKu8AXo2Vqc3iAeYXAjJ0X6QctnM3jd4XO2w2qQzeJiNOUzm7FoZIrwyhhHyVRYD6tfOHzWCsUxc2w2G6OgDxU0MlX4++2Om9TCookHA/f4bcHv/YKdfd7x02gEGCXu0b2XC0KYjUwL3N9kQdhq4Xky3mGlcUNdmePYCguveV53VIpbZZ0JVPshGxY79dF/QMzznvOY51WjgNXimCJ9c3ifw+o+XfQfFt8jtzzvRPql9NqdSk6L9F8VHn9dbRM0i4O6asjmiEGecsnzVmDRwBpuU06MSpir+NLcYrf4aHvIYfdDPfR/KQZZz/XKKx5PsjvAc8xmMtfTmxwGM4YyFipWES3tKNcIPgc4JslH9VSQPi0GWeeyRnvMhVzq9jHFgs9uQhVxRA/AZGTyOzHIwwxSXjM7EP3XFPO63wr3SeT141m8JAZZI96iLXg0EP35ihHje4LtnVHT78qfxSDd8rxX8o+0ye9lgsLrcGGSFPmBi5ezVgxzZ4oDs7oyU1H56dYSlCsfaCM55rA/FPW5Yd3bj7Tq2LzleXOZp6j9ltqnVLicBzhWmCc0R11N1IstYqhVPhaeGYxjRYp7oYaF3OI6lZkkllIuSoeU9zxNHuvFJ/w6JnLOd69D+AY3UUweeeTRRII6EiSo5V32pLj6BywRlkNbGcf5dCTwhquoFt+tVzWf25DLH8Q4Por24ddfMYq75XmniWmTYLhHMUneLaZnQ8NADondLnPJ836XJiw2UBpaFPmKaiKLfRRGSX8oR8Ru3fK809qXyA0sTvObwGTk8LDw0GsbMouipP8VRcdPulxTZtsId5xfBzjarB8LFMlWC4tPoq0mu4ETYrdued6p4j7AZtZxt+9V+iiWi5sq29qLUZ8cLNfxzHK5YoqYHmtrtSxjumIDZTKuZjovpfhJjnPhHKDgPg+4kg22ctVmZvC8yxWlLOOGlL0eYTPbOUZ9a4NCClr/FTOWISk91DCFXWEIkAqFfJKkupc8byYzFTvBw2sv01MH+RYUtJaoWVxMcaT1/3CNYmtMGG0LN+sj34I8dmFxTrkslTFZceRZkLYn7TPKA6IPmxjr+6oM7uTD0MjX8v14nBfmF+MUS2jvrYG1lJk/Ki8IipnFJvELFPfWzPs8ZPKIzHBRSDlrPf3aWDMHeZ3HxDxwyDDxC04FlDCUoZRwq+2V9VRTTTV7+VxXMGZ/wsq+3dlANDE5iNAcLglgOgDTuCSA6QBM45IApgMwDd0CXM2qpEyPHW1/T7Ay2lSnKfT38QXpsS+iBKs807cIqSQmXvD3y8MJHSFdGgS19ubvV7+qtMamBf/3g6D9Maj+9Gt7DP4XbRkMgshhg7oAAAAldEVYdGRhdGU6Y3JlYXRlADIwMTctMTEtMTNUMDc6MjU6NDkrMDE6MDBpE/2xAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDE3LTExLTEzVDA3OjI1OjQ5KzAxOjAwGE5FDQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAAASUVORK5CYII="
 
 /***/ }),
-/* 334 */
+/* 345 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABABAMAAABYR2ztAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAAIVBMVEUAAACO3FyS3VmR3VqR3Fr//wCS3FqR3FqR3FuR3FoAAACFo7o4AAAACXRSTlMAJH6y5gFu9bQdqz9YAAAAAWJLR0QAiAUdSAAAAAlwSFlzAAAN1wAADdcBQiibeAAAAAd0SU1FB+EMAQoFCBK7EUIAAABrSURBVEjHY2BAAUImzooMeEBY5cyZ01Nxy7N2zgSCGQE4FbDNBIMEnArEIQoKcSrQhCiYhFOBJUTBZJwKPCEKppCvgKAVBB1J0JsEA4pgUBOMLMLRPQqgYDRfEKVgNF+MMDCaL4hSMHzzBQCsFKyHixGNSgAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNy0xMi0wMVQxMDowNTowOCswMTowMFBuzpkAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTctMTItMDFUMTA6MDU6MDgrMDE6MDAhM3YlAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAABJRU5ErkJggg=="
 
 /***/ }),
-/* 335 */
+/* 346 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAQAAABpN6lAAAAAAmJLR0QAAKqNIzIAAAAJcEhZcwAAAEgAAABIAEbJaz4AAAOnSURBVHja7dzbduMgDAVQ8Or//zJ9aJrEGDBCR5eg6GUad+yibYEdX0jpG9/4RiqpWDfBKnJKz+SzdWNsAMrpU7g4Tp8CdoT3LvBaEij+0g1M8J9sWIJXqkEJ3hMNSXBOMyBBnSSKQOqACt8p1w0iCCTPJ8AEx2XJqFNsGEdjWSiCXkHxO4IEnMCw3N9kkCPCKLEQBOO0AhDcJbU9Qf9UeO/I9Q+Rkj/l3roeECdy64pQrMg/10Wd/7rLcFjt7verwpGOCM9cDsJKW35HeAHM7NF9CJ6ZUCpgL4JH/JDXON9LKstjQQ9PeWzJS3cGOcPhbNVIQxQOwBrBWoeRgmAC0Ai4Y4UEAhtgnmCc/uy3ETQCAGCGoJ3W/d9aXU8ZYEzQSoI7YOIIQAB9grrxuMMlBuGxXeqJ0DXae71mWW/0dV3o6Re/Au6bBN1jsG3CKmDcHM6+H/0NWBVgAHoE2EPXGRNEgAJoJStx+gInwAFofY0BEyABys1nlwQ4gDK5zBkBCqAQlyMJXAC8N037qhHrL2AA6ivLGgSgGkAAtC6s6xIwto/vAh9GwAfo31j5iCvIchWgQ8CuAS7A3Y0191UgWwEaBMyjgey3QR0C1pblK0CTQB1gPhVJAlYnkL4ipEPA2KpOF9AjUAWgpyBFwOgEmhUgSfAxAO4IEADUAnRFoF8BzghsAOQIyFuyAnBTBXYATggsAVwQ2AI4ILAGQBOQzwmxV4U9EBgA8MOQwAeAIYEXAB6B0Y0R9PMAJlWAvjdoS7CwS/x0AQyBMoD0U0BzBA5uj1sTOACQvNAt+ooFF0DqybB5AifPCOFLVakjeBwDKATzr32KAUAeVFkkYKePviqsT8AOz13gjgCw//E3R+Unz2m/kmEM0GqgPEH7t0YA0nOR1ASQ8kcCaBPAQup9AS0CNgt2DNAmAFSF5GEQTyDwSgYaQPLEReSVDMx7g+NmIbY8SpT10q9MF+gftDDpA+tMpgLazcLMT4qaChr28jSFgDNRx3V9HoECQC8J6pRN/bUAc5lIA/TToQV+gi/RQbBuPBc3T/5mgVqjAhjNm2rVWhUodoE1COl5jQwB+hSoucwJdWMLgAwqwWUQNH9qlxm04XBpPkHvsXREOOirOI5ZgnJe5fMTX4+8UxdYE0gpxa2BLH1Lw3Pk0z/BEHLzx+1i6tRoZ4Apgr0BJgh2B7gl2B/ghiACwJAgBsCAIApAlyAOQIcgEkCTIBZAgyAawIUgHkBF8AuBEu62I9o0sAAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAxNy0xMS0xM1QwMTo0Mjo1MS0wNTowMGXhyeUAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMTctMTEtMTNUMDE6NDI6NTEtMDU6MDAUvHFZAAAAAElFTkSuQmCC"
 
 /***/ }),
-/* 336 */
+/* 347 */
 /***/ (function(module, exports) {
 
 module.exports = "data:image/png;base64,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"
 
 /***/ }),
-/* 337 */
+/* 348 */
 /***/ (function(module, exports) {
 
 if (typeof Object.create === 'function') {
@@ -53929,7 +55044,7 @@ if (typeof Object.create === 'function') {
 
 
 /***/ }),
-/* 338 */
+/* 349 */
 /***/ (function(module, exports) {
 
 module.exports = function isBuffer(arg) {
