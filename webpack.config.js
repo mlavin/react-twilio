@@ -1,8 +1,6 @@
 var path = require('path');
 module.exports = {
-  entry: {
-    javascript: './src/components/TwilioConnectionManager.js',
-  },
+  entry: ['babel-polyfill', './src/components/TwilioConnectionManager.js'],
   output: {
     path: path.resolve(__dirname, 'build'),
     filename: './index.js',
