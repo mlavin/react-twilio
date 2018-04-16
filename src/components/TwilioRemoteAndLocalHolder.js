@@ -162,7 +162,7 @@ class TwilioRemoteAndLocalHolder extends Component {
             !showDisconnect && !isError
             &&
             <div style={{ height: '200px', verticalAlign: 'middle', display: 'table-cell' }}>
-              Connecting to Room1
+              Connecting to Room
               <ReactLoading type={'bars'} style={{ marginLeft: '40%', marginBottom: '10%', height: '20%', width: '20%', fill: 'blue' }} />
             </div>
           }
