@@ -36,7 +36,7 @@ class TwilioAudio extends Component {
   toggleAudioTrack(tracks) {
     this.mute = this.mute ? false : true;
     tracks.filter(track => track.isAudio).forEach((track) => {
-      this.mute ? track.disable() : track.enable()
+      this.mute ? track.disable() : track.enable();
     });
   }
 
