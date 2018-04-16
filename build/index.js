@@ -21904,7 +21904,7 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
         position: 'absolute', right: '5%', bottom: ratio > 1 ? '-5%' : '5%',
         zIndex: 999
       };
-      var controlChildStyle = { margin: '13%', width: '30px', height: '30px' };
+      var controlChildStyle = { cursor: 'pointer', margin: '0px 8px -6px 13px', width: '30px', height: '30px' };
       var myCameraStyle = { width: '20%' };
       var rightMarginCountCalculator = 0;
       var participants = Object.keys(remote);
@@ -22215,10 +22215,13 @@ var VideoControls = function (_Component) {
     _this.state = { localAudioMute: false, localCameraDisabled: false };
     _this.videoControlStyle = {
       height: '50px',
-      width: '75%',
-      position: 'absolute',
-      bottom: '0%',
-      left: '25%'
+      width: '100%',
+      left: '25%',
+      position: 'relative',
+      display: 'block',
+      top: '-50px',
+      marginLeft: '50%',
+      transform: 'translateX(-21%)'
     };
     _this.imageWrapperStryle = {
       height: '40px',
