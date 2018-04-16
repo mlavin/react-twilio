@@ -22221,7 +22221,7 @@ var VideoControls = function (_Component) {
       display: 'block',
       top: '-50px',
       marginLeft: '50%',
-      transform: 'translateX(-21%)'
+      transform: 'translateX(-45%)'
     };
     _this.imageWrapperStryle = {
       height: '40px',
