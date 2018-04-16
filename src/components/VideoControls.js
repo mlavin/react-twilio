@@ -16,10 +16,13 @@ class VideoControls extends Component {
     this.state = {localAudioMute: false, localCameraDisabled: false};
     this.videoControlStyle = {
       height: '50px',
-      width: '75%',
-      position: 'absolute',
-      bottom: '0%',
+      width: '100%',
       left: '25%',
+      position: 'relative',
+      display: 'block',
+      top:'-50px',
+      marginLeft: '50%',
+      transform: 'translateX(-21%)',
     };
     this.imageWrapperStryle = {
       height: '40px',

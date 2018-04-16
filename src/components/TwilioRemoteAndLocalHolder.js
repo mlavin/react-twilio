@@ -138,7 +138,7 @@ class TwilioRemoteAndLocalHolder extends Component {
       position: 'absolute', right: '5%', bottom: ratio > 1 ? '-5%' : '5%',
       zIndex: 999
     };
-    let controlChildStyle = { margin: '13%', width: '30px', height: '30px' };
+    let controlChildStyle = { cursor:'pointer', margin: '0px 8px -6px 13px', width: '30px', height: '30px' };
     let myCameraStyle = { width: '20%' };
     let rightMarginCountCalculator = 0;
     let participants = Object.keys(remote);
