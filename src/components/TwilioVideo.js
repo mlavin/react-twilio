@@ -2,105 +2,85 @@ import React, { Component } from 'react';
 import propTypes from 'prop-types';
 
 class TwilioVideo extends Component {
-    //This Component demands a video object, which is given to it by the overlying layer as a prop
-    constructor(props) {
-        super(props);
-        this.state = {
+  //This Component demands a video object, which is given to it by the overlying layer as a prop
+  constructor(props) {
+    super(props);
+    this.state = {
 
-        };
-        this.alreadyAdded = [];
-        this.cameraDisabled = true;
+    };
+    this.alreadyAdded = [];
+    this.cameraDisabled = true;
+  }
+
+  componentDidMount() {
+    this.attachTracksToDOM(this.props.tracks);
+  }
+
+  componentWillReceiveProps(nextProps) {
+
+  }
+
+  componentDidUpdate() {
+    this.attachTracksToDOM(this.props.tracks);
+  }
+
+  getTrackId() {
+    let { tracks } = this.props;
+    if (tracks.length > 0) {
+      return tracks[0].id;
+    } else {
+      return null;
     }
+  }
 
-    componentWillMount() {
-        let { tracks, remote } = this.props;
-        if (!remote) {
-            tracks.filter(track => !track.isAudio).forEach((track) => {
-                // track.enable() not a function
-                //track.enable();
-            });
-        }
-    }
-
-    componentDidMount() {
-        this.attachTracksToDOM(this.props.tracks);
-    }
-
-    componentWillReceiveProps(nextProps) {
-
-    }
-
-    componentDidUpdate() {
-        this.attachTracksToDOM(this.props.tracks);
-    }
-
-    componentWillUnmount() {
-        let { tracks, remote } = this.props;
-        if (!remote) {
-            tracks.filter(track => !track.isAudio).forEach((track) => {
-                track.stop();
-            });
-        }
-    }
-
-    getTrackId() {
-        let { tracks } = this.props;
-        if (tracks.length > 0) {
-            return tracks[0].id;
+  attachTracksToDOM(tracks) {
+    let { primary, primaryDimensionChanged, secondaryDimensionChanged } = this.props;
+    tracks.forEach((track) => {
+      if (this.alreadyAdded.indexOf(track.id) == -1) {
+        this.alreadyAdded.push(track.id);
+        if (primary) {
+          track.on('dimensionsChanged', (videoTrack) => {
+            primaryDimensionChanged(videoTrack.dimensions);
+          });
         } else {
-            return null;
+          track.on('dimensionsChanged', (videoTrack) => {
+            secondaryDimensionChanged(videoTrack.dimensions);
+          });
         }
-    }
+        let dynamicallyGenerated=track.attach();
+        dynamicallyGenerated.style.width='100%';
+        this.videoDiv.appendChild(dynamicallyGenerated);
+      }
+    });
+  }
 
-    attachTracksToDOM(tracks) {
-        let { primary, primaryDimensionChanged, secondaryDimensionChanged } = this.props;
-        tracks.forEach((track) => {
-            if (this.alreadyAdded.indexOf(track.id) == -1) {
-                this.alreadyAdded.push(track.id);
-                if (primary) {
-                    track.on('dimensionsChanged', (videoTrack) => {
-                        primaryDimensionChanged(videoTrack.dimensions);
-                    });
-                } else {
-                    track.on('dimensionsChanged', (videoTrack) => {
-                        secondaryDimensionChanged(videoTrack.dimensions);
-                    });
-                }
-                let dynamicallyGenerated=track.attach();
-                dynamicallyGenerated.style.width='100%';
-                this.videoDiv.appendChild(dynamicallyGenerated);
-            }
-        });
-    }
+  toggleVideoTrack(tracks) {
 
-    toggleVideoTrack(tracks) {
+    this.cameraDisabled = this.cameraDisabled ? false : true;
+    tracks.filter(track => !track.isAudio).forEach((track) => {
+      this.cameraDisabled ? track.disable() : track.enable()
+    });
+  }
 
-        this.cameraDisabled = this.cameraDisabled ? false : true;
-        tracks.filter(track => !track.isAudio).forEach((track) => {
-            this.cameraDisabled ? track.disable() : track.enable()
-        });
-    }
+  render() {
+    let { tracks, remote, style, primary, onClick } = this.props;
+    return (
+      <div style={style}>
+        {
+          tracks.map((track) => {
+            return <div key={track.id} onClick={() => { onClick(this.getTrackId()) }} ref={(div)=>{this.videoDiv=div;}}>
 
-    render() {
-        let { tracks, remote, style, primary, onClick } = this.props;
-        return (
-            <div style={style}>
-                {
-                    tracks.map((track) => {
-                        return <div key={track.id} onClick={() => { onClick(this.getTrackId()) }} ref={(div)=>{this.videoDiv=div;}}>
-
-                        </div>
-                    })
-                }
             </div>
-        )
-    }
+          })
+        }
+      </div>
+    )
+  }
 }
 
 TwilioVideo.propTypes = {
-    tracks: propTypes.array.isRequired,
-    cameraDisabled: propTypes.bool
-}
+  tracks: propTypes.array.isRequired,
+  cameraDisabled: propTypes.bool
+};
 
 export default TwilioVideo;
-

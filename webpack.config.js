@@ -1,6 +1,8 @@
 var path = require('path');
 module.exports = {
-  entry: './src/components/TwilioConnectionManager.js',
+  entry: {
+    javascript: './src/components/TwilioConnectionManager.js',
+  },
   output: {
     path: path.resolve(__dirname, 'build'),
     filename: './index.js',
@@ -9,15 +11,11 @@ module.exports = {
   module: {
     rules: [
       {
-        test: /\.js$/,
-        include: path.resolve(__dirname, 'src'),
-        exclude: /(node_modules|bower_components|build)/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['env']
-          }
-        }
+        test: /\.(js|jsx)$/,
+        exclude: /node_modules/,
+        use: [
+          'babel-loader',
+        ],
       },
       {
         test: /\.(png|jp(e*)g|svg)$/,
