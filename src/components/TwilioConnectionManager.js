@@ -21,6 +21,7 @@ class TwilioConnectionManager extends Component {
 
   componentDidMount() {
     let { token, roomName, initialCamera } = this.props;
+    debug('Going to connect');
     this.connectToTwilio(token, roomName, initialCamera);
   }
 
