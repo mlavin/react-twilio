@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import TwilioRemoteAndLocalHolder from './TwilioRemoteAndLocalHolder';
 import propTypes from 'prop-types';
 const Video = require('twilio-video');
+const debug = require('debug');
 
 
 class TwilioConnectionManager extends Component {
@@ -25,6 +26,7 @@ class TwilioConnectionManager extends Component {
 
   componentWillUnmount() {
     this.disconnectCall();
+    debug('Going to disconnect', this.localTrackRoom);
     this.localTrackRoom.localParticipant.tracks.forEach(track => track.stop());
   }
 

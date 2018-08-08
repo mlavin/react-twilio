@@ -8,9 +8,10 @@
     "react-dom": "^15.5.4"
   },
   "dependencies": {
+    "debug": "^3.1.0",
     "prop-types": "^15.6.1",
     "react-loading": "^1.0.4",
-    "twilio-video": "^1.8.0"
+    "twilio-video": "^1.13.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
