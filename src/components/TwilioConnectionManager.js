@@ -2,8 +2,6 @@ import React, { Component } from 'react';
 import TwilioRemoteAndLocalHolder from './TwilioRemoteAndLocalHolder';
 import propTypes from 'prop-types';
 const Video = require('twilio-video');
-const debug = require('debug');
-
 
 class TwilioConnectionManager extends Component {
   constructor(props) {
@@ -21,13 +19,11 @@ class TwilioConnectionManager extends Component {
 
   componentDidMount() {
     let { token, roomName, initialCamera } = this.props;
-    debug('Going to connect');
     this.connectToTwilio(token, roomName, initialCamera);
   }
 
   componentWillUnmount() {
     this.disconnectCall();
-    debug('Going to disconnect', this.localTrackRoom);
     this.localTrackRoom.localParticipant.tracks.forEach(track => track.stop());
   }
 
@@ -48,8 +44,8 @@ class TwilioConnectionManager extends Component {
   }
 
   participantConnected = (participant) => {
-    participant.on('trackAdded', track => this.trackAdded(track, participant));
-    participant.on('trackRemoved', track => this.trackRemoved(participant));
+    participant.on('trackSubscribed', track => this.trackAdded(track, participant));
+    participant.on('trackUnsubscribed', track => this.trackRemoved(participant));
   };
 
   participantDisconnected = (participant) =>{
