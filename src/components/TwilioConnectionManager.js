@@ -44,8 +44,8 @@ class TwilioConnectionManager extends Component {
   }
 
   participantConnected = (participant) => {
-    participant.on('trackSubscribed', track => this.trackAdded(track, participant));
-    participant.on('trackUnsubscribed', track => this.trackRemoved(participant));
+    participant.on('trackSubscribed', track => this.trackSubscribed(track, participant));
+    participant.on('trackUnsubscribed', track => this.trackUnsubscribed(participant));
   };
 
   participantDisconnected = (participant) =>{
@@ -93,7 +93,7 @@ class TwilioConnectionManager extends Component {
     });
   }
 
-  trackAdded(track, participant) {
+  trackSubscribed(track, participant) {
     track.on('enabled', () => {
       this.iterateParticipantTracks(participant);
     });
@@ -106,7 +106,7 @@ class TwilioConnectionManager extends Component {
     this.iterateParticipantTracks(participant);
   }
 
-  trackRemoved(participant) {
+  trackUnsubscribed(participant) {
     this.iterateParticipantTracks(participant);
   }
 
