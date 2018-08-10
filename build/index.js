@@ -13586,10 +13586,10 @@ var TwilioConnectionManager = function (_Component) {
 
     _this.participantConnected = function (participant) {
       participant.on('trackSubscribed', function (track) {
-        return _this.trackAdded(track, participant);
+        return _this.trackSubscribed(track, participant);
       });
       participant.on('trackUnsubscribed', function (track) {
-        return _this.trackRemoved(participant);
+        return _this.trackUnsubscribed(participant);
       });
     };
 
@@ -13628,9 +13628,6 @@ var TwilioConnectionManager = function (_Component) {
     key: 'componentWillUnmount',
     value: function componentWillUnmount() {
       this.disconnectCall();
-      this.localTrackRoom.localParticipant.tracks.forEach(function (track) {
-        return track.stop();
-      });
     }
   }, {
     key: 'connectToTwilio',
@@ -13721,8 +13718,8 @@ var TwilioConnectionManager = function (_Component) {
       });
     }
   }, {
-    key: 'trackAdded',
-    value: function trackAdded(track, participant) {
+    key: 'trackSubscribed',
+    value: function trackSubscribed(track, participant) {
       var _this3 = this;
 
       track.on('enabled', function () {
@@ -13737,8 +13734,8 @@ var TwilioConnectionManager = function (_Component) {
       this.iterateParticipantTracks(participant);
     }
   }, {
-    key: 'trackRemoved',
-    value: function trackRemoved(participant) {
+    key: 'trackUnsubscribed',
+    value: function trackUnsubscribed(participant) {
       this.iterateParticipantTracks(participant);
     }
   }, {
@@ -13747,7 +13744,9 @@ var TwilioConnectionManager = function (_Component) {
       if (this.localTrackRoom != null) {
         this.token = null;
         this.setState({ tracks: { remote: {}, local: [] }, disconnected: true });
-        this.localTrackRoom.disconnect();
+        this.localTrackRoom.localParticipant.tracks.forEach(function (track) {
+          return track.stop();
+        });
       }
     }
   }, {
