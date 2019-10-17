@@ -153,10 +153,12 @@ class TwilioRemoteAndLocalHolder extends Component {
     }
     return (
       this.showLoadingScreen() ?
-        <div style={{
-          height: height, width: width, position: 'relative', overflow: 'hidden',
-          textAlign: 'center', display: 'table'
-        }}>
+        <div 
+          // style={{
+          // height: height, width: width, position: 'relative', overflow: 'hidden',
+          // textAlign: 'center', display: 'table'
+          // }}
+        >
 
           {
             !showDisconnect && !isError
@@ -190,9 +192,11 @@ class TwilioRemoteAndLocalHolder extends Component {
 
             !showDisconnect && !isError
             &&
-            <div style={{
-              width: '100%', position: 'relative', overflow: 'hidden', float: 'left', height: height
-            }}>
+            <div 
+              // style={{
+              // width: '100%', position: 'relative', overflow: 'hidden', float: 'left', height: height
+              // }}
+            >
               {
                 participantsChanged != 0
                 &&
@@ -204,11 +208,10 @@ class TwilioRemoteAndLocalHolder extends Component {
               {
                 primaryVideo != null
                 &&
-                <TwilioVideo style={{
-                  height: height, width: width
-                }}
-                             cameraDisabled={true} tracks={[primaryVideo]} onClick={(myid) => { this.videoTrackClicked(myid) }} remote={true} key={primaryVideo.id} primary={true} primaryDimensionChanged={this.primaryDimensionsChanged}></TwilioVideo>
-
+                <TwilioVideo 
+                  style={{height: height, width: width}}
+                  cameraDisabled={true} tracks={[primaryVideo]} onClick={(myid) => { this.videoTrackClicked(myid) }} remote={true} key={primaryVideo.id} primary={true} primaryDimensionChanged={this.primaryDimensionsChanged}>
+                </TwilioVideo>
               }
               {
                 showSecondaryParticipants
