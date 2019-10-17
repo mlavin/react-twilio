@@ -187,7 +187,10 @@ class TwilioRemoteAndLocalHolder extends Component {
               </div>
             </div>
           }
-        </div> : <div style={{ height: height, width: width, background: 'rgb(151, 160, 160)', borderColor: 'black', borderWidth: '1px', textAlign: 'center' }}>
+        </div> : 
+        <div 
+          //style={{ height: height, width: width, background: 'rgb(151, 160, 160)', borderColor: 'black', borderWidth: '1px', textAlign: 'center' }}
+        >
           {
 
             !showDisconnect && !isError

@@ -28054,7 +28054,7 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
         )
       ) : _react2.default.createElement(
         'div',
-        { style: { height: height, width: width, background: 'rgb(151, 160, 160)', borderColor: 'black', borderWidth: '1px', textAlign: 'center' } },
+        null,
         !showDisconnect && !isError && _react2.default.createElement(
           'div',
           null,
