@@ -13777,7 +13777,9 @@ var TwilioConnectionManager = function (_Component) {
           localVideoMute = _state.localVideoMute,
           disconnected = _state.disconnected,
           errorTwilio = _state.errorTwilio;
-      var style = this.props.style;
+      var _props3 = this.props,
+          style = _props3.style,
+          initialAudioMute = _props3.initialAudioMute;
 
       var _ref2 = tracks != null ? tracks : { remote: {}, local: [] },
           remote = _ref2.remote,
@@ -13795,6 +13797,7 @@ var TwilioConnectionManager = function (_Component) {
           local: local,
           localAudioMute: localAudioMute,
           cameraStatus: this.props.initialCamera,
+          initialAudioMute: initialAudioMute,
           localCameraDisabled: localVideoMute,
           isError: errorTwilio })
       );
@@ -13808,7 +13811,8 @@ TwilioConnectionManager.propTypes = {
   roomName: _propTypes2.default.string.isRequired,
   token: _propTypes2.default.string.isRequired,
   initialCamera: _propTypes2.default.bool,
-  style: _propTypes2.default.object.isRequired
+  style: _propTypes2.default.object.isRequired,
+  initialAudioMute: _propTypes2.default.bool
 };
 
 TwilioConnectionManager.defaultProps = {
@@ -28028,7 +28032,12 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
       }
       return this.showLoadingScreen() ? _react2.default.createElement(
         'div',
-        null,
+        {
+          style: {
+            height: height, width: width, position: 'relative', overflow: 'hidden',
+            textAlign: 'center', display: 'table'
+          }
+        },
         !showDisconnect && !isError && _react2.default.createElement(
           'div',
           { style: { height: '200px', verticalAlign: 'middle', display: 'table-cell' } },
@@ -28077,10 +28086,9 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
             return remote[participant].filter(function (track) {
               return track.isAudio;
             }).map(function (track) {
-              return _react2.default.createElement(_TwilioAudio2.default, { style: {
-                  height: '0px', width: '0px'
-                },
-                mute: false, tracks: [track], remote: true, key: track.id });
+              return _react2.default.createElement(_TwilioAudio2.default, {
+                style: { height: '0px', width: '0px' },
+                mute: _this3.props.initialAudioMute, tracks: [track], remote: true, key: track.id });
             });
           }),
           !localCameraDisabled && _react2.default.createElement(

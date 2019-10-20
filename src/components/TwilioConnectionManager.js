@@ -133,7 +133,7 @@ class TwilioConnectionManager extends Component {
 
   render() {
     let { tracks, localAudioMute, localVideoMute, disconnected, errorTwilio } = this.state;
-    let { style } = this.props;
+    let { style, initialAudioMute} = this.props;
     let { remote, local } = tracks != null ? tracks : { remote: {}, local: [] };
     return (
       <div style={style}>
@@ -146,6 +146,7 @@ class TwilioConnectionManager extends Component {
           local={local}
           localAudioMute={localAudioMute}
           cameraStatus={this.props.initialCamera}
+          initialAudioMute = {initialAudioMute}
           localCameraDisabled={localVideoMute}
           isError={errorTwilio} />
       </div>
@@ -157,7 +158,8 @@ TwilioConnectionManager.propTypes = {
   roomName: propTypes.string.isRequired,
   token: propTypes.string.isRequired,
   initialCamera: propTypes.bool,
-  style: propTypes.object.isRequired
+  style: propTypes.object.isRequired,
+  initialAudioMute: propTypes.bool
 };
 
 TwilioConnectionManager.defaultProps = {

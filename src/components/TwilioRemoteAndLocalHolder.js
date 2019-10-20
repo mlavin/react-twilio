@@ -154,12 +154,11 @@ class TwilioRemoteAndLocalHolder extends Component {
     return (
       this.showLoadingScreen() ?
         <div 
-          // style={{
-          // height: height, width: width, position: 'relative', overflow: 'hidden',
-          // textAlign: 'center', display: 'table'
-          // }}
+          style={{
+            height: height, width: width, position: 'relative', overflow: 'hidden',
+            textAlign: 'center', display: 'table'
+          }}
         >
-
           {
             !showDisconnect && !isError
             &&
@@ -226,10 +225,10 @@ class TwilioRemoteAndLocalHolder extends Component {
                 participants.map((participant) => {
                   return remote[participant].filter(track => track.isAudio).map((track) => {
                     return (
-                      <TwilioAudio style={{
-                        height: '0px', width: '0px'
-                      }}
-                                   mute={false} tracks={[track]} remote={true} key={track.id}></TwilioAudio>
+                      <TwilioAudio 
+                        style={{height: '0px', width: '0px'}}
+                        mute={this.props.initialAudioMute} tracks={[track]} remote={true} key={track.id}>
+                      </TwilioAudio>
                     )
                   });
                 })
