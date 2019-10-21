@@ -34,6 +34,12 @@ class VideoControls extends Component {
     }
   }
 
+  componentWillReceiveProps(nextProps){
+    this.setState({
+      localAudioMute: nextProps.localAudioMute
+    })
+  }
+
   render() {
     let {localAudioMute, localCameraDisabled} = this.state;
     let {disconnectCall} = this.props;

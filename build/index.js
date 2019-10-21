@@ -28115,7 +28115,8 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
               _this3.props.disconnect();
             },
             showBar: this.hideSecondaryPaticipantsTray,
-            cameraStatus: this.props.cameraStatus
+            cameraStatus: this.props.cameraStatus,
+            localAudioMute: localAudioMute
           }),
           _react2.default.createElement(_TwilioAudio2.default, { style: { height: '0px', width: '0px' },
             mute: localAudioMute, tracks: local.filter(function (track) {
@@ -28344,6 +28345,13 @@ var VideoControls = function (_Component) {
   }
 
   _createClass(VideoControls, [{
+    key: 'componentWillReceiveProps',
+    value: function componentWillReceiveProps(nextProps) {
+      this.setState({
+        localAudioMute: nextProps.localAudioMute
+      });
+    }
+  }, {
     key: 'render',
     value: function render() {
       var _this2 = this;

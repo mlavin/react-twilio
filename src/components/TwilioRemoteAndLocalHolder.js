@@ -255,6 +255,7 @@ class TwilioRemoteAndLocalHolder extends Component {
                 disconnectCall={() => { this.props.disconnect() }}
                 showBar={this.hideSecondaryPaticipantsTray}
                 cameraStatus={this.props.cameraStatus}
+                localAudioMute={localAudioMute}
               >
               </VideoControls>
 
