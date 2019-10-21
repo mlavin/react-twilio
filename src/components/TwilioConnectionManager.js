@@ -144,7 +144,7 @@ class TwilioConnectionManager extends Component {
           disconnect={this.disconnectCall.bind(this)}
           remote={remote}
           local={local}
-          localAudioMute={localAudioMute}
+          localAudioMute={initialAudioMute}//{localAudioMute}
           cameraStatus={this.props.initialCamera}
           initialAudioMute = {initialAudioMute}
           localCameraDisabled={localVideoMute}

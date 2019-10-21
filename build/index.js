@@ -13795,8 +13795,8 @@ var TwilioConnectionManager = function (_Component) {
           disconnect: this.disconnectCall.bind(this),
           remote: remote,
           local: local,
-          localAudioMute: localAudioMute,
-          cameraStatus: this.props.initialCamera,
+          localAudioMute: initialAudioMute //{localAudioMute}
+          , cameraStatus: this.props.initialCamera,
           initialAudioMute: initialAudioMute,
           localCameraDisabled: localVideoMute,
           isError: errorTwilio })
