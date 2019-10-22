@@ -13797,7 +13797,6 @@ var TwilioConnectionManager = function (_Component) {
           local: local,
           localAudioMute: initialAudioMute //{localAudioMute}
           , cameraStatus: this.props.initialCamera,
-          initialAudioMute: initialAudioMute,
           localCameraDisabled: localVideoMute,
           isError: errorTwilio })
       );
@@ -28088,7 +28087,7 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
             }).map(function (track) {
               return _react2.default.createElement(_TwilioAudio2.default, {
                 style: { height: '0px', width: '0px' },
-                mute: _this3.props.initialAudioMute, tracks: [track], remote: true, key: track.id });
+                mute: false, tracks: [track], remote: true, key: track.id });
             });
           }),
           !localCameraDisabled && _react2.default.createElement(

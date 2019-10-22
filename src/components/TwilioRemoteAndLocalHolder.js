@@ -227,7 +227,7 @@ class TwilioRemoteAndLocalHolder extends Component {
                     return (
                       <TwilioAudio 
                         style={{height: '0px', width: '0px'}}
-                        mute={this.props.initialAudioMute} tracks={[track]} remote={true} key={track.id}>
+                        mute={false} tracks={[track]} remote={true} key={track.id}>
                       </TwilioAudio>
                     )
                   });

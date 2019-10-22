@@ -146,7 +146,6 @@ class TwilioConnectionManager extends Component {
           local={local}
           localAudioMute={initialAudioMute}//{localAudioMute}
           cameraStatus={this.props.initialCamera}
-          initialAudioMute = {initialAudioMute}
           localCameraDisabled={localVideoMute}
           isError={errorTwilio} />
       </div>
