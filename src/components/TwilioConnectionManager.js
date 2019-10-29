@@ -58,9 +58,10 @@ class TwilioConnectionManager extends Component {
 
   iterateLocalParticipantTracks(localParticipant, initalLocalAudioMute) {
     let tracks = [];
+    const muteLocalAudioMute = initalLocalAudioMute;
     localParticipant.audioTracks.forEach((track, trackId) => {
       track.isAudio = true;
-      if ( initalLocalAudioMute ){ 
+      if ( muteLocalAudioMute ){ 
         track.disable();
       }
       else 

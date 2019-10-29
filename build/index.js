@@ -13684,9 +13684,10 @@ var TwilioConnectionManager = function (_Component) {
     key: 'iterateLocalParticipantTracks',
     value: function iterateLocalParticipantTracks(localParticipant, initalLocalAudioMute) {
       var tracks = [];
+      var muteLocalAudioMute = initalLocalAudioMute;
       localParticipant.audioTracks.forEach(function (track, trackId) {
         track.isAudio = true;
-        if (initalLocalAudioMute) {
+        if (muteLocalAudioMute) {
           track.disable();
         } else track.enable();
         return tracks.push(track);
