@@ -13631,6 +13631,15 @@ var TwilioConnectionManager = function (_Component) {
       this.disconnectCall();
     }
   }, {
+    key: 'componentWillReceiveProps',
+    value: function componentWillReceiveProps(nextProps) {
+      var initalLocalAudioMute = nextProps.initalLocalAudioMute;
+
+      if (!this.localTrackRoom) return;
+
+      this.iterateLocalParticipantTracks(this.localTrackRoom, initalLocalAudioMute);
+    }
+  }, {
     key: 'connectToTwilio',
     value: function () {
       var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(token, roomName, initialCamera, initalLocalAudioMute) {
