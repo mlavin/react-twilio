@@ -18,21 +18,21 @@ class TwilioConnectionManager extends Component {
   }
 
   componentDidMount() {
-    let { token, roomName, initialCamera } = this.props;
-    this.connectToTwilio(token, roomName, initialCamera);
+    let { token, roomName, initialCamera, initalLocalAudioMute } = this.props;
+    this.connectToTwilio(token, roomName, initialCamera, initalLocalAudioMute);
   }
 
   componentWillUnmount() {
     this.disconnectCall();
   }
 
-  async connectToTwilio(token, roomName, initialCamera) {
+  async connectToTwilio(token, roomName, initialCamera, initalLocalAudioMute) {
 
     const tracks = await Video.createLocalTracks({audio: true, video: initialCamera});
     const room = await Video.connect(token, { tracks }).then((roomConnection) => {
       this.localTrackRoom = roomConnection;
       this.setState((prevState) => { return { ...prevState, currentRoom: room }});
-      this.iterateLocalParticipantTracks(roomConnection.localParticipant);
+      this.iterateLocalParticipantTracks(roomConnection.localParticipant, initalLocalAudioMute);
       roomConnection.participants.forEach(this.participantConnected);
       roomConnection.on('participantConnected', this.participantConnected);
       roomConnection.on('participantDisconnected', this.participantDisconnected);
@@ -56,10 +56,15 @@ class TwilioConnectionManager extends Component {
     })
   };
 
-  iterateLocalParticipantTracks(localParticipant) {
+  iterateLocalParticipantTracks(localParticipant, initalLocalAudioMute) {
     let tracks = [];
     localParticipant.audioTracks.forEach((track, trackId) => {
       track.isAudio = true;
+      if ( initalLocalAudioMute ){ 
+        track.disable();
+      }
+      else 
+        track.enable();
       return tracks.push(track);
     });
     localParticipant.videoTracks.forEach((track, trackId) => {
@@ -158,7 +163,8 @@ TwilioConnectionManager.propTypes = {
   token: propTypes.string.isRequired,
   initialCamera: propTypes.bool,
   style: propTypes.object.isRequired,
-  initialAudioMute: propTypes.bool
+  initialAudioMute: propTypes.bool,
+  initalLocalAudioMute: propTypes.bool
 };
 
 TwilioConnectionManager.defaultProps = {

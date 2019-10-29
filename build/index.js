@@ -13620,9 +13620,10 @@ var TwilioConnectionManager = function (_Component) {
       var _props = this.props,
           token = _props.token,
           roomName = _props.roomName,
-          initialCamera = _props.initialCamera;
+          initialCamera = _props.initialCamera,
+          initalLocalAudioMute = _props.initalLocalAudioMute;
 
-      this.connectToTwilio(token, roomName, initialCamera);
+      this.connectToTwilio(token, roomName, initialCamera, initalLocalAudioMute);
     }
   }, {
     key: 'componentWillUnmount',
@@ -13632,7 +13633,7 @@ var TwilioConnectionManager = function (_Component) {
   }, {
     key: 'connectToTwilio',
     value: function () {
-      var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(token, roomName, initialCamera) {
+      var _ref = _asyncToGenerator( /*#__PURE__*/regeneratorRuntime.mark(function _callee(token, roomName, initialCamera, initalLocalAudioMute) {
         var _this2 = this;
 
         var tracks, room;
@@ -13651,7 +13652,7 @@ var TwilioConnectionManager = function (_Component) {
                   _this2.setState(function (prevState) {
                     return _extends({}, prevState, { currentRoom: room });
                   });
-                  _this2.iterateLocalParticipantTracks(roomConnection.localParticipant);
+                  _this2.iterateLocalParticipantTracks(roomConnection.localParticipant, initalLocalAudioMute);
                   roomConnection.participants.forEach(_this2.participantConnected);
                   roomConnection.on('participantConnected', _this2.participantConnected);
                   roomConnection.on('participantDisconnected', _this2.participantDisconnected);
@@ -13673,7 +13674,7 @@ var TwilioConnectionManager = function (_Component) {
         }, _callee, this);
       }));
 
-      function connectToTwilio(_x, _x2, _x3) {
+      function connectToTwilio(_x, _x2, _x3, _x4) {
         return _ref.apply(this, arguments);
       }
 
@@ -13681,10 +13682,13 @@ var TwilioConnectionManager = function (_Component) {
     }()
   }, {
     key: 'iterateLocalParticipantTracks',
-    value: function iterateLocalParticipantTracks(localParticipant) {
+    value: function iterateLocalParticipantTracks(localParticipant, initalLocalAudioMute) {
       var tracks = [];
       localParticipant.audioTracks.forEach(function (track, trackId) {
         track.isAudio = true;
+        if (initalLocalAudioMute) {
+          track.disable();
+        } else track.enable();
         return tracks.push(track);
       });
       localParticipant.videoTracks.forEach(function (track, trackId) {
@@ -13811,7 +13815,8 @@ TwilioConnectionManager.propTypes = {
   token: _propTypes2.default.string.isRequired,
   initialCamera: _propTypes2.default.bool,
   style: _propTypes2.default.object.isRequired,
-  initialAudioMute: _propTypes2.default.bool
+  initialAudioMute: _propTypes2.default.bool,
+  initalLocalAudioMute: _propTypes2.default.bool
 };
 
 TwilioConnectionManager.defaultProps = {
