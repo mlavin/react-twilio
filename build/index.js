@@ -28078,7 +28078,7 @@ var TwilioRemoteAndLocalHolder = function (_Component) {
         )
       ) : _react2.default.createElement(
         'div',
-        null,
+        { style: { position: 'relative' } },
         !showDisconnect && !isError && _react2.default.createElement(
           'div',
           null,
@@ -28342,9 +28342,9 @@ var VideoControls = function (_Component) {
       height: '50px',
       width: '100%',
       left: '25%',
-      position: 'relative',
+      position: 'absolute',
       display: 'block',
-      top: '-50px',
+      bottom: '0px',
       marginLeft: '50%',
       transform: 'translateX(-45%)'
     };
