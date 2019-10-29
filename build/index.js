@@ -13635,20 +13635,10 @@ var TwilioConnectionManager = function (_Component) {
     value: function componentWillReceiveProps(nextProps) {
       var initalLocalAudioMute = nextProps.initalLocalAudioMute;
 
-      var tracks = [];
+
       if (!this.localTrackRoom) return;
 
-      this.localTrackRoom.localParticipant.audioTracks.forEach(function (track, trackId) {
-        track.isAudio = true;
-        if (initalLocalAudioMute) {
-          track.disable();
-        } else track.enable();
-        return tracks.push(track);
-      });
-
-      this.setState(function (prevState) {
-        return _extends({}, prevState, { tracks: _extends({}, prevState.tracks, { local: tracks }) });
-      });
+      this.iterateLocalParticipantTracks(this.localTrackRoom.localParticipant, initalLocalAudioMute);
     }
   }, {
     key: 'connectToTwilio',
