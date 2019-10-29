@@ -28,9 +28,23 @@ class TwilioConnectionManager extends Component {
 
   componentWillReceiveProps(nextProps) {
     const { initalLocalAudioMute } = nextProps;
+    let tracks = [];
     if (!this.localTrackRoom) return;
 
-    this.iterateLocalParticipantTracks(this.localTrackRoom, initalLocalAudioMute);
+    this.localTrackRoom.audioTracks.forEach((track, trackId) => {
+      track.isAudio = true;
+      if ( initalLocalAudioMute ){ 
+        track.disable();
+      }
+      else 
+        track.enable();
+      return tracks.push(track);
+    });
+
+    this.setState((prevState) => {
+      return { ...prevState, tracks: { ...prevState.tracks, local: tracks } }
+    });
+   
   }
 
   async connectToTwilio(token, roomName, initialCamera, initalLocalAudioMute) {
