@@ -1,5 +1,5 @@
-import React, { Component } from 'react';
-import propTypes from 'prop-types';
+import React, { Component } from "react";
+import propTypes from "prop-types";
 
 class TwilioAudio extends Component {
   //This Component demands a video object, which is given to it by the overlying layer as a prop
@@ -25,7 +25,7 @@ class TwilioAudio extends Component {
   }
 
   attachTracksToDOM(tracks) {
-    tracks.forEach((track) => {
+    tracks.forEach(track => {
       if (this.alreadyAdded.indexOf(track.id) == -1) {
         this.alreadyAdded.push(track.id);
         this.audioDiv.appendChild(track.attach());
@@ -35,31 +35,35 @@ class TwilioAudio extends Component {
 
   toggleAudioTrack(tracks) {
     this.mute = this.mute ? false : true;
-    tracks.filter(track => track.isAudio).forEach((track) => {
-      this.mute ? track.disable() : track.enable()
-    });
+    tracks
+      .filter(track => track.isAudio)
+      .forEach(track => {
+        this.mute ? track.disable() : track.enable();
+      });
   }
 
   render() {
     let { tracks, remote, style } = this.props;
     return (
-      <div style={{ height: '0px', width: '0px' }} >
-        {
-          tracks.map((track) => {
-            return <div key={track.id} ref={(div)=>{this.audioDiv=div;}}>
-            </div>
-          })
-        }
+      <div style={{ height: "0px", width: "0px" }}>
+        {tracks.map(track => {
+          return (
+            <div
+              key={track.sid}
+              ref={div => {
+                this.audioDiv = div;
+              }}
+            ></div>
+          );
+        })}
       </div>
-    )
+    );
   }
 }
-
 
 TwilioAudio.propTypes = {
   tracks: propTypes.array.isRequired,
   mute: propTypes.bool
 };
-
 
 export default TwilioAudio;
